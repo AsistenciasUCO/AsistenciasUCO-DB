@@ -22,6 +22,7 @@ PRINT '======================================================================';
 :r /tmp/test/test_attendance_review.sql
 :r /tmp/test/test_usp_crear_coordinador.sql
 :r /tmp/test/test_usp_resolver_solicitud_matricula.sql
+:r /tmp/test/test_authorized_views_rbac.sql
 
 IF @@TRANCOUNT <> 0
 BEGIN

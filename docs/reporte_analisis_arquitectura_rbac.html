@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte Arquitectónico: Seguridad de Datos y Autorización RBAC</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0b0f17;
+            --bg-secondary: #131926;
+            --bg-card: #1a2234;
+            --bg-card-hover: #222c42;
+            --border-color: #2a364f;
+            --border-highlight: #3b82f6;
+            
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            
+            --accent-blue: #3b82f6;
+            --accent-cyan: #06b6d4;
+            --accent-emerald: #10b981;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+            --accent-indigo: #6366f1;
+            
+            --gradient-primary: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+            --gradient-accent: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+            --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 2rem 1rem;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 1100px;
+            width: 100%;
+        }
+
+        /* Header Styling */
+        .header-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2.5rem;
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .header-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: var(--gradient-primary);
+        }
+
+        .badge-container {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 0.35rem 0.75rem;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge-blue { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+        .badge-emerald { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+        .badge-amber { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+
+        .header-title {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.02em;
+        }
+
+        .header-subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            font-weight: 400;
+            margin-bottom: 1.5rem;
+        }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            padding-top: 1.25rem;
+            border-top: 1px solid var(--border-color);
+            font-size: 0.9rem;
+        }
+
+        .meta-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .meta-label {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.25rem;
+        }
+
+        .meta-value {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        /* Section Styling */
+        .section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .section-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--accent-blue);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .section-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        /* Card Grids */
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.25rem;
+            margin-top: 1.25rem;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .card:hover {
+            background: var(--bg-card-hover);
+            border-color: rgba(59, 130, 246, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.75rem;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .card-tag {
+            font-size: 0.7rem;
+            font-family: 'JetBrains Mono', monospace;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .tag-red { background: rgba(244, 63, 94, 0.15); color: #fb7185; }
+        .tag-amber { background: rgba(245, 158, 11, 0.15); color: #fcd34d; }
+        .tag-emerald { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; }
+
+        .card-desc {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        /* Hierarchy Tree Styling */
+        .tree-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            margin: 1.5rem 0;
+            line-height: 1.8;
+            overflow-x: auto;
+        }
+
+        .tree-node { color: #60a5fa; font-weight: 600; }
+        .tree-sub { color: #34d399; }
+        .tree-leaf { color: #fcd34d; }
+
+        /* Accordion / Matrix Cards */
+        .matrix-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .matrix-role {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 0.75rem;
+        }
+
+        .role-pill {
+            padding: 0.25rem 0.6rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .pill-admin { background: rgba(244, 63, 94, 0.2); color: #fda4af; border: 1px solid rgba(244, 63, 94, 0.4); }
+        .pill-dean { background: rgba(168, 85, 247, 0.2); color: #d8b4fe; border: 1px solid rgba(168, 85, 247, 0.4); }
+        .pill-coord { background: rgba(59, 130, 246, 0.2); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); }
+        .pill-teacher { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.4); }
+
+        .rules-list {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .rules-list li {
+            position: relative;
+            padding-left: 1.5rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.92rem;
+            color: var(--text-secondary);
+        }
+
+        .rules-list li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: var(--accent-emerald);
+            font-weight: bold;
+        }
+
+        /* Timeline for Next Steps */
+        .timeline {
+            position: relative;
+            padding-left: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 0.4rem;
+            top: 0.5rem;
+            bottom: 0.5rem;
+            width: 2px;
+            background: var(--border-color);
+        }
+
+        .timeline-step {
+            position: relative;
+            margin-bottom: 1.5rem;
+        }
+
+        .timeline-step::before {
+            content: '';
+            position: absolute;
+            left: -1.5rem;
+            top: 0.35rem;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            box-shadow: 0 0 0 4px var(--bg-secondary);
+        }
+
+        .step-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 0.25rem;
+        }
+
+        .step-desc {
+            font-size: 0.88rem;
+            color: var(--text-secondary);
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem 0;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border-color);
+            margin-top: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        
+        <!-- Header Card -->
+        <header class="header-card">
+            <div class="badge-container">
+                <span class="badge badge-blue">Arquitectura DB</span>
+                <span class="badge badge-emerald">Seguridad RBAC</span>
+                <span class="badge badge-amber">Data-Level Security</span>
+            </div>
+            <h1 class="header-title">Reporte de Análisis Arquitectónico</h1>
+            <p class="header-subtitle">Seguridad a Nivel de Datos, Autorización Jerárquica y Aislamiento de Capas en `gestionasistenciadb`</p>
+            
+            <div class="meta-grid">
+                <div class="meta-item">
+                    <span class="meta-label">Sistema Target</span>
+                    <span class="meta-value">gestionasistenciadb</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Rol Emisor</span>
+                    <span class="meta-value">Arquitecto DB & Data Security Specialist</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Estado de Evaluación</span>
+                    <span class="meta-value">Recomendación Aprobada</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Fecha</span>
+                    <span class="meta-value">Septiembre 2026</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Section 1: Estrategia de Solución -->
+        <section class="section">
+            <div class="section-header">
+                <div class="section-icon">1</div>
+                <h2 class="section-title">Estrategia de Solución Arquitectónica</h2>
+            </div>
+            
+            <p>Para resolver la necesidad de restringir las lecturas según la matriz de roles sin alterar ni sesgar las validaciones de negocio ejecutadas por los procedimientos almacenados internos (<code>*_interno</code>), se evaluaron tres patrones principales de arquitectura:</p>
+
+            <div class="grid-3">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">RLS Nativo Directo</span>
+                        <span class="card-tag tag-red">Alto Riesgo</span>
+                    </div>
+                    <p class="card-desc">Aplicar Row-Level Security directamente sobre <code>uv_*</code> provocaría un acoplamiento crítico: los procedimientos <code>*_interno</code> tendrían filtrados en silencio, provocando falsos negativos y rompiendo las validaciones de negocio.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">SPs de Consulta (`usp_consultar_*`)</span>
+                        <span class="card-tag tag-amber">Intermedio</span>
+                    </div>
+                    <p class="card-desc">Procedimientos orquestadores públicos de lectura con parámetro <code>@idUsuarioEjecutor</code>. Mantiene el estándar canónico pero limita la flexibilidad de consultas dinámicas/paginadas desde la API.</p>
+                </div>
+
+                <div class="card" style="border-color: rgba(16, 185, 129, 0.4);">
+                    <div class="card-header">
+                        <span class="card-title">Capa Dual Vistas (`uv_auth_*`)</span>
+                        <span class="card-tag tag-emerald">Recomendado</span>
+                    </div>
+                    <p class="card-desc">Desacoplamiento total: la capa interna <code>uv_*</code> permanece 100% limpia para el motor interno, mientras la capa externa <code>uv_auth_*</code> resuelve el filtrado jerárquico mediante <code>SESSION_CONTEXT</code>.</p>
+                </div>
+            </div>
+
+            <div style="margin-top: 1.5rem; background: var(--bg-card); padding: 1.25rem; border-radius: 10px; border-left: 4px solid var(--accent-blue);">
+                <h4 style="color: #fff; margin-bottom: 0.5rem; font-size: 1rem;">💡 Justificación de la Elección Arquitectónica</h4>
+                <p style="font-size: 0.9rem; margin-bottom: 0;">Se selecciona el <strong>Patrón de Capa Dual de Vistas Autorizadas (Dual-Layer View Pattern)</strong> respaldado por <strong>SESSION_CONTEXT</strong>. Garantiza que la lógica de procedimientos internos procese el 100% de la información real del sistema, mientras que la exposición a la API/Backend se realiza de forma estrictamente segura mediante el Principio de Mínimo Privilegio.</p>
+            </div>
+        </section>
+
+        <!-- Section 2: Análisis de Impacto -->
+        <section class="section">
+            <div class="section-header">
+                <div class="section-icon">2</div>
+                <h2 class="section-title">Análisis de Impacto Arquitectónico</h2>
+            </div>
+
+            <div class="grid-3">
+                <div class="card">
+                    <h3 class="card-title" style="color: var(--accent-emerald); margin-bottom: 0.5rem;">Impacto en Procedimientos Internos</h3>
+                    <p class="card-desc"><strong>Impacto Nulo de Regresión:</strong> Los 29 procedimientos internos (<code>*_interno</code>) continúan operando sobre la capa de vistas base <code>uv_*</code>. Operaciones críticas como verificación de cruce de horarios, cupos o prerrequisitos no sufren ninguna alteración.</p>
+                </div>
+
+                <div class="card">
+                    <h3 class="card-title" style="color: var(--accent-cyan); margin-bottom: 0.5rem;">Impacto en Procedimientos Públicos</h3>
+                    <p class="card-desc"><strong>Firma Canónica Unificada:</strong> Los 24 procedimientos públicos mantienen el parámetro opcional <code>@idUsuarioEjecutor UNIQUEIDENTIFIER = NULL</code>. Para escrituras validan RBAC explícito; para lecturas masivas pueden consumir las vistas autorizadas.</p>
+                </div>
+
+                <div class="card">
+                    <h3 class="card-title" style="color: var(--accent-indigo); margin-bottom: 0.5rem;">Impacto en Permisos (Hardening)</h3>
+                    <p class="card-desc"><strong>Exposición Controlada:</strong> Se revocan los permisos de <code>SELECT</code> directo a las aplicaciones sobre <code>dbo.*</code> y <code>uv_*</code>. La API sólo tendrá permisos de lectura sobre la capa <code>uv_auth_*</code> y ejecución sobre <code>usp_*</code>.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 3: Mapeo de Jerarquías -->
+        <section class="section">
+            <div class="section-header">
+                <div class="section-icon">3</div>
+                <h2 class="section-title">Mapeo de Jerarquías y Trazo de Custodia</h2>
+            </div>
+
+            <p>Para inferir la visibilidad sin duplicar lógica, las vistas autorizadas navegan el árbol de dominio institucional de forma determinista:</p>
+
+            <div class="tree-container">
+                <div class="tree-node">[Institución] (Macro Dominio / ADMINISTRADOR)</div>
+                <div> ├── <span class="tree-sub">[Periodo Académico]</span></div>
+                <div> └── <span class="tree-node">[Facultad]</span> (Creada por Administrador)</div>
+                <div>      └── <span class="tree-node">[Decano]</span> (DECANO / Dominio Facultad)</div>
+                <div>           └── <span class="tree-node">[Programa Académico]</span> (Registrado por Decano)</div>
+                <div>                └── <span class="tree-node">[Coordinador]</span> (COORDINADOR / Dominio Programa)</div>
+                <div>                     ├── <span class="tree-sub">[PlanEstudio / Asignatura]</span></div>
+                <div>                     └── <span class="tree-node">[Grupo Académico]</span></div>
+                <div>                          └── <span class="tree-leaf">[Docente Titular]</span> (DOCENTE / Dominio Grupo)</div>
+                <div>                               └── <span class="tree-leaf">[Sesión de Clase]</span></div>
+                <div>                                    ├── <span class="tree-sub">[EstudianteGrupo / Asistencia]</span></div>
+                <div>                                    └── <span class="tree-sub">[SolicitudRevisionAsistencia]</span></div>
+            </div>
+
+            <!-- Role Matrix Cards -->
+            <div class="matrix-card">
+                <div class="matrix-role">
+                    <span class="role-pill pill-admin">ADMINISTRADOR</span>
+                    <span>Dominio Institucional</span>
+                </div>
+                <ul class="rules-list">
+                    <li>Consulta limitada a datos propios de usuario y entidades asociadas a su Institución.</li>
+                    <li>Visibilidad sobre Decanos, Facultades y Periodos Académicos pertenecientes exclusivamente a su Institución.</li>
+                </ul>
+            </div>
+
+            <div class="matrix-card">
+                <div class="matrix-role">
+                    <span class="role-pill pill-dean">DECANO</span>
+                    <span>Dominio de Facultad</span>
+                </div>
+                <ul class="rules-list">
+                    <li>Consulta limitada a su usuario y a Coordinadores de su Facultad.</li>
+                    <li>Acceso a Programas, Docentes, Estudiantes, Grupos, Sesiones y Asistencias adscritos a su Facultad.</li>
+                </ul>
+            </div>
+
+            <div class="matrix-card">
+                <div class="matrix-role">
+                    <span class="role-pill pill-coord">COORDINADOR</span>
+                    <span>Dominio de Programa</span>
+                </div>
+                <ul class="rules-list">
+                    <li>Acceso limitado a su usuario, Programas que coordina y Docentes/Estudiantes de su Programa.</li>
+                    <li>Control de lecturas sobre Grupos, Sesiones, Asistencias y Solicitudes de Revisión de su Programa.</li>
+                </ul>
+            </div>
+
+            <div class="matrix-card">
+                <div class="matrix-role">
+                    <span class="role-pill pill-teacher">DOCENTE</span>
+                    <span>Dominio de Grupo / Cátedra</span>
+                </div>
+                <ul class="rules-list">
+                    <li>Acceso limitado a su usuario y a los Estudiantes inscritos en sus grupos asignados.</li>
+                    <li>Consulta restringida exclusivamente a Grupos, Sesiones, Asistencias y Solicitudes de sus asignaturas a cargo.</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Section 4: Próximos Pasos -->
+        <section class="section">
+            <div class="section-header">
+                <div class="section-icon">4</div>
+                <h2 class="section-title">Próximos Pasos Recomendados</h2>
+            </div>
+
+            <div class="timeline">
+                <div class="timeline-step">
+                    <div class="step-title">Fase 1: Estandarización de SESSION_CONTEXT</div>
+                    <div class="step-desc">Definir el mecanismo de conexión desde la API para inyectar <code>SESSION_CONTEXT('idUsuarioEjecutor')</code> al iniciar la conexión DB.</div>
+                </div>
+
+                <div class="timeline-step">
+                    <div class="step-title">Fase 2: Construcción de Vistas Autorizadas (`uv_auth_*`)</div>
+                    <div class="step-desc">Crear las vistas de lectura externa aplicando los filtros de custodia jerárquica sobre cada entidad del sistema.</div>
+                </div>
+
+                <div class="timeline-step">
+                    <div class="step-title">Fase 3: Refactorización de Esquema de Permisos (Hardening)</div>
+                    <div class="step-desc">Revocar permisos de lectura sobre <code>dbo.*</code> y <code>uv_*</code> para el usuario de aplicación, concediendo acceso únicamente a <code>uv_auth_*</code> y <code>usp_*</code>.</div>
+                </div>
+
+                <div class="timeline-step">
+                    <div class="step-title">Fase 4: Verificación de Calidad y Pruebas RBAC (`test_suite.sql`)</div>
+                    <div class="step-desc">Incorporar pruebas automáticas en la suite de calidad que verifiquen el cumplimiento del 100% de la matriz de autorización con resultado <code>DB GATE PASS</code>.</div>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <p>Reporte Técnico de Arquitectura &bull; Base de Datos `gestionasistenciadb` &bull; 2026</p>
+        </footer>
+
+    </div>
+</body>
+</html>

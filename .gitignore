@@ -1,2 +1,5 @@
 # Configuración local de entorno
 .env
+
+# Archivos y directorio temporal de scratch
+scratch/

@@ -1,0 +1,14 @@
+USE [gestionasistenciadb];
+GO
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
+
+CREATE OR ALTER FUNCTION [dbo].[ufn_obtener_usuario_ejecutor_contexto] ()
+RETURNS UNIQUEIDENTIFIER
+AS
+BEGIN
+    RETURN TRY_CAST(SESSION_CONTEXT(N'idUsuarioEjecutor') AS UNIQUEIDENTIFIER);
+END;
+GO
