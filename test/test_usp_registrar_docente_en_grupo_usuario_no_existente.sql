@@ -7,7 +7,8 @@ DECLARE @tipoId UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_tipo_identificac
 DECLARE @grupo UNIQUEIDENTIFIER, @originalTeacher UNIQUEIDENTIFIER;
 SELECT TOP 1 @grupo = id, @originalTeacher = idDocente
 FROM dbo.uv_grupo WHERE grupoEstaHablitado = 1 ORDER BY cuposDisponibles DESC;
-IF @tipoId IS NULL OR @grupo IS NULL OR @originalTeacher IS NULL
+DECLARE @idUsuarioCoordinadorEjecutor UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_coordinador_identidad WHERE estaActivoUsuario = 1);
+IF @tipoId IS NULL OR @grupo IS NULL OR @originalTeacher IS NULL OR @idUsuarioCoordinadorEjecutor IS NULL
     THROW 51610, 'TEST FAILED: TEACHER_SUCCESS fixture missing.', 1;
 
 DECLARE @correo NVARCHAR(255) = CONCAT(N'qa.teacher.', REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), N'@test.local');
@@ -28,7 +29,7 @@ BEGIN TRY
         @primerApellido = N'Quality', @segundoApellido = N'Gate',
         @primerNombre = N'Docente', @segundoNombre = N'Success',
         @correo = @correo, @password = N'HashBackend_QaTeacher1234567890',
-        @idGrupo = @grupo, @idCorrelacion = @corr;
+        @idGrupo = @grupo, @idCorrelacion = @corr, @idUsuarioEjecutor = @idUsuarioCoordinadorEjecutor;
 
     DECLARE @expectedUser NVARCHAR(4000), @expectedTech NVARCHAR(4000);
     EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = 'GEN_005', @p_param1 = 'Docente en Grupo',
@@ -72,9 +73,11 @@ DECLARE @missingGroup UNIQUEIDENTIFIER = NEWID(), @corr UNIQUEIDENTIFIER = NEWID
 DECLARE @correo NVARCHAR(255) = CONCAT(N'qa.teacher.missing.', REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), N'@test.local');
 DECLARE @numero INT = 1500000000 + ABS(CHECKSUM(NEWID()) % 400000000);
 DECLARE @userMsg NVARCHAR(4000), @techMsg NVARCHAR(4000);
+DECLARE @idUsuarioCoordinadorEjecutor UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_coordinador_identidad WHERE estaActivoUsuario = 1);
 DECLARE @usersBefore INT = (SELECT COUNT(*) FROM dbo.Usuario);
 DECLARE @teachersBefore INT = (SELECT COUNT(*) FROM dbo.Docente);
 DECLARE @groupsBefore INT = (SELECT COUNT(*) FROM dbo.Grupo);
+IF @idUsuarioCoordinadorEjecutor IS NULL THROW 51620, 'TEST FAILED: TEACHER_GROUP_NOT_FOUND fixture missing coordinator.', 1;
 EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = 'ERR_GRUPO_NO_EXISTE',
     @p_param1 = @missingGroup, @mensajeUsuarioResultado = @userMsg OUTPUT,
     @mensajeTecnicoResultado = @techMsg OUTPUT;
@@ -86,7 +89,7 @@ EXEC dbo.usp_registrar_docente_en_grupo
     @primerApellido = N'Quality', @segundoApellido = N'Gate',
     @primerNombre = N'Docente', @segundoNombre = N'Missing',
     @correo = @correo, @password = N'HashBackend_QaTeacher1234567890',
-    @idGrupo = @missingGroup, @idCorrelacion = @corr;
+    @idGrupo = @missingGroup, @idCorrelacion = @corr, @idUsuarioEjecutor = @idUsuarioCoordinadorEjecutor;
 PRINT 'TEST_RESULT_END:TEACHER_GROUP_NOT_FOUND';
 IF EXISTS (SELECT 1 FROM dbo.Usuario WHERE correo = @correo)
     THROW 51615, 'TEST FAILED: TEACHER_GROUP_NOT_FOUND left partial Usuario.', 1;

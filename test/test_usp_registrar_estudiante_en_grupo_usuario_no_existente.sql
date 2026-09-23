@@ -10,8 +10,9 @@ DECLARE @numero INT = 1000000000 + ABS(CHECKSUM(NEWID()) % 500000000);
 DECLARE @corr UNIQUEIDENTIFIER = NEWID();
 DECLARE @usuario UNIQUEIDENTIFIER;
 DECLARE @estudiante UNIQUEIDENTIFIER;
+DECLARE @idUsuarioEstudianteEjecutor UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_estudiante_identidad WHERE estaActivoUsuario = 1);
 
-IF @tipoId IS NULL OR @grupo IS NULL THROW 51100, 'TEST FAILED: STUDENT_SUCCESS fixture missing.', 1;
+IF @tipoId IS NULL OR @grupo IS NULL OR @idUsuarioEstudianteEjecutor IS NULL THROW 51100, 'TEST FAILED: STUDENT_SUCCESS fixture missing.', 1;
 
 CREATE TABLE #studentResult (
     idCorrelacion UNIQUEIDENTIFIER NULL,
@@ -27,7 +28,7 @@ BEGIN TRY
         @primerApellido = N'Quality', @segundoApellido = N'Gate',
         @primerNombre = N'Estudiante', @segundoNombre = N'Success',
         @correo = @correo, @password = N'HashBackend_QaStudent1234567890',
-        @idGrupo = @grupo, @idCorrelacion = @corr;
+        @idGrupo = @grupo, @idCorrelacion = @corr, @idUsuarioEjecutor = @idUsuarioEstudianteEjecutor;
 
     DECLARE @expectedUser NVARCHAR(4000), @expectedTech NVARCHAR(4000);
     SELECT @usuario = id FROM dbo.Usuario WHERE correo = @correo;
@@ -66,7 +67,7 @@ BEGIN TRY
         @primerApellido = N'Duplicado', @segundoApellido = N'Gate',
         @primerNombre = N'Estudiante', @segundoNombre = N'QA',
         @correo = @correo, @password = N'HashBackend_QaStudent1234567890',
-        @idGrupo = @grupo, @idCorrelacion = @dupCorr;
+        @idGrupo = @grupo, @idCorrelacion = @dupCorr, @idUsuarioEjecutor = @idUsuarioEstudianteEjecutor;
     PRINT 'TEST_RESULT_END:STUDENT_DUPLICATE';
     IF NOT EXISTS (SELECT 1 FROM dbo.Usuario WHERE id = @usuario AND primerApellido = N'Quality')
         THROW 51105, 'TEST FAILED: STUDENT_DUPLICATE changed the existing user.', 1;
@@ -108,10 +109,12 @@ DECLARE @missingGroup UNIQUEIDENTIFIER = NEWID(), @corr UNIQUEIDENTIFIER = NEWID
 DECLARE @correo NVARCHAR(255) = CONCAT(N'qa.student.missing.', REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), N'@test.local');
 DECLARE @numero INT = 1000000000 + ABS(CHECKSUM(NEWID()) % 500000000);
 DECLARE @userMsg NVARCHAR(4000), @techMsg NVARCHAR(4000);
+DECLARE @idUsuarioEstudianteEjecutor UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_estudiante_identidad WHERE estaActivoUsuario = 1);
 DECLARE @usersBefore INT = (SELECT COUNT(*) FROM dbo.Usuario);
 DECLARE @studentsBefore INT = (SELECT COUNT(*) FROM dbo.Estudiante);
 DECLARE @linksBefore INT = (SELECT COUNT(*) FROM dbo.EstudianteGrupo);
 DECLARE @programsBefore INT = (SELECT COUNT(*) FROM dbo.EstudiantePrograma);
+IF @idUsuarioEstudianteEjecutor IS NULL THROW 51121, 'TEST FAILED: STUDENT_GROUP_NOT_FOUND executor fixture missing.', 1;
 EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = 'ERR_GRUPO_NO_EXISTE',
     @p_param1 = @missingGroup, @mensajeUsuarioResultado = @userMsg OUTPUT,
     @mensajeTecnicoResultado = @techMsg OUTPUT;
@@ -123,7 +126,7 @@ EXEC dbo.usp_registrar_estudiante_en_grupo
     @primerApellido = N'Quality', @segundoApellido = N'Gate',
     @primerNombre = N'Estudiante', @segundoNombre = N'Missing',
     @correo = @correo, @password = N'HashBackend_QaStudent1234567890',
-    @idGrupo = @missingGroup, @idCorrelacion = @corr;
+    @idGrupo = @missingGroup, @idCorrelacion = @corr, @idUsuarioEjecutor = @idUsuarioEstudianteEjecutor;
 PRINT 'TEST_RESULT_END:STUDENT_GROUP_NOT_FOUND';
 IF EXISTS (SELECT 1 FROM dbo.Usuario WHERE correo = @correo)
     THROW 51108, 'TEST FAILED: STUDENT_GROUP_NOT_FOUND left a partial Usuario.', 1;
@@ -148,7 +151,8 @@ DECLARE @period UNIQUEIDENTIFIER = NEWID(), @closedGroup UNIQUEIDENTIFIER = NEWI
 DECLARE @correo NVARCHAR(255) = CONCAT(N'qa.student.closed.', REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), N'@test.local');
 DECLARE @numero INT = 1000000000 + ABS(CHECKSUM(NEWID()) % 500000000);
 DECLARE @userMsg NVARCHAR(4000), @techMsg NVARCHAR(4000);
-IF @baseGroup IS NULL OR @institution IS NULL THROW 51110, 'TEST FAILED: STUDENT_GROUP_DISABLED fixture missing.', 1;
+DECLARE @idUsuarioEstudianteEjecutor UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_estudiante_identidad WHERE estaActivoUsuario = 1);
+IF @baseGroup IS NULL OR @institution IS NULL OR @idUsuarioEstudianteEjecutor IS NULL THROW 51110, 'TEST FAILED: STUDENT_GROUP_DISABLED fixture missing.', 1;
 BEGIN TRANSACTION;
 BEGIN TRY
     INSERT dbo.PeriodoAcademico (id, institucion, nombre, codigo, fechaInicio, fechaFin, anio)
@@ -173,7 +177,7 @@ BEGIN TRY
         @primerApellido = N'Quality', @segundoApellido = N'Gate',
         @primerNombre = N'Estudiante', @segundoNombre = N'Closed',
         @correo = @correo, @password = N'HashBackend_QaStudent1234567890',
-        @idGrupo = @closedGroup, @idCorrelacion = @corr;
+        @idGrupo = @closedGroup, @idCorrelacion = @corr, @idUsuarioEjecutor = @idUsuarioEstudianteEjecutor;
     PRINT 'TEST_RESULT_END:STUDENT_GROUP_DISABLED';
     IF EXISTS (SELECT 1 FROM dbo.Usuario WHERE correo = @correo)
         THROW 51111, 'TEST FAILED: STUDENT_GROUP_DISABLED left partial Usuario.', 1;
@@ -206,7 +210,8 @@ DECLARE @fullGroup UNIQUEIDENTIFIER = NEWID(), @corr UNIQUEIDENTIFIER = NEWID();
 DECLARE @correo NVARCHAR(255) = CONCAT(N'qa.student.full.', REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), N'@test.local');
 DECLARE @numero INT = 1000000000 + ABS(CHECKSUM(NEWID()) % 500000000);
 DECLARE @userMsg NVARCHAR(4000), @techMsg NVARCHAR(4000);
-IF @baseGroup IS NULL OR @existingStudent IS NULL OR @activeState IS NULL
+DECLARE @idUsuarioEstudianteEjecutor UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_estudiante_identidad WHERE estaActivoUsuario = 1);
+IF @baseGroup IS NULL OR @existingStudent IS NULL OR @activeState IS NULL OR @idUsuarioEstudianteEjecutor IS NULL
     THROW 51113, 'TEST FAILED: STUDENT_CAPACITY_EXCEEDED fixture missing.', 1;
 BEGIN TRANSACTION;
 BEGIN TRY
@@ -232,7 +237,7 @@ BEGIN TRY
         @primerApellido = N'Quality', @segundoApellido = N'Gate',
         @primerNombre = N'Estudiante', @segundoNombre = N'Full',
         @correo = @correo, @password = N'HashBackend_QaStudent1234567890',
-        @idGrupo = @fullGroup, @idCorrelacion = @corr;
+        @idGrupo = @fullGroup, @idCorrelacion = @corr, @idUsuarioEjecutor = @idUsuarioEstudianteEjecutor;
     PRINT 'TEST_RESULT_END:STUDENT_CAPACITY_EXCEEDED';
     IF EXISTS (SELECT 1 FROM dbo.Usuario WHERE correo = @correo)
         THROW 51114, 'TEST FAILED: STUDENT_CAPACITY_EXCEEDED left partial Usuario.', 1;

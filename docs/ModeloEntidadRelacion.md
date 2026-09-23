@@ -144,10 +144,12 @@ erDiagram
         UUID asignatura FK
         UUID periodoAcademico FK
         UUID docente FK
+        INT codigo
         NVARCHAR nombre
-        INT cupoMaximo
-        NVARCHAR aula
-        BIT estado
+        INT cantidadEstudiantes
+        INT cantidadEstudiantesFinalizaron
+        INT cantidadEstudiantesCancelaronVoluntadPropia
+        INT cantidadEstudiantesCancelaronAutomaticamente
     }
 
     EstadoEstudianteGrupo {
@@ -187,13 +189,13 @@ erDiagram
 
     Sesion {
         UUID id PK
+        NVARCHAR nombre
+        INT numero
+        NVARCHAR codigo
+        INT numeroSemana
         UUID grupo FK
         DATETIME fechaHoraInicio
         DATETIME fechaHoraFin
-        NVARCHAR descripcion
-        NVARCHAR aula
-        NVARCHAR tipo
-        BIT estado
     }
 
     Asistencia {

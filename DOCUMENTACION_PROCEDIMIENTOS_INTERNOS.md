@@ -96,16 +96,17 @@ Esta documentación especifica la arquitectura, reglas de negocio, contrato de f
 - **Parámetros de Entrada**:
   - `@idEstudiante UNIQUEIDENTIFIER`
   - `@idSesion UNIQUEIDENTIFIER`
-  - `@codigoEstado NVARCHAR(5)`: `'A'`, `'F'`, `'T'`, `'J'`.
+  - `@codigoEstado NVARCHAR(5)`: código canónico de `dbo.RazonCausa` (`'AN'`, `'SJC'`, `'EX'`). Alias legacy **solo internos**: `'A'` → `AN` y `'F'` → `SJC` (callers `usp_registrar_asistencia_estudiante*`); el batch público los rechaza antes de llegar aquí.
   - `@idCorrelacion UNIQUEIDENTIFIER`
 - **Parámetros de Salida**: `@mensajeUsuarioResultado`, `@mensajeTecnicoResultado`, `@estadoResultado`.
-- **Códigos de Catálogo Consumidos**: `SES_001`, `EST_004`, `GEN_004`, `SYS_001`.
+- **Códigos de Catálogo Consumidos**: `SES_001`, `EST_004`, `RC_001`, `GEN_004`, `SYS_001`.
+- **Catálogo cerrado**: un código inexistente en `dbo.RazonCausa` responde `RC_001` (`estadoResultado = 0`); **no** inserta ni actualiza `RazonCausa`. `asistio = 1` solo para `AN`.
 - **Flujo de Ejecución**:
   1. PASO 1: Validación de correlación.
   2. PASO 2: Asignación por defecto de código de estado (`'A'`).
   3. PASO 3: Verificación de existencia de la sesión y franja horaria.
   4. PASO 4: Verificación de la matrícula del estudiante en el grupo.
-  5. PASO 5: Resolución de razón causa (`dbo.RazonCausa`).
+  5. PASO 5: Resolución de la razón causa **existente** en `dbo.RazonCausa` (sin creación dinámica; `RC_001` si no existe).
   6. PASO 6: Inserción/actualización de cabecera (`dbo.Asistencia`) y detalle (`dbo.DetalleAsistencia`).
 
 ---

@@ -9,10 +9,15 @@ PRINT 'TEST START: test_transaction_ownership';
 DECLARE @tipoId UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_tipo_identificacion WHERE tipoIdentificacion = 'CC');
 DECLARE @idPrograma UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_programa);
 DECLARE @idFacultad UNIQUEIDENTIFIER = (SELECT TOP 1 idFacultad FROM dbo.uv_programa WHERE id = @idPrograma);
+DECLARE @studentUser UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_estudiante_identidad WHERE estaActivoUsuario = 1);
+DECLARE @coordinatorUser UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_coordinador_identidad WHERE estaActivoUsuario = 1);
+DECLARE @deanUser UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_decano_identidad WHERE estaActivoUsuario = 1);
+DECLARE @adminUser UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_administrador WHERE estaActivoUsuario = 1);
 
 IF @tipoId IS NULL THROW 51500, 'TEST FAILED: no existe fixture CC.', 1;
 IF @idPrograma IS NULL THROW 51501, 'TEST FAILED: no existe fixture uv_programa.', 1;
 IF @idFacultad IS NULL THROW 51502, 'TEST FAILED: programa no expone facultad.', 1;
+IF @studentUser IS NULL OR @coordinatorUser IS NULL OR @deanUser IS NULL OR @adminUser IS NULL THROW 51512, 'TEST FAILED: ownership executor fixtures missing.', 1;
 
 BEGIN TRANSACTION;
 BEGIN TRY
@@ -29,7 +34,8 @@ BEGIN TRY
         @correo = @correoEst,
         @password = N'HashBackend_QaOwnership1234567890',
         @idGrupo = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-        @idCorrelacion = @corrEst;
+        @idCorrelacion = @corrEst,
+        @idUsuarioEjecutor = @studentUser;
 
     IF @@TRANCOUNT <> @beforeEst THROW 51503, 'TEST FAILED: estudiante hizo rollback/commit total de transaccion externa.', 1;
     IF EXISTS (SELECT 1 FROM dbo.Usuario WHERE correo = @correoEst) THROW 51504, 'TEST FAILED: estudiante dejo Usuario parcial tras rollback a savepoint.', 1;
@@ -57,7 +63,8 @@ BEGIN TRY
         @correo = @correoDoc,
         @password = N'HashBackend_QaOwnership1234567890',
         @idGrupo = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-        @idCorrelacion = @corrDoc;
+        @idCorrelacion = @corrDoc,
+        @idUsuarioEjecutor = @coordinatorUser;
 
     IF @@TRANCOUNT <> @beforeDoc THROW 51505, 'TEST FAILED: docente hizo rollback/commit total de transaccion externa.', 1;
     IF EXISTS (SELECT 1 FROM dbo.Usuario WHERE correo = @correoDoc) THROW 51506, 'TEST FAILED: docente dejo Usuario parcial tras rollback a savepoint.', 1;
@@ -87,7 +94,8 @@ BEGIN TRY
         @idPrograma = @idPrograma,
         @idFacultad = @idFacultad,
         @password = NULL,
-        @idCorrelacion = @corrCoord;
+        @idCorrelacion = @corrCoord,
+        @idUsuarioEjecutor = @deanUser;
 
     IF @@TRANCOUNT <> @beforeCoord THROW 51507, 'TEST FAILED: coordinador hizo rollback/commit total de transaccion externa.', 1;
     IF EXISTS (SELECT 1 FROM dbo.Usuario WHERE correo = @correoCoord) THROW 51508, 'TEST FAILED: coordinador dejo Usuario parcial tras fallo post-savepoint.', 1;
@@ -116,7 +124,8 @@ BEGIN TRY
         @idFacultad = @idFacultad,
         @nombreFacultad = NULL,
         @password = NULL,
-        @idCorrelacion = @corrDec;
+        @idCorrelacion = @corrDec,
+        @idUsuarioEjecutor = @adminUser;
 
     IF @@TRANCOUNT <> @beforeDec THROW 51509, 'TEST FAILED: decano hizo rollback/commit total de transaccion externa.', 1;
     IF EXISTS (SELECT 1 FROM dbo.Usuario WHERE correo = N'ownership.decano@test.local') THROW 51510, 'TEST FAILED: decano dejo Usuario parcial tras fallo post-savepoint.', 1;

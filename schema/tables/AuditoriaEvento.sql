@@ -1,298 +1,125 @@
 USE [gestionasistenciadb];
-
-
 GO
 SET ANSI_NULLS ON;
-
-
 GO
 SET QUOTED_IDENTIFIER ON;
-
-
 GO
+
 IF OBJECT_ID('dbo.[AuditoriaEvento]', 'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[AuditoriaEvento] (
+        [id]            UNIQUEIDENTIFIER   NOT NULL,
+        [occurredAt]    DATETIMEOFFSET (7) NOT NULL,
+        [actorId]       NVARCHAR (120)     NULL,
+        [actorType]     VARCHAR (20)       NOT NULL,
+        [action]        VARCHAR (120)      NOT NULL,
+        [resourceType]  VARCHAR (120)      NOT NULL,
+        [resourceId]    NVARCHAR (120)     NULL,
+        [result]        VARCHAR (20)       NOT NULL,
+        [correlationId] UNIQUEIDENTIFIER   NULL,
+        [traceId]       CHAR (32)          NULL,
+        [spanId]        CHAR (16)          NULL,
+        [httpMethod]    VARCHAR (16)       NOT NULL,
+        [path]          NVARCHAR (240)     NOT NULL,
+        [httpStatus]    SMALLINT           NOT NULL,
+        [clientIp]      VARCHAR (45)       NULL,
+        [errorCode]     VARCHAR (120)      NULL,
+        [metadata]      NVARCHAR (MAX)     NULL,
+        CONSTRAINT [PK_AuditoriaEvento] PRIMARY KEY CLUSTERED ([id]),
+        CONSTRAINT [CK_AuditoriaEvento_ActorType] CHECK ([actorType] IN ('USER', 'ANONYMOUS', 'SYSTEM')),
+        CONSTRAINT [CK_AuditoriaEvento_Result] CHECK ([result] IN ('SUCCESS', 'FAILURE')),
+        CONSTRAINT [CK_AuditoriaEvento_HttpStatus] CHECK ([httpStatus] >= 100 AND [httpStatus] <= 599),
+        CONSTRAINT [CK_AuditoriaEvento_MetadataJson] CHECK ([metadata] IS NULL OR ISJSON([metadata]) = 1)
+    );
+END
+ELSE
+BEGIN
+    IF (SELECT COUNT(1) FROM sys.columns WHERE [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')) <> 17
+       OR EXISTS (
+            SELECT 1
+            FROM (VALUES
+                (N'id',            N'uniqueidentifier', CONVERT(SMALLINT, 16), CONVERT(TINYINT, 0), CONVERT(BIT, 0)),
+                (N'occurredAt',    N'datetimeoffset',   CONVERT(SMALLINT, 10), CONVERT(TINYINT, 7), CONVERT(BIT, 0)),
+                (N'actorId',       N'nvarchar',         CONVERT(SMALLINT, 240), CONVERT(TINYINT, 0), CONVERT(BIT, 1)),
+                (N'actorType',     N'varchar',          CONVERT(SMALLINT, 20), CONVERT(TINYINT, 0), CONVERT(BIT, 0)),
+                (N'action',        N'varchar',          CONVERT(SMALLINT, 120), CONVERT(TINYINT, 0), CONVERT(BIT, 0)),
+                (N'resourceType',  N'varchar',          CONVERT(SMALLINT, 120), CONVERT(TINYINT, 0), CONVERT(BIT, 0)),
+                (N'resourceId',    N'nvarchar',         CONVERT(SMALLINT, 240), CONVERT(TINYINT, 0), CONVERT(BIT, 1)),
+                (N'result',        N'varchar',          CONVERT(SMALLINT, 20), CONVERT(TINYINT, 0), CONVERT(BIT, 0)),
+                (N'correlationId', N'uniqueidentifier', CONVERT(SMALLINT, 16), CONVERT(TINYINT, 0), CONVERT(BIT, 1)),
+                (N'traceId',       N'char',             CONVERT(SMALLINT, 32), CONVERT(TINYINT, 0), CONVERT(BIT, 1)),
+                (N'spanId',        N'char',             CONVERT(SMALLINT, 16), CONVERT(TINYINT, 0), CONVERT(BIT, 1)),
+                (N'httpMethod',    N'varchar',          CONVERT(SMALLINT, 16), CONVERT(TINYINT, 0), CONVERT(BIT, 0)),
+                (N'path',          N'nvarchar',         CONVERT(SMALLINT, 480), CONVERT(TINYINT, 0), CONVERT(BIT, 0)),
+                (N'httpStatus',    N'smallint',         CONVERT(SMALLINT, 2), CONVERT(TINYINT, 0), CONVERT(BIT, 0)),
+                (N'clientIp',      N'varchar',          CONVERT(SMALLINT, 45), CONVERT(TINYINT, 0), CONVERT(BIT, 1)),
+                (N'errorCode',     N'varchar',          CONVERT(SMALLINT, 120), CONVERT(TINYINT, 0), CONVERT(BIT, 1)),
+                (N'metadata',      N'nvarchar',         CONVERT(SMALLINT, -1), CONVERT(TINYINT, 0), CONVERT(BIT, 1))
+            ) AS expected([name], [type_name], [max_length], [scale], [is_nullable])
+            LEFT JOIN sys.columns c
+              ON c.[object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
+             AND c.[name] = expected.[name]
+            LEFT JOIN sys.types t
+              ON t.user_type_id = c.user_type_id
+            WHERE c.[column_id] IS NULL
+               OR t.[name] <> expected.[type_name]
+               OR c.[max_length] <> expected.[max_length]
+               OR c.[is_nullable] <> expected.[is_nullable]
+               OR (expected.[scale] <> 0 AND c.[scale] <> expected.[scale])
+       )
+       OR NOT EXISTS (
+            SELECT 1 FROM sys.key_constraints
+            WHERE [parent_object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
+              AND [name] = N'PK_AuditoriaEvento'
+              AND [type] = 'PK'
+       )
+       OR (SELECT COUNT(1)
+           FROM sys.check_constraints
+           WHERE [parent_object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
+             AND [name] IN (
+                 N'CK_AuditoriaEvento_ActorType',
+                 N'CK_AuditoriaEvento_Result',
+                 N'CK_AuditoriaEvento_HttpStatus',
+                 N'CK_AuditoriaEvento_MetadataJson'
+             )) <> 4
     BEGIN
-        CREATE TABLE [dbo].[AuditoriaEvento] (
-            [id]            UNIQUEIDENTIFIER   NOT NULL,
-            [occurredAt]    DATETIMEOFFSET (7) NOT NULL,
-            [actorId]       NVARCHAR (120)     NULL,
-            [actorType]     VARCHAR (20)       NOT NULL,
-            [action]        VARCHAR (120)      NOT NULL,
-            [resourceType]  VARCHAR (120)      NOT NULL,
-            [resourceId]    NVARCHAR (120)     NULL,
-            [result]        VARCHAR (20)       NOT NULL,
-            [correlationId] UNIQUEIDENTIFIER   NULL,
-            [traceId]       CHAR (32)          NULL,
-            [spanId]        CHAR (16)          NULL,
-            [httpMethod]    VARCHAR (16)       NOT NULL,
-            [path]          NVARCHAR (240)     NOT NULL,
-            [httpStatus]    SMALLINT           NOT NULL,
-            [clientIp]      VARCHAR (45)       NULL,
-            [errorCode]     VARCHAR (120)      NULL,
-            [metadata]      NVARCHAR (MAX)     NULL,
-            CONSTRAINT [PK_AuditoriaEvento] PRIMARY KEY CLUSTERED ([id]),
-            CONSTRAINT [CK_AuditoriaEvento_ActorType] CHECK ([actorType] IN ('USER', 'ANONYMOUS', 'SYSTEM')),
-            CONSTRAINT [CK_AuditoriaEvento_Result] CHECK ([result] IN ('SUCCESS', 'FAILURE')),
-            CONSTRAINT [CK_AuditoriaEvento_HttpStatus] CHECK ([httpStatus] >= 100
-                                                              AND [httpStatus] <= 599),
-            CONSTRAINT [CK_AuditoriaEvento_MetadataJson] CHECK ([metadata] IS NULL
-                                                                OR ISJSON([metadata]) = 1)
-        );
+        THROW 51000, 'SCHEMA_CONTRACT_CONFLICT: dbo.AuditoriaEvento shape differs from DB baseline.', 1;
     END
-
-
+END
 GO
-IF OBJECT_ID('dbo.[AuditoriaEvento]', 'U') IS NOT NULL
-    BEGIN
-        IF EXISTS (SELECT 1
-                   FROM   sys.indexes
-                   WHERE  [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                          AND [name] COLLATE Latin1_General_BIN2 IN (N'IX_AuditoriaEvento_occurredAt', N'IX_AuditoriaEvento_correlationId', N'IX_AuditoriaEvento_traceId'))
-            BEGIN
-                IF EXISTS (SELECT 1
-                           FROM   sys.indexes
-                           WHERE  [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                                  AND [name] COLLATE Latin1_General_BIN2 = N'IX_AuditoriaEvento_occurredAt')
-                    BEGIN
-                        DROP INDEX [IX_AuditoriaEvento_occurredAt]
-                            ON [dbo].[AuditoriaEvento];
-                    END
-                IF EXISTS (SELECT 1
-                           FROM   sys.indexes
-                           WHERE  [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                                  AND [name] COLLATE Latin1_General_BIN2 = N'IX_AuditoriaEvento_correlationId')
-                    BEGIN
-                        DROP INDEX [IX_AuditoriaEvento_correlationId]
-                            ON [dbo].[AuditoriaEvento];
-                    END
-                IF EXISTS (SELECT 1
-                           FROM   sys.indexes
-                           WHERE  [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                                  AND [name] COLLATE Latin1_General_BIN2 = N'IX_AuditoriaEvento_traceId')
-                    BEGIN
-                        DROP INDEX [IX_AuditoriaEvento_traceId]
-                            ON [dbo].[AuditoriaEvento];
-                    END
-            END
-        IF EXISTS (SELECT 1
-                   FROM   sys.columns AS c
-                          INNER JOIN
-                          sys.types AS t
-                          ON c.user_type_id = t.user_type_id
-                   WHERE  c.[object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                          AND ((c.[name] = N'id'
-                                AND t.[name] <> N'uniqueidentifier')
-                               OR (c.[name] = N'occurredAt'
-                                   AND (t.[name] <> N'datetimeoffset'
-                                        OR c.[scale] <> 7))
-                               OR (c.[name] = N'actorId'
-                                   AND (t.[name] <> N'nvarchar'
-                                        OR c.[max_length] <> 240
-                                        OR c.[is_nullable] <> 1))
-                               OR (c.[name] = N'actorType'
-                                   AND (t.[name] <> N'varchar'
-                                        OR c.[max_length] <> 20
-                                        OR c.[is_nullable] <> 0))
-                               OR (c.[name] = N'action'
-                                   AND (t.[name] <> N'varchar'
-                                        OR c.[max_length] <> 120
-                                        OR c.[is_nullable] <> 0))
-                               OR (c.[name] = N'resourceType'
-                                   AND (t.[name] <> N'varchar'
-                                        OR c.[max_length] <> 120
-                                        OR c.[is_nullable] <> 0))
-                               OR (c.[name] = N'resourceId'
-                                   AND (t.[name] <> N'nvarchar'
-                                        OR c.[max_length] <> 240
-                                        OR c.[is_nullable] <> 1))
-                               OR (c.[name] = N'result'
-                                   AND (t.[name] <> N'varchar'
-                                        OR c.[max_length] <> 20
-                                        OR c.[is_nullable] <> 0))
-                               OR (c.[name] = N'correlationId'
-                                   AND (t.[name] <> N'uniqueidentifier'
-                                        OR c.[is_nullable] <> 1))
-                               OR (c.[name] = N'traceId'
-                                   AND (t.[name] <> N'char'
-                                        OR c.[max_length] <> 32
-                                        OR c.[is_nullable] <> 1))
-                               OR (c.[name] = N'spanId'
-                                   AND (t.[name] <> N'char'
-                                        OR c.[max_length] <> 16
-                                        OR c.[is_nullable] <> 1))
-                               OR (c.[name] = N'httpMethod'
-                                   AND (t.[name] <> N'varchar'
-                                        OR c.[max_length] <> 16
-                                        OR c.[is_nullable] <> 0))
-                               OR (c.[name] = N'path'
-                                   AND (t.[name] <> N'nvarchar'
-                                        OR c.[max_length] <> 480
-                                        OR c.[is_nullable] <> 0))
-                               OR (c.[name] = N'httpStatus'
-                                   AND (t.[name] <> N'smallint'
-                                        OR c.[is_nullable] <> 0))
-                               OR (c.[name] = N'clientIp'
-                                   AND (t.[name] <> N'varchar'
-                                        OR c.[max_length] <> 45
-                                        OR c.[is_nullable] <> 1))
-                               OR (c.[name] = N'errorCode'
-                                   AND (t.[name] <> N'varchar'
-                                        OR c.[max_length] <> 120
-                                        OR c.[is_nullable] <> 1))
-                               OR (c.[name] = N'metadata'
-                                   AND (t.[name] <> N'nvarchar'
-                                        OR c.[max_length] <> -1
-                                        OR c.[is_nullable] <> 1))))
-            BEGIN
-                IF EXISTS (SELECT 1
-                           FROM   sys.indexes
-                           WHERE  [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                                  AND [name] IN (N'IX_AuditoriaEvento_OccurredAt', N'IX_AuditoriaEvento_CorrelationId_OccurredAt', N'IX_AuditoriaEvento_TraceId_OccurredAt', N'IX_AuditoriaEvento_ActorId_OccurredAt', N'IX_AuditoriaEvento_Action_OccurredAt', N'IX_AuditoriaEvento_ResourceType_ResourceId_OccurredAt'))
-                    BEGIN
-                        IF EXISTS (SELECT 1
-                                   FROM   sys.indexes
-                                   WHERE  [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                                          AND [name] = N'IX_AuditoriaEvento_OccurredAt')
-                            DROP INDEX [IX_AuditoriaEvento_OccurredAt]
-                                ON [dbo].[AuditoriaEvento];
-                        IF EXISTS (SELECT 1
-                                   FROM   sys.indexes
-                                   WHERE  [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                                          AND [name] = N'IX_AuditoriaEvento_CorrelationId_OccurredAt')
-                            DROP INDEX [IX_AuditoriaEvento_CorrelationId_OccurredAt]
-                                ON [dbo].[AuditoriaEvento];
-                        IF EXISTS (SELECT 1
-                                   FROM   sys.indexes
-                                   WHERE  [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                                          AND [name] = N'IX_AuditoriaEvento_TraceId_OccurredAt')
-                            DROP INDEX [IX_AuditoriaEvento_TraceId_OccurredAt]
-                                ON [dbo].[AuditoriaEvento];
-                        IF EXISTS (SELECT 1
-                                   FROM   sys.indexes
-                                   WHERE  [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                                          AND [name] = N'IX_AuditoriaEvento_ActorId_OccurredAt')
-                            DROP INDEX [IX_AuditoriaEvento_ActorId_OccurredAt]
-                                ON [dbo].[AuditoriaEvento];
-                        IF EXISTS (SELECT 1
-                                   FROM   sys.indexes
-                                   WHERE  [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                                          AND [name] = N'IX_AuditoriaEvento_Action_OccurredAt')
-                            DROP INDEX [IX_AuditoriaEvento_Action_OccurredAt]
-                                ON [dbo].[AuditoriaEvento];
-                        IF EXISTS (SELECT 1
-                                   FROM   sys.indexes
-                                   WHERE  [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                                          AND [name] = N'IX_AuditoriaEvento_ResourceType_ResourceId_OccurredAt')
-                            DROP INDEX [IX_AuditoriaEvento_ResourceType_ResourceId_OccurredAt]
-                                ON [dbo].[AuditoriaEvento];
-                    END
-                IF EXISTS (SELECT 1
-                           FROM   sys.key_constraints
-                           WHERE  [parent_object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                                  AND [name] = N'PK_AuditoriaEvento')
-                    BEGIN
-                        ALTER TABLE [dbo].[AuditoriaEvento] DROP CONSTRAINT [PK_AuditoriaEvento];
-                    END
-                ALTER TABLE [dbo].[AuditoriaEvento] ALTER COLUMN [id] UNIQUEIDENTIFIER NOT NULL;
-                ALTER TABLE [dbo].[AuditoriaEvento] ALTER COLUMN [occurredAt] DATETIMEOFFSET (7) NOT NULL;
-                ALTER TABLE [dbo].[AuditoriaEvento] ALTER COLUMN [actorId] NVARCHAR (120) NULL;
-                ALTER TABLE [dbo].[AuditoriaEvento] ALTER COLUMN [actorType] VARCHAR (20) NOT NULL;
-                ALTER TABLE [dbo].[AuditoriaEvento] ALTER COLUMN [action] VARCHAR (120) NOT NULL;
-                ALTER TABLE [dbo].[AuditoriaEvento] ALTER COLUMN [resourceType] VARCHAR (120) NOT NULL;
-                ALTER TABLE [dbo].[AuditoriaEvento] ALTER COLUMN [resourceId] NVARCHAR (120) NULL;
-                ALTER TABLE [dbo].[AuditoriaEvento] ALTER COLUMN [result] VARCHAR (20) NOT NULL;
-                ALTER TABLE [dbo].[AuditoriaEvento] ALTER COLUMN [correlationId] UNIQUEIDENTIFIER NULL;
-                ALTER TABLE [dbo].[AuditoriaEvento] ALTER COLUMN [traceId] CHAR (32) NULL;
-                ALTER TABLE [dbo].[AuditoriaEvento] ALTER COLUMN [spanId] CHAR (16) NULL;
-                ALTER TABLE [dbo].[AuditoriaEvento] ALTER COLUMN [httpMethod] VARCHAR (16) NOT NULL;
-                ALTER TABLE [dbo].[AuditoriaEvento] ALTER COLUMN [path] NVARCHAR (240) NOT NULL;
-                ALTER TABLE [dbo].[AuditoriaEvento] ALTER COLUMN [httpStatus] SMALLINT NOT NULL;
-                ALTER TABLE [dbo].[AuditoriaEvento] ALTER COLUMN [clientIp] VARCHAR (45) NULL;
-                ALTER TABLE [dbo].[AuditoriaEvento] ALTER COLUMN [errorCode] VARCHAR (120) NULL;
-                ALTER TABLE [dbo].[AuditoriaEvento] ALTER COLUMN [metadata] NVARCHAR (MAX) NULL;
-            END
-        IF NOT EXISTS (SELECT 1
-                       FROM   sys.key_constraints
-                       WHERE  [parent_object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                              AND [name] = N'PK_AuditoriaEvento')
-            BEGIN
-                ALTER TABLE [dbo].[AuditoriaEvento]
-                    ADD CONSTRAINT [PK_AuditoriaEvento] PRIMARY KEY CLUSTERED ([id]);
-            END
-        IF NOT EXISTS (SELECT 1
-                       FROM   sys.check_constraints
-                       WHERE  [parent_object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                              AND [name] = N'CK_AuditoriaEvento_ActorType')
-            BEGIN
-                ALTER TABLE [dbo].[AuditoriaEvento] WITH CHECK
-                    ADD CONSTRAINT [CK_AuditoriaEvento_ActorType] CHECK ([actorType] IN ('USER', 'ANONYMOUS', 'SYSTEM'));
-            END
-        IF NOT EXISTS (SELECT 1
-                       FROM   sys.check_constraints
-                       WHERE  [parent_object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                              AND [name] = N'CK_AuditoriaEvento_Result')
-            BEGIN
-                ALTER TABLE [dbo].[AuditoriaEvento] WITH CHECK
-                    ADD CONSTRAINT [CK_AuditoriaEvento_Result] CHECK ([result] IN ('SUCCESS', 'FAILURE'));
-            END
-        IF NOT EXISTS (SELECT 1
-                       FROM   sys.check_constraints
-                       WHERE  [parent_object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                              AND [name] = N'CK_AuditoriaEvento_HttpStatus')
-            BEGIN
-                ALTER TABLE [dbo].[AuditoriaEvento] WITH CHECK
-                    ADD CONSTRAINT [CK_AuditoriaEvento_HttpStatus] CHECK ([httpStatus] >= 100
-                                                                          AND [httpStatus] <= 599);
-            END
-        IF NOT EXISTS (SELECT 1
-                       FROM   sys.check_constraints
-                       WHERE  [parent_object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                              AND [name] = N'CK_AuditoriaEvento_MetadataJson')
-            BEGIN
-                ALTER TABLE [dbo].[AuditoriaEvento] WITH CHECK
-                    ADD CONSTRAINT [CK_AuditoriaEvento_MetadataJson] CHECK ([metadata] IS NULL
-                                                                            OR ISJSON([metadata]) = 1);
-            END
-        IF NOT EXISTS (SELECT 1
-                       FROM   sys.indexes
-                       WHERE  [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                              AND [name] = N'IX_AuditoriaEvento_OccurredAt')
-            BEGIN
-                EXECUTE (N'CREATE NONCLUSTERED INDEX [IX_AuditoriaEvento_OccurredAt] ON [dbo].[AuditoriaEvento] ([occurredAt]);');
-            END
-        IF NOT EXISTS (SELECT 1
-                       FROM   sys.indexes
-                       WHERE  [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                              AND [name] = N'IX_AuditoriaEvento_CorrelationId_OccurredAt')
-            BEGIN
-                EXECUTE (N'CREATE NONCLUSTERED INDEX [IX_AuditoriaEvento_CorrelationId_OccurredAt] ON [dbo].[AuditoriaEvento] ([correlationId], [occurredAt]);');
-            END
-        IF NOT EXISTS (SELECT 1
-                       FROM   sys.indexes
-                       WHERE  [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                              AND [name] = N'IX_AuditoriaEvento_TraceId_OccurredAt')
-            BEGIN
-                EXECUTE (N'CREATE NONCLUSTERED INDEX [IX_AuditoriaEvento_TraceId_OccurredAt] ON [dbo].[AuditoriaEvento] ([traceId], [occurredAt]);');
-            END
-        IF NOT EXISTS (SELECT 1
-                       FROM   sys.indexes
-                       WHERE  [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                              AND [name] = N'IX_AuditoriaEvento_ActorId_OccurredAt')
-            BEGIN
-                EXECUTE (N'CREATE NONCLUSTERED INDEX [IX_AuditoriaEvento_ActorId_OccurredAt] ON [dbo].[AuditoriaEvento] ([actorId], [occurredAt]);');
-            END
-        IF NOT EXISTS (SELECT 1
-                       FROM   sys.indexes
-                       WHERE  [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                              AND [name] = N'IX_AuditoriaEvento_Action_OccurredAt')
-            BEGIN
-                EXECUTE (N'CREATE NONCLUSTERED INDEX [IX_AuditoriaEvento_Action_OccurredAt] ON [dbo].[AuditoriaEvento] ([action], [occurredAt]);');
-            END
-        IF NOT EXISTS (SELECT 1
-                       FROM   sys.indexes
-                       WHERE  [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]')
-                              AND [name] = N'IX_AuditoriaEvento_ResourceType_ResourceId_OccurredAt')
-            BEGIN
-                EXECUTE (N'CREATE NONCLUSTERED INDEX [IX_AuditoriaEvento_ResourceType_ResourceId_OccurredAt] ON [dbo].[AuditoriaEvento] ([resourceType], [resourceId], [occurredAt]);');
-            END
-    END
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]') AND [name] = N'IX_AuditoriaEvento_OccurredAt')
+BEGIN
+    CREATE NONCLUSTERED INDEX [IX_AuditoriaEvento_OccurredAt] ON [dbo].[AuditoriaEvento] ([occurredAt]);
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]') AND [name] = N'IX_AuditoriaEvento_CorrelationId_OccurredAt')
+BEGIN
+    CREATE NONCLUSTERED INDEX [IX_AuditoriaEvento_CorrelationId_OccurredAt] ON [dbo].[AuditoriaEvento] ([correlationId], [occurredAt]);
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]') AND [name] = N'IX_AuditoriaEvento_TraceId_OccurredAt')
+BEGIN
+    CREATE NONCLUSTERED INDEX [IX_AuditoriaEvento_TraceId_OccurredAt] ON [dbo].[AuditoriaEvento] ([traceId], [occurredAt]);
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]') AND [name] = N'IX_AuditoriaEvento_ActorId_OccurredAt')
+BEGIN
+    CREATE NONCLUSTERED INDEX [IX_AuditoriaEvento_ActorId_OccurredAt] ON [dbo].[AuditoriaEvento] ([actorId], [occurredAt]);
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]') AND [name] = N'IX_AuditoriaEvento_Action_OccurredAt')
+BEGIN
+    CREATE NONCLUSTERED INDEX [IX_AuditoriaEvento_Action_OccurredAt] ON [dbo].[AuditoriaEvento] ([action], [occurredAt]);
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [object_id] = OBJECT_ID('dbo.[AuditoriaEvento]') AND [name] = N'IX_AuditoriaEvento_ResourceType_ResourceId_OccurredAt')
+BEGIN
+    CREATE NONCLUSTERED INDEX [IX_AuditoriaEvento_ResourceType_ResourceId_OccurredAt] ON [dbo].[AuditoriaEvento] ([resourceType], [resourceId], [occurredAt]);
+END
+GO

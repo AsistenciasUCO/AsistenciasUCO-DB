@@ -39,7 +39,12 @@ USING (VALUES
     ('ASISTENCIA', 'MARGEN_RETARDO_MINUTOS', '30', 'INT', '30'),
     ('ASISTENCIA', 'DIAS_LIMITE_JUSTIFICACION', '5', 'INT', '5'),
     ('ASISTENCIA', 'UMBRAL_ALERTA_ADVERTENCIA', '15', 'DECIMAL', '15'),
-    ('ASISTENCIA', 'UMBRAL_ALERTA_PERDIDA', '20', 'DECIMAL', '20')
+    ('ASISTENCIA', 'UMBRAL_ALERTA_PERDIDA', '20', 'DECIMAL', '20'),
+
+    -- Política temporal base del contrato DB-GP-001
+    ('TIEMPO', 'ZONA_HORARIA_IANA', 'America/Bogota', 'STRING', 'America/Bogota'),
+    ('TIEMPO', 'ZONA_HORARIA_SQLSERVER', 'SA Pacific Standard Time', 'STRING', 'SA Pacific Standard Time'),
+    ('TIEMPO', 'ALMACENAMIENTO_INSTANTES', 'UTC', 'STRING', 'UTC')
 ) AS Source (grupo, clave, valor, tipoDato, valorDefecto)
 ON (Target.grupo = Source.grupo AND Target.clave = Source.clave)
 WHEN MATCHED THEN
@@ -47,8 +52,8 @@ WHEN MATCHED THEN
         Target.valor = Source.valor, 
         Target.tipoDato = Source.tipoDato,
         Target.valorDefecto = Source.valorDefecto,
-        Target.fechaModificacion = GETDATE()
+        Target.fechaModificacion = SYSUTCDATETIME()
 WHEN NOT MATCHED THEN
     INSERT (grupo, clave, valor, tipoDato, valorDefecto, estaActivo, fechaCreacion, fechaModificacion)
-    VALUES (Source.grupo, Source.clave, Source.valor, Source.tipoDato, Source.valorDefecto, 1, GETDATE(), GETDATE());
+    VALUES (Source.grupo, Source.clave, Source.valor, Source.tipoDato, Source.valorDefecto, 1, SYSUTCDATETIME(), SYSUTCDATETIME());
 GO

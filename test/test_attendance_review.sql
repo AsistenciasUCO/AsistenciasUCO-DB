@@ -9,13 +9,15 @@ FROM dbo.uv_estudiante_grupo eg JOIN dbo.uv_grupo g ON g.id = eg.idGrupo
 WHERE eg.codigoEstadoEstudiante = 'A' AND g.grupoEstaHablitado = 1
 ORDER BY eg.id;
 DECLARE @reason UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.RazonCausa WHERE codigo IN ('SJC', 'F'));
+DECLARE @studentUser UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_estudiante_identidad WHERE id = @student);
+DECLARE @teacherUser UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_docente_identidad WHERE id = @teacher);
 DECLARE @session UNIQUEIDENTIFIER = NEWID(), @attendance UNIQUEIDENTIFIER = NEWID(), @detail UNIQUEIDENTIFIER = NEWID();
 DECLARE @sessionCode NVARCHAR(50) = LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8);
 DECLARE @number INT = 1 + (SELECT ISNULL(MAX(numero), 0) FROM dbo.Sesion WHERE grupo = @group);
 DECLARE @detailCode INT = 1 + (SELECT ISNULL(MAX(codigo), 0) FROM dbo.DetalleAsistencia);
 DECLARE @corr UNIQUEIDENTIFIER, @userMsg NVARCHAR(4000), @techMsg NVARCHAR(4000);
 DECLARE @request UNIQUEIDENTIFIER;
-IF @group IS NULL OR @student IS NULL OR @teacher IS NULL OR @reason IS NULL
+IF @group IS NULL OR @student IS NULL OR @teacher IS NULL OR @studentUser IS NULL OR @teacherUser IS NULL OR @reason IS NULL
     THROW 51950, 'TEST FAILED: REVIEW fixture missing.', 1;
 CREATE TABLE #reviewResult (idCorrelacion UNIQUEIDENTIFIER NULL, mensajeUsuarioResultado NVARCHAR(MAX),
     mensajeTecnicoResultado NVARCHAR(MAX), estadoResultado INT NOT NULL);
@@ -35,7 +37,8 @@ BEGIN TRY
     INSERT INTO #reviewResult
     EXEC dbo.usp_radicar_solicitud_revision_asistencia @idEstudiante = @missingStudent,
         @idSesion = @session, @categoria = N'ASISTENCIA', @justificacion = N'QA',
-        @soporteNombre = NULL, @soporteUrl = NULL, @idCorrelacion = @corr;
+        @soporteNombre = NULL, @soporteUrl = NULL, @idCorrelacion = @corr,
+        @idUsuarioEjecutor = @studentUser;
     IF (SELECT COUNT(*) FROM #reviewResult WHERE idCorrelacion = @corr AND estadoResultado = 0
         AND mensajeUsuarioResultado = @userMsg
         AND mensajeTecnicoResultado = CONCAT(@techMsg, ' Correlacion: ', @corr)) <> 1
@@ -51,7 +54,7 @@ BEGIN TRY
     EXEC dbo.usp_radicar_solicitud_revision_asistencia @idEstudiante = @student,
         @idSesion = @session, @categoria = N'ASISTENCIA', @justificacion = N'Clase QA',
         @soporteNombre = N'evidencia.pdf', @soporteUrl = N'https://example.invalid/qa',
-        @idCorrelacion = @corr;
+        @idCorrelacion = @corr, @idUsuarioEjecutor = @studentUser;
     IF (SELECT COUNT(*) FROM #reviewResult WHERE idCorrelacion = @corr AND estadoResultado = 1
         AND mensajeUsuarioResultado = @userMsg
         AND mensajeTecnicoResultado = CONCAT(@techMsg, ' Correlacion: ', @corr)) <> 1
@@ -69,7 +72,7 @@ BEGIN TRY
     INSERT INTO #reviewResult
     EXEC dbo.usp_resolver_solicitud_revision_asistencia @idSolicitud = @request,
         @idDocente = @otherTeacher, @accion = N'APROBADA', @respuestaDocente = N'No autorizado',
-        @idCorrelacion = @corr;
+        @idCorrelacion = @corr, @idUsuarioEjecutor = @teacherUser;
     IF (SELECT COUNT(*) FROM #reviewResult WHERE idCorrelacion = @corr AND estadoResultado = 0
         AND mensajeUsuarioResultado = @userMsg
         AND mensajeTecnicoResultado = CONCAT(@techMsg, ' Correlacion: ', @corr)) <> 1
@@ -84,7 +87,7 @@ BEGIN TRY
     INSERT INTO #reviewResult
     EXEC dbo.usp_resolver_solicitud_revision_asistencia @idSolicitud = @request,
         @idDocente = @teacher, @accion = N'APROBADA', @respuestaDocente = N'Aprobada por QA',
-        @idCorrelacion = @corr;
+        @idCorrelacion = @corr, @idUsuarioEjecutor = @teacherUser;
     IF (SELECT COUNT(*) FROM #reviewResult WHERE idCorrelacion = @corr AND estadoResultado = 1
         AND mensajeUsuarioResultado = @userMsg
         AND mensajeTecnicoResultado = CONCAT(@techMsg, ' Correlacion: ', @corr)) <> 1

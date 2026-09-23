@@ -11,20 +11,14 @@ CREATE OR ALTER PROCEDURE [dbo].[usp_actualizar_sesion]
     @nombre             NVARCHAR(50),
     @fechaHoraInicio    DATETIME2,
     @fechaHoraFin       DATETIME2,
-    @aula               NVARCHAR(100) = NULL,
-    @descripcion        NVARCHAR(MAX) = NULL,
-    @idDocente          UNIQUEIDENTIFIER = NULL,
     @idCorrelacion      UNIQUEIDENTIFIER,
     @idUsuarioEjecutor  UNIQUEIDENTIFIER = NULL
 )
 AS
     DECLARE @idCorrelacionDefecto     UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idCorrelacion, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
     DECLARE @idSesionDefecto          UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idSesion, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
-    DECLARE @idDocenteDefecto         UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idDocente, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
     DECLARE @idUsuarioEjecutorDefecto UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idUsuarioEjecutor, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
     DECLARE @nombreDefecto            NVARCHAR(50)     = TRIM(@nombre);
-    DECLARE @aulaDefecto              NVARCHAR(100)    = NULLIF(TRIM(@aula), '');
-    DECLARE @descripcionDefecto       NVARCHAR(MAX)    = NULLIF(TRIM(@descripcion), '');
 
     DECLARE @idGrupoSesion UNIQUEIDENTIFIER;
 
@@ -43,8 +37,21 @@ BEGIN
             @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT, 
             @estadoResultado = @estadoResultado OUTPUT;
 
-        -- PASO 1.5: Validación de perfil RBAC y titularidad del Docente sobre la Sesión
-        IF @estadoResultado = 1 AND @idUsuarioEjecutor IS NOT NULL
+        -- PASO 1.5: El ejecutor (Usuario.id) es obligatorio y nunca puede saltar seguridad.
+        IF @estadoResultado = 1 AND @idUsuarioEjecutor IS NULL
+        BEGIN
+            EXEC dbo.usp_obtener_mensaje_catalogo
+                @p_codigo = 'GEN_002',
+                @p_param1 = 'idUsuarioEjecutor',
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
+
+            SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+            SET @estadoResultado = 0;
+        END
+
+        -- PASO 1.6: Validación de perfil RBAC del ejecutor
+        IF @estadoResultado = 1
         BEGIN
             EXEC dbo.usp_validar_permiso_rbac_usuario_interno
                 @idUsuario = @idUsuarioEjecutorDefecto,
@@ -53,33 +60,21 @@ BEGIN
                 @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                 @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
                 @estadoResultado = @estadoResultado OUTPUT;
-
-            IF @estadoResultado = 1 AND @idSesionDefecto IS NOT NULL
-            BEGIN
-                EXEC dbo.usp_validar_titularidad_jerarquica_interno
-                    @idUsuario = @idUsuarioEjecutorDefecto,
-                    @idEntidadPadre = @idSesionDefecto,
-                    @tipoEntidadPadre = 'SESION',
-                    @idCorrelacion = @idCorrelacionDefecto,
-                    @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
-                    @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
-                    @estadoResultado = @estadoResultado OUTPUT;
-            END
         END
 
-        -- PASO 2: Validar existencia de la sesión consultando uv_sesion
+        -- PASO 2: Validar existencia de la sesión con código semántico SES_001
         IF @estadoResultado = 1
         BEGIN
             SELECT TOP 1 
-                @idGrupoSesion = idGrupo
-            FROM [dbo].[uv_sesion] 
+                @idGrupoSesion = grupo
+            FROM [dbo].[Sesion]
             WHERE id = @idSesionDefecto;
 
             IF @idGrupoSesion IS NULL
             BEGIN
                 EXEC dbo.usp_obtener_mensaje_catalogo
-                    @p_codigo = 'VAL_002',
-                    @p_param1 = 'Sesion',
+                    @p_codigo = 'SES_001',
+                    @p_param1 = @idSesionDefecto,
                     @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                     @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
 
@@ -88,26 +83,63 @@ BEGIN
             END
         END
 
-        -- PASO 3: Validar pertenencia del grupo al docente titular si se envía idDocente (se usa el
-        -- parámetro crudo: @idDocenteDefecto resuelve a un GUID centinela incluso cuando no se envía)
-        IF @estadoResultado = 1 AND @idDocente IS NOT NULL
+        -- PASO 3: Titularidad del docente ejecutor sobre la sesión.
+        IF @estadoResultado = 1
         BEGIN
-            EXEC dbo.usp_validar_grupo_exista_para_docente_interno
-                @idGrupo = @idGrupoSesion,
-                @idDocente = @idDocenteDefecto,
+            EXEC dbo.usp_validar_titularidad_jerarquica_interno
+                @idUsuario = @idUsuarioEjecutorDefecto,
+                @idEntidadPadre = @idSesionDefecto,
+                @tipoEntidadPadre = 'SESION',
                 @idCorrelacion = @idCorrelacionDefecto,
                 @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                 @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
                 @estadoResultado = @estadoResultado OUTPUT;
         END
 
-        -- PASO 4: Actualización atómica de la Sesión
+        -- PASO 4: PUT completo de fechas obligatorias.
+        IF @estadoResultado = 1 AND @fechaHoraInicio IS NULL
+        BEGIN
+            EXEC dbo.usp_obtener_mensaje_catalogo
+                @p_codigo = 'GEN_002',
+                @p_param1 = 'fechaHoraInicio',
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
+
+            SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+            SET @estadoResultado = 0;
+        END
+
+        IF @estadoResultado = 1 AND @fechaHoraFin IS NULL
+        BEGIN
+            EXEC dbo.usp_obtener_mensaje_catalogo
+                @p_codigo = 'GEN_002',
+                @p_param1 = 'fechaHoraFin',
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
+
+            SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+            SET @estadoResultado = 0;
+        END
+
+        IF @estadoResultado = 1 AND @fechaHoraFin <= @fechaHoraInicio
+        BEGIN
+            EXEC dbo.usp_obtener_mensaje_catalogo
+                @p_codigo = 'SES_004',
+                @p_param1 = 'fechaHoraFin',
+                @p_param2 = 'fechaHoraInicio',
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
+
+            SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+            SET @estadoResultado = 0;
+        END
+
         IF @estadoResultado = 1
         BEGIN
             UPDATE dbo.Sesion
             SET nombre = CASE WHEN @nombreDefecto IS NOT NULL AND @nombreDefecto <> '' THEN @nombreDefecto ELSE nombre END,
-                fechaHoraInicio = CASE WHEN @fechaHoraInicio IS NOT NULL THEN @fechaHoraInicio ELSE fechaHoraInicio END,
-                fechaHoraFin = CASE WHEN @fechaHoraFin IS NOT NULL THEN @fechaHoraFin ELSE fechaHoraFin END
+                fechaHoraInicio = @fechaHoraInicio,
+                fechaHoraFin = @fechaHoraFin
             WHERE id = @idSesionDefecto;
 
             EXEC dbo.usp_obtener_mensaje_catalogo

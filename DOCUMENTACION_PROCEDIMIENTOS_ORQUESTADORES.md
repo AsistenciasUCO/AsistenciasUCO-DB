@@ -230,13 +230,18 @@ Esta documentación especifica la arquitectura, reglas de negocio, contrato de f
 ---
 
 ### 12. `dbo.usp_registrar_asistencias_sesion`
-- **Propósito**: Registra masivamente la asistencia de todos los estudiantes inscritos en una sesión de clase dada.
+- **Propósito**: Registra en un lote atómico la asistencia de los estudiantes de una sesión, enviada como JSON (`[{ "idEstudiante", "estado" }]`).
 - **Parámetros de Entrada**:
   - `@idSesion UNIQUEIDENTIFIER`
+  - `@asistenciaJSON NVARCHAR(MAX)`: estados públicos `AN` / `SJC` / `EX` (se normalizan `TRIM` + `UPPER`; `A`, `F`, `T`, `J` y cualquier otro valor son inválidos).
   - `@idCorrelacion UNIQUEIDENTIFIER`
-- **Conjunto de Resultados Retornado**: `idCorrelacion`, `mensajeUsuarioResultado`, `mensajeTecnicoResultado`, `estadoResultado`.
+  - `@idUsuarioEjecutor UNIQUEIDENTIFIER = NULL`: `Usuario.id` del docente; requerido semánticamente (opcional en firma ≠ opcional en contrato; `NULL` → `GEN_002`, sin escritura).
+- **Conjunto de Resultados Retornado** (una fila): `idCorrelacion`, `mensajeUsuarioResultado`, `mensajeTecnicoResultado`, `estadoResultado`.
 - **Flujo de Ejecución**:
   1. Validar `@idCorrelacionDefecto`.
-  2. Obtener lista de estudiantes activos del grupo desde `dbo.uv_estudiante_grupo`.
-  3. Procesar iterativamente o masivamente con `usp_sincronizar_asistencia_estudiante_interno`.
-  4. Retornar bloque final `SELECT`.
+  2. Exigir `@idUsuarioEjecutor` (`GEN_002`); validar RBAC `DOCENTE` (`usp_validar_permiso_rbac_usuario_interno`).
+  3. Validar existencia de la sesión y titularidad (`usp_validar_titularidad_jerarquica_interno`, `SESION`, por `Usuario.id`).
+  4. `OPENJSON` y validación de **todos** los registros antes de escribir (`idEstudiante` no nulo; estado ∈ `AN`/`SJC`/`EX`, si no `RC_001`).
+  5. Transacción (propia o `SAVE TRANSACTION`), por cada estudiante: `usp_validar_estudiante_pertenece_a_grupo_de_sesion_interno` + `usp_sincronizar_asistencia_estudiante_interno`; cualquier fallo revierte el lote completo.
+  6. Retornar bloque final `SELECT`.
+- **RazonCausa**: catálogo cerrado; no se crean filas dinámicamente. Detalle: `docs/stored-procedures/usp_registrar_asistencias_sesion.md`.

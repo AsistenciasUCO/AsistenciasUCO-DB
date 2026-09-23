@@ -5,6 +5,7 @@ SET XACT_ABORT OFF;
 
 DECLARE @plan UNIQUEIDENTIFIER = (SELECT TOP 1 idPlanEstudio FROM dbo.uv_semestre_plan_estudio);
 DECLARE @semester INT = (SELECT TOP 1 numero FROM dbo.uv_semestre);
+DECLARE @coordinatorUser UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_coordinador_identidad WHERE estaActivoUsuario = 1);
 DECLARE @subject UNIQUEIDENTIFIER = NEWID();
 DECLARE @code NVARCHAR(50) = CONCAT(N'QA', LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 10));
 DECLARE @reactiveCode NVARCHAR(50) = CONCAT(N'QR', LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 10));
@@ -12,7 +13,7 @@ DECLARE @messageCode NVARCHAR(50) = CONCAT(N'QA_', LEFT(REPLACE(CONVERT(VARCHAR(
 DECLARE @corr UNIQUEIDENTIFIER, @userMsg NVARCHAR(4000), @techMsg NVARCHAR(4000);
 DECLARE @reactiveId UNIQUEIDENTIFIER, @missingSubject UNIQUEIDENTIFIER = NEWID();
 DECLARE @reactiveRequestedId UNIQUEIDENTIFIER = NEWID();
-IF @plan IS NULL OR @semester IS NULL THROW 51970, 'TEST FAILED: SUBJECT fixture missing.', 1;
+IF @plan IS NULL OR @semester IS NULL OR @coordinatorUser IS NULL THROW 51970, 'TEST FAILED: SUBJECT fixture missing.', 1;
 CREATE TABLE #subjectResult (idCorrelacion UNIQUEIDENTIFIER NULL, mensajeUsuarioResultado NVARCHAR(MAX),
     mensajeTecnicoResultado NVARCHAR(MAX), estadoResultado INT NOT NULL);
 BEGIN TRANSACTION;
@@ -23,7 +24,8 @@ BEGIN TRY
     INSERT INTO #subjectResult
     EXEC dbo.usp_crear_asignatura @idAsignatura = @subject, @codigo = @code,
         @nombre = N'QA Materia', @creditos = 4, @idPlanEstudio = @plan,
-        @semestreNumero = @semester, @nombreArea = NULL, @nombreComponente = NULL, @idCorrelacion = @corr;
+        @semestreNumero = @semester, @nombreArea = NULL, @nombreComponente = NULL,
+        @idCorrelacion = @corr, @idUsuarioEjecutor = @coordinatorUser;
     IF (SELECT COUNT(*) FROM #subjectResult WHERE idCorrelacion = @corr AND estadoResultado = 1
         AND mensajeUsuarioResultado = @userMsg
         AND mensajeTecnicoResultado = CONCAT(@techMsg, ' Correlacion: ', @corr)) <> 1
@@ -71,7 +73,8 @@ BEGIN TRY
     INSERT INTO #subjectResult
     EXEC dbo.usp_crear_asignatura @idAsignatura = @reactiveRequestedId, @codigo = @reactiveCode,
         @nombre = N'QA Reactiva', @creditos = 3, @idPlanEstudio = @plan,
-        @semestreNumero = @semester, @nombreArea = NULL, @nombreComponente = NULL, @idCorrelacion = @corr;
+        @semestreNumero = @semester, @nombreArea = NULL, @nombreComponente = NULL,
+        @idCorrelacion = @corr, @idUsuarioEjecutor = @coordinatorUser;
     IF (SELECT COUNT(*) FROM #subjectResult WHERE idCorrelacion = @corr AND estadoResultado = 1
         AND mensajeUsuarioResultado = @userMsg
         AND mensajeTecnicoResultado = CONCAT(@techMsg, ' Correlacion: ', @corr)) <> 1

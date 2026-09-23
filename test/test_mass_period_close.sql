@@ -6,6 +6,7 @@ SET XACT_ABORT OFF;
 DECLARE @institution UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_institucion);
 DECLARE @assignment UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_asignatura);
 DECLARE @teacher UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_docente);
+DECLARE @adminUser UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_administrador WHERE estaActivoUsuario = 1);
 DECLARE @studentAbsent UNIQUEIDENTIFIER, @studentPresent UNIQUEIDENTIFIER;
 SELECT @studentAbsent = id FROM (SELECT id, ROW_NUMBER() OVER (ORDER BY id) AS rn FROM dbo.Estudiante) e WHERE rn = 1;
 SELECT @studentPresent = id FROM (SELECT id, ROW_NUMBER() OVER (ORDER BY id) AS rn FROM dbo.Estudiante) e WHERE rn = 2;
@@ -20,6 +21,7 @@ DECLARE @periodCodeText NVARCHAR(50) = CONVERT(NVARCHAR(50), @periodCode);
 DECLARE @corr UNIQUEIDENTIFIER = NEWID(), @userMsg NVARCHAR(4000), @techMsg NVARCHAR(4000);
 DECLARE @baseDetailCode INT = 1 + (SELECT ISNULL(MAX(codigo), 0) FROM dbo.DetalleAsistencia);
 IF @institution IS NULL OR @assignment IS NULL OR @teacher IS NULL OR
+   @adminUser IS NULL OR
    @studentAbsent IS NULL OR @studentPresent IS NULL OR @active IS NULL OR
    @finished IS NULL OR @cancelled IS NULL OR @absence IS NULL
     THROW 52010, 'TEST FAILED: MASS_CLOSE fixture missing.', 1;
@@ -61,7 +63,8 @@ BEGIN TRY
     PRINT CONCAT('TEST_EXPECTED_TECH:MASS_CLOSE_SUCCESS|', @techMsg, ' Correlacion: ', @corr);
     PRINT 'TEST_RESULT_BEGIN:MASS_CLOSE_SUCCESS';
     EXEC dbo.usp_ejecutar_cierre_masivo_periodo
-        @codigoPeriodo = @periodCodeText, @idActor = N'QA_LOCAL', @idCorrelacion = @corr;
+        @codigoPeriodo = @periodCodeText, @idActor = N'QA_LOCAL', @idCorrelacion = @corr,
+        @idUsuarioEjecutor = @adminUser;
     PRINT 'TEST_RESULT_END:MASS_CLOSE_SUCCESS';
     IF @@TRANCOUNT <> 1
         THROW 52011, 'TEST FAILED: MASS_CLOSE_SUCCESS destroyed the caller transaction.', 1;

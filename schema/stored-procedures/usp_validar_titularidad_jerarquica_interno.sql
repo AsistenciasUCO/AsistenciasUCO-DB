@@ -16,6 +16,9 @@ CREATE OR ALTER PROCEDURE [dbo].[usp_validar_titularidad_jerarquica_interno]
     @estadoResultado         BIT OUTPUT
 )
 AS
+    -- @idUsuario es Usuario.id (identidad autenticada), NO Docente.id / Coordinador.id / Decano.id.
+    -- Cada rama resuelve el ID de rol hacia Usuario.id mediante uv_docente_identidad / uv_coordinador_identidad /
+    -- uv_decano_identidad. INSTITUCION compara Administrador.usuario, que ya es Usuario.id.
     -- 1. Estandarización e inicialización de variables utilizando funciones de catálogo (Sin ISNULL)
     DECLARE @idCorrelacionDefecto    UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idCorrelacion, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
     DECLARE @idUsuarioDefecto        UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idUsuario, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
@@ -45,12 +48,14 @@ BEGIN
             IF @tipoEntidadPadreDefecto = 'GRUPO'
             BEGIN
                 IF NOT EXISTS (
-                    SELECT 1 FROM dbo.uv_grupo 
-                    WHERE id = @idEntidadPadreDefecto AND idDocente = @idUsuarioDefecto
+                    SELECT 1
+                    FROM dbo.uv_grupo g
+                    INNER JOIN dbo.uv_docente_identidad di ON di.id = g.idDocente
+                    WHERE g.id = @idEntidadPadreDefecto AND di.idUsuario = @idUsuarioDefecto
                 )
                 BEGIN
                     EXEC dbo.usp_obtener_mensaje_catalogo
-                        @p_codigo = 'VAL_003',
+                        @p_codigo = 'SEC_002',
                         @p_param1 = 'Titularidad Grupo',
                         @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                         @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
@@ -62,12 +67,14 @@ BEGIN
             ELSE IF @tipoEntidadPadreDefecto = 'PROGRAMA'
             BEGIN
                 IF NOT EXISTS (
-                    SELECT 1 FROM dbo.uv_programa 
-                    WHERE id = @idEntidadPadreDefecto AND idCoordinador = @idUsuarioDefecto
+                    SELECT 1
+                    FROM dbo.uv_programa p
+                    INNER JOIN dbo.uv_coordinador_identidad ci ON ci.id = p.idCoordinador
+                    WHERE p.id = @idEntidadPadreDefecto AND ci.idUsuario = @idUsuarioDefecto
                 )
                 BEGIN
                     EXEC dbo.usp_obtener_mensaje_catalogo
-                        @p_codigo = 'VAL_003',
+                        @p_codigo = 'SEC_002',
                         @p_param1 = 'Titularidad Programa',
                         @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                         @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
@@ -79,12 +86,14 @@ BEGIN
             ELSE IF @tipoEntidadPadreDefecto = 'FACULTAD'
             BEGIN
                 IF NOT EXISTS (
-                    SELECT 1 FROM dbo.uv_facultad 
-                    WHERE id = @idEntidadPadreDefecto AND idDecano = @idUsuarioDefecto
+                    SELECT 1
+                    FROM dbo.uv_facultad f
+                    INNER JOIN dbo.uv_decano_identidad di ON di.id = f.idDecano
+                    WHERE f.id = @idEntidadPadreDefecto AND di.idUsuario = @idUsuarioDefecto
                 )
                 BEGIN
                     EXEC dbo.usp_obtener_mensaje_catalogo
-                        @p_codigo = 'VAL_003',
+                        @p_codigo = 'SEC_002',
                         @p_param1 = 'Titularidad Facultad',
                         @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                         @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
@@ -101,7 +110,7 @@ BEGIN
                 )
                 BEGIN
                     EXEC dbo.usp_obtener_mensaje_catalogo
-                        @p_codigo = 'VAL_003',
+                        @p_codigo = 'SEC_002',
                         @p_param1 = 'Titularidad Institución',
                         @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                         @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
@@ -116,11 +125,12 @@ BEGIN
                     SELECT 1 
                     FROM dbo.uv_sesion s
                     INNER JOIN dbo.uv_grupo g ON s.idGrupo = g.id
-                    WHERE s.id = @idEntidadPadreDefecto AND g.idDocente = @idUsuarioDefecto
+                    INNER JOIN dbo.uv_docente_identidad di ON di.id = g.idDocente
+                    WHERE s.id = @idEntidadPadreDefecto AND di.idUsuario = @idUsuarioDefecto
                 )
                 BEGIN
                     EXEC dbo.usp_obtener_mensaje_catalogo
-                        @p_codigo = 'VAL_003',
+                        @p_codigo = 'SEC_002',
                         @p_param1 = 'Titularidad Sesión',
                         @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                         @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;

@@ -60,11 +60,12 @@ SET NOCOUNT ON;
 SET XACT_ABORT OFF;
 DECLARE @faculty UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_facultad);
 DECLARE @oldDean UNIQUEIDENTIFIER = (SELECT decano FROM dbo.Facultad WHERE id = @faculty);
+DECLARE @adminUser UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_administrador WHERE estaActivoUsuario = 1);
 DECLARE @newDean UNIQUEIDENTIFIER = NEWID(), @corr UNIQUEIDENTIFIER = NEWID();
 DECLARE @email NVARCHAR(100) = CONCAT(N'qa.dean.', LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 20), N'@test.local');
 DECLARE @number INT = 1500000000 + ABS(CHECKSUM(NEWID()) % 300000000);
 DECLARE @userMsg NVARCHAR(4000), @techMsg NVARCHAR(4000);
-IF @faculty IS NULL THROW 51930, 'TEST FAILED: DEAN_SUCCESS faculty fixture missing.', 1;
+IF @faculty IS NULL OR @adminUser IS NULL THROW 51930, 'TEST FAILED: DEAN_SUCCESS faculty/admin fixture missing.', 1;
 CREATE TABLE #deanResult (idCorrelacion UNIQUEIDENTIFIER NULL, mensajeUsuarioResultado NVARCHAR(MAX),
     mensajeTecnicoResultado NVARCHAR(MAX), estadoResultado INT NOT NULL);
 BEGIN TRANSACTION;
@@ -75,7 +76,8 @@ BEGIN TRY
     EXEC dbo.usp_crear_decano @idDecano = @newDean, @numeroIdentificacion = @number,
         @primerNombre = N'Decano', @segundoNombre = N'QA', @primerApellido = N'Quality',
         @segundoApellido = N'Gate', @correo = @email, @idFacultad = @faculty,
-        @nombreFacultad = NULL, @password = N'HashBackend_QaDean1234567890', @idCorrelacion = @corr;
+        @nombreFacultad = NULL, @password = N'HashBackend_QaDean1234567890',
+        @idCorrelacion = @corr, @idUsuarioEjecutor = @adminUser;
     IF (SELECT COUNT(*) FROM #deanResult WHERE idCorrelacion = @corr AND estadoResultado = 1
         AND mensajeUsuarioResultado = @userMsg
         AND mensajeTecnicoResultado = CONCAT(@techMsg, ' Correlacion: ', @corr)) <> 1
@@ -105,38 +107,19 @@ SELECT TOP 1 @session = s.id, @group = s.idGrupo, @teacher = g.idDocente
 FROM dbo.uv_sesion s JOIN dbo.uv_grupo g ON g.id = s.idGrupo
 WHERE g.grupoEstaHablitado = 1 ORDER BY s.id;
 IF @session IS NULL OR @teacher IS NULL THROW 51940, 'TEST FAILED: SESSION_CLOSE fixture missing.', 1;
-DECLARE @otherTeacher UNIQUEIDENTIFIER = NEWID(), @corr UNIQUEIDENTIFIER = NEWID();
+DECLARE @corr UNIQUEIDENTIFIER = NEWID();
 DECLARE @userMsg NVARCHAR(4000), @techMsg NVARCHAR(4000);
 CREATE TABLE #closeResult (idCorrelacion UNIQUEIDENTIFIER NULL, mensajeUsuarioResultado NVARCHAR(MAX),
     mensajeTecnicoResultado NVARCHAR(MAX), estadoResultado INT NOT NULL);
-EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = 'GEN_004', @p_param1 = 'SesionCerrada',
+EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = 'SES_003', @p_param1 = @session,
     @mensajeUsuarioResultado = @userMsg OUTPUT, @mensajeTecnicoResultado = @techMsg OUTPUT;
 INSERT INTO #closeResult
 EXEC dbo.usp_cerrar_sesion @idSesion = @session, @idDocente = @teacher, @idCorrelacion = @corr;
-IF (SELECT COUNT(*) FROM #closeResult WHERE idCorrelacion = @corr AND estadoResultado = 1
-    AND mensajeUsuarioResultado = @userMsg
-    AND mensajeTecnicoResultado = CONCAT(@techMsg, ' Correlacion: ', @corr)) <> 1
-    THROW 51941, 'TEST FAILED: SESSION_CLOSE_SUCCESS wrong canonical result.', 1;
-TRUNCATE TABLE #closeResult;
-SET @corr = NEWID();
-INSERT INTO #closeResult
-EXEC dbo.usp_cerrar_sesion @idSesion = @session, @idDocente = @teacher, @idCorrelacion = @corr;
-IF (SELECT COUNT(*) FROM #closeResult WHERE idCorrelacion = @corr AND estadoResultado = 1
-    AND mensajeUsuarioResultado = @userMsg) <> 1
-    THROW 51942, 'TEST FAILED: SESSION_CLOSE repeat is not idempotent.', 1;
-TRUNCATE TABLE #closeResult;
-SET @corr = NEWID();
-EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = 'ERR_DOCENTE_NO_TITULAR_GRUPO',
-    @p_param1 = @otherTeacher, @p_param2 = @group,
-    @mensajeUsuarioResultado = @userMsg OUTPUT, @mensajeTecnicoResultado = @techMsg OUTPUT;
-INSERT INTO #closeResult
-EXEC dbo.usp_cerrar_sesion @idSesion = @session, @idDocente = @otherTeacher, @idCorrelacion = @corr;
 IF (SELECT COUNT(*) FROM #closeResult WHERE idCorrelacion = @corr AND estadoResultado = 0
     AND mensajeUsuarioResultado = @userMsg
     AND mensajeTecnicoResultado = CONCAT(@techMsg, ' Correlacion: ', @corr)) <> 1
-    THROW 51943, 'TEST FAILED: SESSION_CLOSE_NON_OWNER wrong canonical result.', 1;
+    THROW 51941, 'TEST FAILED: SESSION_CLOSE_NOT_SUPPORTED wrong canonical result.', 1;
 IF NOT EXISTS (SELECT 1 FROM dbo.uv_sesion WHERE id = @session AND idGrupo = @group)
     THROW 51944, 'TEST FAILED: SESSION_CLOSE changed/deleted session.', 1;
-PRINT 'TEST_PASS:SESSION_CLOSE_SUCCESS';
-PRINT 'TEST_PASS:SESSION_CLOSE_NON_OWNER';
+PRINT 'TEST_PASS:SESSION_CLOSE_NOT_SUPPORTED';
 GO

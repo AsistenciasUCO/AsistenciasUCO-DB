@@ -31,8 +31,8 @@ SELECT		id = g.id,
 			cuposDisponibles = (g.cantidadEstudiantes - eg.cantidadActivos),
 			
 			-- ESTADO DE HABILITACIÓN
-			grupoEstaHablitado = IIF(GETDATE() BETWEEN pa.fechaInicio AND pa.fechaFin, 1, 0),
-			grupoEstaHablitadoTexto = IIF(GETDATE() BETWEEN pa.fechaInicio AND pa.fechaFin, 'SI', 'NO')
+			grupoEstaHablitado = IIF(t.fechaLocalInstitucional BETWEEN pa.fechaInicio AND pa.fechaFin, 1, 0),
+			grupoEstaHablitadoTexto = IIF(t.fechaLocalInstitucional BETWEEN pa.fechaInicio AND pa.fechaFin, 'SI', 'NO')
 
 FROM		Grupo g
 INNER JOIN	uv_periodo_academico pa 
@@ -41,4 +41,16 @@ INNER JOIN	uv_asignatura a
 ON			g.asignatura = a.id
 INNER JOIN	uv_estadistica_grupo eg 
 ON			g.id = eg.id
+CROSS APPLY (
+    SELECT fechaLocalInstitucional = CAST(
+        SYSUTCDATETIME() AT TIME ZONE 'UTC' AT TIME ZONE COALESCE(
+            (SELECT TOP 1 valor
+             FROM dbo.CatalogoParametro
+             WHERE grupo = 'TIEMPO'
+               AND clave = 'ZONA_HORARIA_SQLSERVER'
+               AND estaActivo = 1),
+            'SA Pacific Standard Time'
+        ) AS DATE
+    )
+) t
 GO

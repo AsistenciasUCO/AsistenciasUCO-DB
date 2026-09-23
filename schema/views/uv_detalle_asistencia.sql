@@ -13,6 +13,7 @@ SELECT		id = da.id,
 			asistio = da.asistio,
 			idRazonCausa = rc.id,
 			nombreRazonCausa = rc.nombre,
+			codigoRazonCausa = rc.codigo,
 			fechaHoraInicio = da.fechaHoraInicio,
 			fechaHoraFin = da.fechaHoraFin
 

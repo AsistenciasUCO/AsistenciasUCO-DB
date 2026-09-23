@@ -3,6 +3,8 @@ param (
     [string]$Password
 )
 
+$ErrorActionPreference = 'Stop'
+
 # Cargar variables de entorno desde archivo .env si existe
 $envFile = Join-Path $PSScriptRoot ".env"
 if (Test-Path $envFile) {
@@ -19,7 +21,10 @@ if (-not $ContainerName) {
     $ContainerName = if ($env:SQL_CONTAINER_NAME) { $env:SQL_CONTAINER_NAME } else { "sqlserver" }
 }
 if (-not $Password) {
-    $Password = if ($env:SQL_CONTAINER_PASSWORD) { $env:SQL_CONTAINER_PASSWORD } elseif ($env:MSSQL_SA_PASSWORD) { $env:MSSQL_SA_PASSWORD } else { "Rionegro2233+" }
+    $Password = if ($env:SQL_CONTAINER_PASSWORD) { $env:SQL_CONTAINER_PASSWORD } elseif ($env:MSSQL_SA_PASSWORD) { $env:MSSQL_SA_PASSWORD } else { $null }
+}
+if (-not $Password) {
+    throw "SQL password is required. Pass -Password or set SQL_CONTAINER_PASSWORD/MSSQL_SA_PASSWORD."
 }
 
 Write-Host "Iniciando despliegue de arquitectura por objeto (/schema)..." -ForegroundColor Cyan
@@ -29,11 +34,14 @@ $schemaDir = Join-Path $PSScriptRoot "schema"
 # 0. Asegurar que la base de datos existe
 Write-Host "`nAsegurando base de datos 'gestionasistenciadb'..." -ForegroundColor Yellow
 docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$Password" -C -Q "IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = 'gestionasistenciadb') CREATE DATABASE gestionasistenciadb;"
+if ($LASTEXITCODE -ne 0) { throw "Could not create/verify database gestionasistenciadb." }
 
 # 0.1 Copiar la carpeta schema al contenedor para evitar problemas de codificación de tubería (BOM/stdin)
 Write-Host "Copiando esquema al contenedor..." -ForegroundColor Gray
 docker exec $ContainerName mkdir -p /tmp/schema
+if ($LASTEXITCODE -ne 0) { throw "Could not create /tmp/schema in SQL container." }
 docker cp "$schemaDir" "${ContainerName}:/tmp/"
+if ($LASTEXITCODE -ne 0) { throw "Could not copy schema into SQL container." }
 
 # Función auxiliar para ejecutar archivos SQL desde el contenedor
 function Execute-Sql-File {
@@ -44,7 +52,8 @@ function Execute-Sql-File {
     $relativePath = $LocalFilePath.Substring($schemaDir.Length).Replace('\', '/')
     $containerPath = "/tmp/schema$relativePath"
     
-    docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$Password" -C -i $containerPath
+    docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$Password" -C -b -i $containerPath
+    if ($LASTEXITCODE -ne 0) { throw "SQL file failed: $LocalFilePath" }
 }
 
 # 1. Aplicar Tablas
@@ -75,8 +84,8 @@ while ($pendingViews.Count -gt 0 -and $progressMade -and $pass -le $maxPasses) {
     foreach ($viewFile in $pendingViews) {
         $relativePath = $viewFile.FullName.Substring($schemaDir.Length).Replace('\', '/')
         $containerPath = "/tmp/schema$relativePath"
-        $sqlResult = docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$Password" -C -i $containerPath 2>&1
-        if ($sqlResult -match "Msg \d+, Level \d+") {
+        $sqlResult = docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$Password" -C -b -i $containerPath 2>&1
+        if ($LASTEXITCODE -ne 0 -or $sqlResult -match "Msg \d+, Level \d+") {
             $failedThisPass.Add($viewFile)
         }
         else {

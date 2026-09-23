@@ -11,12 +11,14 @@ DECLARE @idProgramaValido UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_progra
 DECLARE @idFacultadCorrecta UNIQUEIDENTIFIER = (SELECT TOP 1 idFacultad FROM dbo.uv_programa WHERE id = @idProgramaValido);
 DECLARE @idInstitucion UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_institucion);
 DECLARE @idDecano UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_decano);
+DECLARE @idUsuarioDecano UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_decano_identidad WHERE id = @idDecano);
 
 IF @tipoId IS NULL THROW 51400, 'TEST FAILED: no existe fixture uv_tipo_identificacion CC.', 1;
 IF @idProgramaValido IS NULL THROW 51401, 'TEST FAILED: no existe fixture uv_programa.', 1;
 IF @idFacultadCorrecta IS NULL THROW 51402, 'TEST FAILED: programa fixture no expone facultad.', 1;
 IF @idInstitucion IS NULL THROW 51403, 'TEST FAILED: no existe fixture uv_institucion.', 1;
 IF @idDecano IS NULL THROW 51404, 'TEST FAILED: no existe fixture uv_decano.', 1;
+IF @idUsuarioDecano IS NULL THROW 51415, 'TEST FAILED: no existe fixture usuario decano.', 1;
 
 BEGIN TRANSACTION;
 BEGIN TRY
@@ -49,7 +51,8 @@ BEGIN TRY
         @idPrograma = @idProgramaValido,
         @idFacultad = @idFacultadIncorrecta,
         @password = N'HashBackend_QaCoord1234567890',
-        @idCorrelacion = @corrMismatch;
+        @idCorrelacion = @corrMismatch,
+        @idUsuarioEjecutor = @idUsuarioDecano;
 
     IF NOT EXISTS (SELECT 1 FROM #coordinadorResultado WHERE estadoResultado = 0 AND mensajeUsuarioResultado = (SELECT contenido FROM dbo.uv_mensaje_usuario WHERE codigo = 'ERR_PROGRAMA_FACULTAD_INCONSISTENTE'))
         THROW 51405, 'TEST FAILED: mismatch Programa/Facultad no retorno ERR_PROGRAMA_FACULTAD_INCONSISTENTE.', 1;
@@ -71,7 +74,8 @@ BEGIN TRY
         @idPrograma = '15151515-1515-1515-1515-151515151515',
         @idFacultad = @idFacultadCorrecta,
         @password = N'HashBackend_QaCoord1234567890',
-        @idCorrelacion = @corrProgramaMissing;
+        @idCorrelacion = @corrProgramaMissing,
+        @idUsuarioEjecutor = @idUsuarioDecano;
 
     IF NOT EXISTS (SELECT 1 FROM #coordinadorResultado WHERE estadoResultado = 0 AND mensajeUsuarioResultado = (SELECT contenido FROM dbo.uv_mensaje_usuario WHERE codigo = 'PROG_001'))
         THROW 51407, 'TEST FAILED: Programa inexistente no retorno PROG_001.', 1;
@@ -93,7 +97,8 @@ BEGIN TRY
         @idPrograma = @idProgramaValido,
         @idFacultad = '16161616-1616-1616-1616-161616161616',
         @password = N'HashBackend_QaCoord1234567890',
-        @idCorrelacion = @corrFacultadMissing;
+        @idCorrelacion = @corrFacultadMissing,
+        @idUsuarioEjecutor = @idUsuarioDecano;
 
     IF NOT EXISTS (SELECT 1 FROM #coordinadorResultado WHERE estadoResultado = 0 AND mensajeUsuarioResultado = (SELECT dbo.ufn_reemplazar_plantilla_mensaje(contenido, N'Facultad', NULL, NULL) FROM dbo.uv_mensaje_usuario WHERE codigo = 'GEN_001'))
         THROW 51409, 'TEST FAILED: Facultad inexistente no retorno el codigo existente GEN_001.', 1;
@@ -115,7 +120,8 @@ BEGIN TRY
         @idPrograma = @idProgramaValido,
         @idFacultad = @idFacultadCorrecta,
         @password = N'HashBackend_QaCoord1234567890',
-        @idCorrelacion = @corrSuccess;
+        @idCorrelacion = @corrSuccess,
+        @idUsuarioEjecutor = @idUsuarioDecano;
 
     IF NOT EXISTS (SELECT 1 FROM #coordinadorResultado WHERE estadoResultado = 1)
         THROW 51411, 'TEST FAILED: Programa/Facultad correctos no retorno SUCCESS.', 1;

@@ -67,10 +67,20 @@ USING (VALUES
     ('SES_001', 'BUSINESS_ERROR', 'MEDIO', 'La sesión de clase especificada no existe o no se encuentra activa.'),
     ('ERR_SESION_NO_EXISTE', 'BUSINESS_ERROR', 'MEDIO', 'La sesion de clase no existe o no esta abierta.'),
     ('SES_002', 'BUSINESS_ERROR', 'MEDIO', 'El código de verificación de asistencia es incorrecto o ha expirado.'),
+    ('SES_003', 'BUSINESS_ERROR', 'MEDIO', 'El cierre de sesión no está soportado por el contrato vigente de base de datos.'),
+    ('SES_004', 'BUSINESS_ERROR', 'MEDIO', 'La fecha y hora de fin de sesión debe ser posterior a la fecha y hora de inicio.'),
     ('ERR_TOKEN_VERIFICACION_INVALIDO', 'BUSINESS_ERROR', 'MEDIO', 'El codigo de verificacion de asistencia es incorrecto o ha expirado.'),
 
     ('INST_001', 'BUSINESS_ERROR', 'CRITICO', 'El estudiante, programa y facultad deben pertenecer a la misma institución.'),
     ('ERR_PROGRAMA_FACULTAD_INCONSISTENTE', 'BUSINESS_ERROR', 'CRITICO', 'El programa académico indicado no pertenece a la facultad especificada.'),
+
+    -- Razón de causa / estado de asistencia (contrato AN, SJC, EX)
+    ('RC_001', 'BUSINESS_ERROR', 'MEDIO', 'El estado de asistencia {} no corresponde a una razón de causa válida.'),
+    ('ATT_001', 'BUSINESS_ERROR', 'MEDIO', 'El payload JSON de asistencia no cumple el contrato requerido.'),
+    ('ATT_002', 'BUSINESS_ERROR', 'MEDIO', 'El lote de asistencia no puede estar vacío.'),
+    ('ATT_003', 'BUSINESS_ERROR', 'MEDIO', 'El estudiante {} aparece más de una vez en el lote de asistencia.'),
+    ('SEC_001', 'BUSINESS_ERROR', 'ALTO', 'No tiene permisos suficientes para realizar esta operación.'),
+    ('SEC_002', 'BUSINESS_ERROR', 'ALTO', 'No tiene autorización sobre el recurso solicitado.'),
 
     -- Capacidades no implementadas
     ('ERR_SOLICITUD_MATRICULA_NO_IMPLEMENTADA', 'BUSINESS_ERROR', 'MEDIO', 'La gestión de solicitudes de matrícula aún no se encuentra disponible.'),
@@ -93,10 +103,10 @@ WHEN MATCHED THEN
         Target.tipoMensaje = Source.tipoMensaje,
         Target.severidad = Source.severidad,
         Target.contenido = Source.contenido,
-        Target.fechaModificacion = GETDATE()
+        Target.fechaModificacion = SYSUTCDATETIME()
 WHEN NOT MATCHED THEN
     INSERT (codigo, tipoMensaje, severidad, contenido, estaActivo, fechaCreacion, fechaModificacion)
-    VALUES (Source.codigo, Source.tipoMensaje, Source.severidad, Source.contenido, 1, GETDATE(), GETDATE());
+    VALUES (Source.codigo, Source.tipoMensaje, Source.severidad, Source.contenido, 1, SYSUTCDATETIME(), SYSUTCDATETIME());
 GO
 
 -- Sembrado Idempotente Completo: Catálogo de Mensajes Técnicos (CatalogoMensajeTecnico)
@@ -161,10 +171,20 @@ USING (VALUES
     ('SES_001', 'BUSINESS_ERROR', 'MEDIO', 'Error de búsqueda: Sesión no encontrada o cerrada en uv_sesion: {}.'),
     ('ERR_SESION_NO_EXISTE', 'BUSINESS_ERROR', 'MEDIO', 'Error: No se encontro una sesion activa para el ID especificado: {}.'),
     ('SES_002', 'BUSINESS_ERROR', 'MEDIO', 'Validación fallida: Token QR o código de verificación no coincide o venció para Sesión: {}.'),
+    ('SES_003', 'BUSINESS_ERROR', 'MEDIO', 'LEGACY_NOT_SUPPORTED: dbo.Sesion no posee columna de cierre/estado; usp_cerrar_sesion no persiste cierre real.'),
+    ('SES_004', 'BUSINESS_ERROR', 'MEDIO', 'Validación temporal fallida: fechaHoraFin [{}] debe ser posterior a fechaHoraInicio [{}].'),
     ('ERR_TOKEN_VERIFICACION_INVALIDO', 'BUSINESS_ERROR', 'MEDIO', 'Fallo: Codigo de verificacion incorrecto o expirado para Sesion: {}.'),
 
     ('INST_001', 'BUSINESS_ERROR', 'CRITICO', 'Inconsistencia institucional: Los identificadores de institución no coinciden entre la facultad, programa y estudiante: {}.'),
     ('ERR_PROGRAMA_FACULTAD_INCONSISTENTE', 'BUSINESS_ERROR', 'CRITICO', 'Programa {} no pertenece a la Facultad {} indicada en uv_programa.idFacultad.'),
+
+    -- Razón de causa / estado de asistencia (contrato AN, SJC, EX)
+    ('RC_001', 'BUSINESS_ERROR', 'MEDIO', 'RazonCausa.codigo = [{}] no existe o no es válido para el contrato de asistencia.'),
+    ('ATT_001', 'BUSINESS_ERROR', 'MEDIO', 'Payload JSON inválido: se requiere un arreglo no nulo de objetos con exactamente idEstudiante y estado.'),
+    ('ATT_002', 'BUSINESS_ERROR', 'MEDIO', 'Payload JSON válido pero vacío: no hay operación de negocio que ejecutar.'),
+    ('ATT_003', 'BUSINESS_ERROR', 'MEDIO', 'Duplicidad en payload JSON: idEstudiante [{}] aparece más de una vez.'),
+    ('SEC_001', 'BUSINESS_ERROR', 'ALTO', 'RBAC denegado: el usuario no posee perfil activo requerido o no existe/está inactivo.'),
+    ('SEC_002', 'BUSINESS_ERROR', 'ALTO', 'Titularidad denegada: el usuario no está autorizado sobre el recurso solicitado.'),
 
     -- Capacidades no implementadas
     ('ERR_SOLICITUD_MATRICULA_NO_IMPLEMENTADA', 'BUSINESS_ERROR', 'MEDIO', 'Capability SolicitudMatricula is not implemented in the current schema.'),
@@ -187,8 +207,8 @@ WHEN MATCHED THEN
         Target.tipoMensaje = Source.tipoMensaje,
         Target.severidad = Source.severidad,
         Target.contenido = Source.contenido,
-        Target.fechaModificacion = GETDATE()
+        Target.fechaModificacion = SYSUTCDATETIME()
 WHEN NOT MATCHED THEN
     INSERT (codigo, tipoMensaje, severidad, contenido, estaActivo, fechaCreacion, fechaModificacion)
-    VALUES (Source.codigo, Source.tipoMensaje, Source.severidad, Source.contenido, 1, GETDATE(), GETDATE());
+    VALUES (Source.codigo, Source.tipoMensaje, Source.severidad, Source.contenido, 1, SYSUTCDATETIME(), SYSUTCDATETIME());
 GO

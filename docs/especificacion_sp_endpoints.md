@@ -34,13 +34,17 @@
 - **Intención de negocio**: El docente toma asistencia de toda la lista de estudiantes de una sesión en una sola operación.
 - **Atomicidad requerida**: N estudiantes deben registrarse en una misma transacción. Si falla uno, se revierte todo.
 - **Lógica de validación**:
-  1. Validar que la sesión exista y no esté cerrada (`usp_validar_sesion_exista_por_id_interno`).
+  1. Validar que la sesión exista (`usp_validar_sesion_exista_por_id_interno`).
   2. Para cada estudiante del lote, validar que pertenezca activamente al grupo de la sesión (`usp_validar_estudiante_pertenece_a_grupo_de_sesion_interno`).
-  3. Resolver dinámicamente el `RazonCausa.id` a partir del código enviado (ej. `'AN'`, `'SJC'`).
-  4. Insertar o actualizar (`MERGE`) en `Asistencia` + `DetalleAsistencia`.
-- **Concurrencia**: `SET XACT_ABORT ON; BEGIN TRANSACTION ... COMMIT`.
+  3. Resolver el `RazonCausa.id` **existente** a partir del código enviado. Estados públicos del batch: `'AN'`, `'SJC'`, `'EX'` (única lista aceptada; `A`, `F`, `T`, `J` y otros → `RC_001`). `RazonCausa` es catálogo cerrado: no se crean filas dinámicamente.
+  4. Insertar o actualizar en `Asistencia` + `DetalleAsistencia`.
+- **Seguridad**: `@idUsuarioEjecutor` = `Usuario.id` (requerido semánticamente; `NULL` → `GEN_002`), perfil `DOCENTE` y titularidad de la sesión (`Sesion → Grupo → Docente.id → uv_docente_identidad.idUsuario`).
+- **Lectura**: el estado se lee vía `uv_detalle_asistencia.codigoRazonCausa`.
+- **Concurrencia**: el lote se valida completo antes de escribir y es atómico (`BEGIN TRANSACTION ... COMMIT`, o `SAVE TRANSACTION` bajo transacción externa; cualquier fallo revierte todo el lote).
 - **Procedimientos internos invocados**:
   - `usp_validar_id_correlacion_esta_presente_interno`
+  - `usp_validar_permiso_rbac_usuario_interno`
+  - `usp_validar_titularidad_jerarquica_interno`
   - `usp_validar_sesion_exista_por_id_interno`
   - `usp_validar_estudiante_pertenece_a_grupo_de_sesion_interno` (por cada estudiante)
   - `usp_sincronizar_asistencia_estudiante_interno` (por cada estudiante)
@@ -88,15 +92,14 @@
   - `usp_validar_id_correlacion_esta_presente_interno`
   - `usp_validar_grupo_exista_para_docente_interno`
 
-### Transacción 2.2: Cerrar Sesión y Congelar Planilla
+### Transacción 2.2: Cierre de Sesión Legacy No Soportado
 
-- **Intención de negocio**: El docente cierra oficialmente una sesión. Los estudiantes matriculados sin registro son marcados automáticamente como ausentes.
-- **Atomicidad requerida**: Cambiar el flag de cierre + marcar ausencias pendientes en una transacción.
+- **Intención de negocio**: Contrato histórico no soportado por el shape vigente. `dbo.Sesion` no posee estado/cierre persistible.
+- **Atomicidad requerida**: Cero escrituras.
 - **Lógica de validación**:
-  1. Validar que la sesión exista y no esté ya cerrada.
-  2. Validar que el docente sea titular del grupo de la sesión.
-  3. Insertar registros de ausencia (`asistio = 0`, `RazonCausa = 'SJC'`) para los estudiantes activos del grupo que no tengan registro en `Asistencia` para esa sesión.
-  4. Marcar la sesión como cerrada.
+  1. Retornar `SES_003`.
+  2. `estadoResultado = 0`.
+  3. No crear ausencias para estudiantes omitidos.
 - **Procedimientos internos invocados**:
   - `usp_validar_id_correlacion_esta_presente_interno`
   - `usp_validar_sesion_exista_por_id_interno`
@@ -109,7 +112,7 @@
 - **Atomicidad requerida**: Cambiar estado de la sesión + registrar motivo en una transacción. Las asistencias parcialmente tomadas deben anularse.
 - **Lógica de validación**:
   1. Validar existencia de la sesión y titularidad del docente.
-  2. Validar que la sesión no haya sido ya cerrada con asistencia completa.
+  2. No validar cierre persistido porque `dbo.Sesion` no contiene esa columna.
   3. Anular registros existentes de `DetalleAsistencia` para esa sesión.
   4. Marcar la sesión como cancelada con el motivo proporcionado.
 - **Procedimientos internos invocados**:
@@ -355,7 +358,7 @@
 
 | Tabla | Transacción / Acción de Negocio | Procedimiento Almacenado (BD) | Método del Controlador (Backend) | Rol / Permiso Requerido | Descripción del procedimiento |
 |:---|:---|:---|:---|:---|:---|
-| `Asistencia`, `DetalleAsistencia` | Registrar asistencia masiva por planilla | `usp_registrar_asistencias_sesion` | `POST /api/v1/asistencias/lote` | `DOCENTE` (titular del grupo) | Recibe JSON con lista de estudiantes y estado. Valida sesión abierta y pertenencia de cada estudiante al grupo. Itera y sincroniza cada asistencia en una transacción atómica. Invoca internamente: `usp_validar_sesion_exista_por_id_interno`, `usp_validar_estudiante_pertenece_a_grupo_de_sesion_interno`, `usp_sincronizar_asistencia_estudiante_interno`. |
+| `Asistencia`, `DetalleAsistencia` | Registrar asistencia masiva por planilla | `usp_registrar_asistencias_sesion` | `POST /api/v1/asistencias/lote` | `DOCENTE` (titular del grupo) | Recibe JSON array con elementos exactos `idEstudiante` y estado (`AN`/`SJC`/`EX`) y `@idUsuarioEjecutor` (`Usuario.id`, requerido). Valida RBAC docente, titularidad de la sesión, existencia de sesión, JSON completo, duplicados y pertenencia activa de cada estudiante antes de escribir. Lote parcial permitido; estudiante omitido = sin registro. Sincroniza asistencia en transacción atómica e idempotente. |
 | `Asistencia`, `DetalleAsistencia` | Registrar asistencia individual | `usp_registrar_asistencia_estudiante` | `POST /api/v1/asistencias` | `DOCENTE` (titular del grupo) | Registra la asistencia de un único estudiante para una sesión. Valida matrícula activa (`usp_validar_estudiante_grupo_exista_interno`) y existencia de sesión (`usp_validar_sesion_exista_por_id_interno`). Resuelve `RazonCausa` por código y delega a `usp_sincronizar_asistencia_estudiante_interno`. |
 | `Asistencia`, `DetalleAsistencia` | Auto-registro de asistencia por QR/PIN | `usp_registrar_asistencia_estudiante_autonomo` | `POST /api/v1/estudiante/asistencia-qr` | `ESTUDIANTE` (matriculado en grupo) | Valida token/PIN efímero (TTL 60s) generado por el docente. Verifica que la sesión esté dentro de la ventana temporal. Valida matrícula activa del estudiante (sin autovivificación). Registra asistencia como `'AN'` (Asistencia Normal). Invoca internamente: `usp_validar_sesion_abierta_con_ventana_temporal_interno`, `usp_validar_estudiante_pertenece_a_grupo_de_sesion_interno`, `usp_sincronizar_asistencia_estudiante_interno`. |
 | `Sesion` | Generar token/PIN efímero para asistencia | — *(Backend Java)* | `GET /api/v1/sesiones/{id}/qr-token` | `DOCENTE` (titular del grupo) | Genera un token UUID + PIN de 6 dígitos con expiración de 60 segundos en memoria (sin SP, lógica en Spring Boot `AsistenciaQrController`). |
@@ -364,11 +367,11 @@
 
 | Tabla | Transacción / Acción de Negocio | Procedimiento Almacenado (BD) | Método del Controlador (Backend) | Rol / Permiso Requerido | Descripción del procedimiento |
 |:---|:---|:---|:---|:---|:---|
-| `Sesion` | Crear sesión ordinaria o extraordinaria | `usp_crear_sesion` | `POST /api/v1/sesiones` | `DOCENTE` (titular del grupo) | Valida que el grupo pertenezca al docente titular (`usp_validar_grupo_exista_para_docente_interno`). Calcula correlativo secuencial `MAX(numero) + 1` con bloqueo `UPDLOCK, HOLDLOCK`. Genera código `SES-XX`. Inserta en `dbo.Sesion`. |
-| `Sesion`, `Asistencia`, `DetalleAsistencia` | Cerrar sesión y congelar planilla | `usp_cerrar_sesion` | `POST /api/v1/sesiones/cierres` | `DOCENTE` (titular del grupo) | Valida existencia de la sesión, que no esté ya cerrada, y titularidad del docente. Marca como ausentes (`asistio = 0`) a los estudiantes activos del grupo sin registro de asistencia para esa sesión (`usp_marcar_ausencias_pendientes_sesion_interno`). Marca sesión como cerrada. |
+| `Sesion` | Crear sesión ordinaria o extraordinaria | `usp_crear_sesion` | `POST /api/v1/sesiones` | `DOCENTE` (titular del grupo) | Firma pública sin `@idDocente`: recibe `@idGrupo`, `@nombre`, `@fechaHoraInicio`, `@fechaHoraFin`, `@idCorrelacion`, `@idUsuarioEjecutor`. Valida RBAC docente y titularidad del grupo resolviendo `Usuario.id -> Docente.id`. Fechas inicio/fin son obligatorias y `fechaHoraFin > fechaHoraInicio`. Calcula `numero = COALESCE(MAX(numero), 0) + 1` por grupo (no `COUNT(*)`) y `codigo` (`SES-01`...`SES-99`, `SES-100+` sin truncar) dentro de la misma transacción (ownership propia o savepoint), protegida con `UPDLOCK, HOLDLOCK` y respaldada por los índices `UNIQUE` `UX_Sesion_Grupo_Numero`/`UX_Sesion_Grupo_Codigo`. |
+| `Sesion` | Cierre legacy no soportado | `usp_cerrar_sesion` | No incluir en contrato backend target | N/A | Retorna `SES_003`, `estadoResultado = 0`, sin escrituras. `dbo.Sesion` no posee columna de cierre/estado. |
 | `Sesion` | Cancelar sesión con motivo | `usp_cancelar_sesion_con_motivo` | `PATCH /api/v1/docente/sesiones/{id}/cancelar` | `DOCENTE` (titular del grupo) | Valida existencia de la sesión y titularidad del docente. Marca sesión como cancelada con motivo de cancelación. Anula registros existentes de `DetalleAsistencia` para esa sesión si los hay. |
-| `Sesion` | Generar sesiones masivas del semestre | `usp_generar_sesiones_grupo` | `POST /api/v1/grupos` *(después de crear grupo)* | `DOCENTE`, `COORDINADOR` | Recibe el ID del grupo. Valida existencia de horarios y coherencia de fechas del periodo. Itera cada día del calendario académico, cruza con las franjas horarias del grupo (tabla `Horario`) y genera las sesiones evitando duplicación. Transacción completa. Invoca: `usp_validar_grupo_exista_por_id_interno`, `usp_validar_horarios_grupo_interno`, `usp_validar_fechas_periodo_academico_interno`. |
-| `Sesion` | Actualizar datos operativos de sesión | `usp_actualizar_sesion` | `PUT /api/v1/sesiones/{id}` | `DOCENTE` (titular del grupo) | Actualiza nombre, descripción, fechas de una sesión no cerrada. Valida existencia y titularidad. |
+| `Sesion` | Generar sesiones masivas del semestre | `usp_generar_sesiones_grupo` | `POST /api/v1/grupos` *(después de crear grupo)* | `DOCENTE` (titular del grupo) | Recibe el ID del grupo y `@idUsuarioEjecutor` obligatorio. Valida existencia de horarios, coherencia de fechas del periodo, RBAC docente y titularidad del grupo. Convierte fecha local + horario local desde `TIEMPO/ZONA_HORARIA_SQLSERVER` con `AT TIME ZONE` y persiste instantes UTC. El correlativo `MAX(numero)` se calcula dentro de la transacción protegida con `UPDLOCK, HOLDLOCK` para evitar duplicados frente a `usp_crear_sesion` concurrente. |
+| `Sesion` | Actualizar datos operativos de sesión | `usp_actualizar_sesion` | `PUT /api/v1/sesiones/{id}` | `DOCENTE` (titular del grupo) | Firma pública sin `@idDocente`: recibe `@idSesion`, `@nombre`, `@fechaHoraInicio`, `@fechaHoraFin`, `@idCorrelacion`, `@idUsuarioEjecutor`. PUT completo: inicio y fin son obligatorios, `fechaHoraFin > fechaHoraInicio`, sesión inexistente retorna `SES_001`, y la titularidad se resuelve con `Usuario.id`. No existen atributos de aula, descripción, tipo ni cierre en `dbo.Sesion`. |
 
 ## Módulo: Matrículas e Inscripciones
 
@@ -486,7 +489,7 @@
 | `usp_validar_perfil_existe_por_codigo_interno` | Validación | Valida existencia de un perfil institucional por código | `usp_sincronizar_*_interno` |
 | `usp_validar_usuario_existe_por_id_interno` | Validación | Valida existencia del usuario por ID | Reutilizable |
 | `usp_sincronizar_usuario_interno` | Persistencia | Crea o actualiza registro en `Usuario` | `usp_crear_decano`, `usp_crear_coordinador` |
-| `usp_sincronizar_asistencia_estudiante_interno` | Persistencia | MERGE idempotente en `Asistencia` + `DetalleAsistencia` | `usp_registrar_asistencia*`, `usp_registrar_asistencias_sesion` |
+| `usp_sincronizar_asistencia_estudiante_interno` | Persistencia | Inserta/actualiza `Asistencia` + `DetalleAsistencia` resolviendo una `RazonCausa` existente (catálogo cerrado, `RC_001` si no existe; alias legacy `A→AN`, `F→SJC` solo internos) | `usp_registrar_asistencia*`, `usp_registrar_asistencias_sesion` |
 | `usp_sincronizar_docente_interno` | Persistencia | Crea registro `Docente` desde `Usuario` existente | `DocenteRepositorySqlServerAdapter` |
 | `usp_sincronizar_estudiante_interno` | Persistencia | Crea registro `Estudiante` desde `Usuario` existente | Orquestadores de registro estudiantil |
 | `usp_obtener_mensaje_catalogo` | Mensajería | Traduce códigos de catálogo a mensajes para usuario/técnico | Todos los SPs |
