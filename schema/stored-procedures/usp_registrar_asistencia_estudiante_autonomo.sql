@@ -40,7 +40,19 @@ BEGIN
             @estadoResultado = @estadoResultado OUTPUT;
 
         -- PASO 1.5: Validación de perfil RBAC del usuario ejecutor si es suministrado
-        IF @estadoResultado = 1 AND @idUsuarioEjecutor IS NOT NULL
+        IF @estadoResultado = 1 AND @idUsuarioEjecutor IS NULL
+        BEGIN
+            EXEC dbo.usp_obtener_mensaje_catalogo
+                @p_codigo = 'GEN_002',
+                @p_param1 = 'idUsuarioEjecutor',
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
+
+            SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+            SET @estadoResultado = 0;
+        END
+
+        IF @estadoResultado = 1
         BEGIN
             EXEC dbo.usp_validar_permiso_rbac_usuario_interno
                 @idUsuario = @idUsuarioEjecutorDefecto,
@@ -95,13 +107,13 @@ BEGIN
             END
         END
 
-        -- PASO 5: Registro de la asistencia auto-gestionada por el estudiante (Estado 'A' - Asistió)
+        -- PASO 5: Registro de la asistencia auto-gestionada por el estudiante (Estado AN - Asistió)
         IF @estadoResultado = 1
         BEGIN
             EXEC dbo.usp_sincronizar_asistencia_estudiante_interno
                 @idEstudiante = @idEstudianteDefecto,
                 @idSesion = @idSesionDefecto,
-                @codigoEstado = 'A',
+                @codigoEstado = 'AN',
                 @idCorrelacion = @idCorrelacionDefecto,
                 @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                 @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,

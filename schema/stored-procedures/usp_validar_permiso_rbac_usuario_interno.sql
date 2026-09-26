@@ -59,7 +59,7 @@ BEGIN
             )
             BEGIN
                 EXEC dbo.usp_obtener_mensaje_catalogo
-                    @p_codigo = 'VAL_003',
+                    @p_codigo = 'SEC_001',
                     @p_param1 = @codigoPerfilDefecto,
                     @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                     @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;

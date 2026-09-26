@@ -13,7 +13,6 @@ CREATE OR ALTER PROCEDURE [dbo].[usp_crear_grupo]
     @codigo                  INT,
     @nombre                  NVARCHAR(50),
     @idDocente               UNIQUEIDENTIFIER,
-    @aula                    NVARCHAR(100) = NULL,
     @idCorrelacion           UNIQUEIDENTIFIER,
     @idUsuarioEjecutor       UNIQUEIDENTIFIER = NULL
 )
@@ -25,7 +24,6 @@ AS
     DECLARE @idDocenteDefecto          UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idDocente, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
     DECLARE @idUsuarioEjecutorDefecto UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idUsuarioEjecutor, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
     DECLARE @nombreDefecto             NVARCHAR(50)     = TRIM(@nombre);
-    DECLARE @aulaDefecto               NVARCHAR(100)    = NULLIF(TRIM(@aula), '');
 
     DECLARE @idPeriodoResolved         UNIQUEIDENTIFIER = @idPeriodoAcademicoDefecto;
     DECLARE @capacidadMaximaDefecto    INT;
@@ -46,7 +44,19 @@ BEGIN
             @estadoResultado = @estadoResultado OUTPUT;
 
         -- PASO 1.5: Validación de perfil RBAC del usuario ejecutor si es suministrado
-        IF @estadoResultado = 1 AND @idUsuarioEjecutor IS NOT NULL
+        IF @estadoResultado = 1 AND @idUsuarioEjecutor IS NULL
+        BEGIN
+            EXEC dbo.usp_obtener_mensaje_catalogo
+                @p_codigo = 'GEN_002',
+                @p_param1 = 'idUsuarioEjecutor',
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
+
+            SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+            SET @estadoResultado = 0;
+        END
+
+        IF @estadoResultado = 1
         BEGIN
             EXEC dbo.usp_validar_permiso_rbac_usuario_interno
                 @idUsuario = @idUsuarioEjecutorDefecto,
@@ -144,7 +154,7 @@ BEGIN
             END
         END
 
-        -- PASO 7: Inserción directa de Grupo con capacidad máxima proveniente del catálogo y aula normalizada
+        -- PASO 7: Inserción directa de Grupo con capacidad máxima proveniente del catálogo
         IF @estadoResultado = 1
         BEGIN
             INSERT INTO dbo.Grupo (

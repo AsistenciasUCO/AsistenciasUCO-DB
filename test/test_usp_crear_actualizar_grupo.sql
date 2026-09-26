@@ -9,11 +9,13 @@ PRINT 'TEST START: test_usp_crear_actualizar_grupo';
 DECLARE @idAsig UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_asignatura);
 DECLARE @idPeriodo UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_periodo_academico ORDER BY anio DESC);
 DECLARE @idDocente UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_docente);
+DECLARE @idUsuarioCoordinador UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_coordinador_identidad WHERE estaActivoUsuario = 1);
 DECLARE @capacidadDefecto INT = dbo.ufn_obtener_parametro_int(NULL, 'GRUPO', 'CAPACIDAD_MAXIMA_DEFECTO');
 
 IF @idAsig IS NULL THROW 51200, 'TEST FAILED: no existe fixture uv_asignatura.', 1;
 IF @idPeriodo IS NULL THROW 51201, 'TEST FAILED: no existe fixture uv_periodo_academico.', 1;
 IF @idDocente IS NULL THROW 51202, 'TEST FAILED: no existe fixture uv_docente.', 1;
+IF @idUsuarioCoordinador IS NULL THROW 51217, 'TEST FAILED: no existe fixture usuario coordinador.', 1;
 IF @capacidadDefecto IS NULL OR @capacidadDefecto <= 0 THROW 51203, 'TEST FAILED: capacidad defecto invalida.', 1;
 
 BEGIN TRANSACTION;
@@ -40,7 +42,8 @@ BEGIN TRY
         @codigo = @codigoGrupo,
         @nombre = N'Grupo Capacidad Defecto',
         @idDocente = @idDocente,
-        @idCorrelacion = @c1;
+        @idCorrelacion = @c1,
+        @idUsuarioEjecutor = @idUsuarioCoordinador;
 
     IF NOT EXISTS (SELECT 1 FROM #grupoResultado WHERE estadoResultado = 1)
         THROW 51204, 'TEST FAILED: usp_crear_grupo no retorno SUCCESS.', 1;
@@ -56,7 +59,8 @@ BEGIN TRY
         @nombre = NULL,
         @idDocente = NULL,
         @cupoMaximo = 60,
-        @idCorrelacion = @c2;
+        @idCorrelacion = @c2,
+        @idUsuarioEjecutor = @idUsuarioCoordinador;
 
     IF NOT EXISTS (SELECT 1 FROM #grupoResultado WHERE estadoResultado = 1)
         THROW 51208, 'TEST FAILED: usp_actualizar_grupo no retorno SUCCESS.', 1;
@@ -85,7 +89,8 @@ BEGIN TRY
         @nombre = NULL,
         @idDocente = NULL,
         @cupoMaximo = 1,
-        @idCorrelacion = @c3;
+        @idCorrelacion = @c3,
+        @idUsuarioEjecutor = @idUsuarioCoordinador;
 
     IF NOT EXISTS (SELECT 1 FROM #grupoResultado WHERE estadoResultado = 0 AND mensajeUsuarioResultado = (SELECT contenido FROM dbo.uv_mensaje_usuario WHERE codigo = 'ERR_CUPO_INFERIOR_OCUPACION'))
         THROW 51212, 'TEST FAILED: cupo inferior no retorno ERR_CUPO_INFERIOR_OCUPACION.', 1;
@@ -101,7 +106,8 @@ BEGIN TRY
         @nombre = N'Grupo Renombrado',
         @idDocente = NULL,
         @cupoMaximo = NULL,
-        @idCorrelacion = @c4;
+        @idCorrelacion = @c4,
+        @idUsuarioEjecutor = @idUsuarioCoordinador;
 
     IF NOT EXISTS (SELECT 1 FROM dbo.Grupo WHERE id = @idGrupo1 AND cantidadEstudiantes = 60 AND nombre = N'Grupo Renombrado')
         THROW 51214, 'TEST FAILED: actualizar grupo con NULL no conservo cupo.', 1;

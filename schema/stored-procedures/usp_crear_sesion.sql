@@ -8,25 +8,17 @@ GO
 CREATE OR ALTER PROCEDURE [dbo].[usp_crear_sesion]
 (
     @idGrupo            UNIQUEIDENTIFIER,
-    @idDocente          UNIQUEIDENTIFIER,
     @nombre             NVARCHAR(50),
-    @descripcion        NVARCHAR(250) = NULL,
     @fechaHoraInicio    DATETIME2,
     @fechaHoraFin       DATETIME2,
-    @aula               NVARCHAR(50) = NULL,
-    @tipo               NVARCHAR(50) = NULL,
     @idCorrelacion      UNIQUEIDENTIFIER,
     @idUsuarioEjecutor  UNIQUEIDENTIFIER = NULL
 )
 AS
     DECLARE @idCorrelacionDefecto     UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idCorrelacion, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
     DECLARE @idGrupoDefecto           UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idGrupo, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
-    DECLARE @idDocenteDefecto         UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idDocente, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
     DECLARE @idUsuarioEjecutorDefecto UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idUsuarioEjecutor, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
     DECLARE @nombreDefecto            NVARCHAR(50)     = TRIM(@nombre);
-    DECLARE @descripcionDefecto       NVARCHAR(250)    = NULLIF(TRIM(@descripcion), '');
-    DECLARE @aulaDefecto              NVARCHAR(50)     = NULLIF(TRIM(@aula), '');
-    DECLARE @tipoDefecto              NVARCHAR(50)     = NULLIF(TRIM(@tipo), '');
 
     DECLARE @idNuevoSesion   UNIQUEIDENTIFIER = NEWID();
     DECLARE @numeroSiguiente INT = 1;
@@ -36,6 +28,10 @@ AS
     DECLARE @mensajeUsuarioResultado NVARCHAR(4000) = dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA');
     DECLARE @mensajeTecnicoResultado NVARCHAR(4000) = dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA');
     DECLARE @estadoResultado         BIT = 1;
+
+    -- Ownership transaccional (propia o savepoint bajo transacción externa)
+    DECLARE @transaccionPropia BIT = 0;
+    DECLARE @savepointCreado   BIT = 0;
 
 BEGIN
     SET NOCOUNT ON;
@@ -47,8 +43,21 @@ BEGIN
             @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT, 
             @estadoResultado = @estadoResultado OUTPUT;
 
-        -- PASO 1.5: Validación de perfil RBAC y titularidad del Docente sobre el Grupo
-        IF @estadoResultado = 1 AND @idUsuarioEjecutor IS NOT NULL
+        -- PASO 1.5: El ejecutor (Usuario.id) es obligatorio y nunca puede saltar seguridad.
+        IF @estadoResultado = 1 AND @idUsuarioEjecutor IS NULL
+        BEGIN
+            EXEC dbo.usp_obtener_mensaje_catalogo
+                @p_codigo = 'GEN_002',
+                @p_param1 = 'idUsuarioEjecutor',
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
+
+            SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+            SET @estadoResultado = 0;
+        END
+
+        -- PASO 1.6: Validación de perfil RBAC del ejecutor
+        IF @estadoResultado = 1
         BEGIN
             EXEC dbo.usp_validar_permiso_rbac_usuario_interno
                 @idUsuario = @idUsuarioEjecutorDefecto,
@@ -57,40 +66,93 @@ BEGIN
                 @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                 @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
                 @estadoResultado = @estadoResultado OUTPUT;
-
-            IF @estadoResultado = 1 AND @idGrupoDefecto IS NOT NULL
-            BEGIN
-                EXEC dbo.usp_validar_titularidad_jerarquica_interno
-                    @idUsuario = @idUsuarioEjecutorDefecto,
-                    @idEntidadPadre = @idGrupoDefecto,
-                    @tipoEntidadPadre = 'GRUPO',
-                    @idCorrelacion = @idCorrelacionDefecto,
-                    @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
-                    @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
-                    @estadoResultado = @estadoResultado OUTPUT;
-            END
         END
 
-        -- PASO 2: Validación de pertenencia del grupo al docente titular mediante procedimiento interno
+        -- PASO 2: Validación de existencia del grupo académico
         IF @estadoResultado = 1
         BEGIN
-            EXEC dbo.usp_validar_grupo_exista_para_docente_interno
+            EXEC dbo.usp_validar_grupo_exista_por_id_interno
                 @idGrupo = @idGrupoDefecto,
-                @idDocente = @idDocenteDefecto,
                 @idCorrelacion = @idCorrelacionDefecto,
                 @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                 @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
                 @estadoResultado = @estadoResultado OUTPUT;
         END
 
-        -- PASO 3: Cálculo reactivo de correlativo de sesión e inserción
+        -- PASO 2.1: Titularidad del docente ejecutor sobre el grupo.
         IF @estadoResultado = 1
         BEGIN
-            SELECT @numeroSiguiente = ISNULL(COUNT(1), 0) + 1
-            FROM [dbo].[uv_sesion]
-            WHERE idGrupo = @idGrupoDefecto;
+            EXEC dbo.usp_validar_titularidad_jerarquica_interno
+                @idUsuario = @idUsuarioEjecutorDefecto,
+                @idEntidadPadre = @idGrupoDefecto,
+                @tipoEntidadPadre = 'GRUPO',
+                @idCorrelacion = @idCorrelacionDefecto,
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+                @estadoResultado = @estadoResultado OUTPUT;
+        END
 
-            SET @codigoSesion = CONCAT('SES-', RIGHT('00' + CAST(@numeroSiguiente AS VARCHAR(5)), 2));
+        -- PASO 2.5: Las fechas de sesión son obligatorias y representan instantes UTC.
+        IF @estadoResultado = 1 AND @fechaHoraInicio IS NULL
+        BEGIN
+            EXEC dbo.usp_obtener_mensaje_catalogo
+                @p_codigo = 'GEN_002',
+                @p_param1 = 'fechaHoraInicio',
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
+
+            SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+            SET @estadoResultado = 0;
+        END
+
+        IF @estadoResultado = 1 AND @fechaHoraFin IS NULL
+        BEGIN
+            EXEC dbo.usp_obtener_mensaje_catalogo
+                @p_codigo = 'GEN_002',
+                @p_param1 = 'fechaHoraFin',
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
+
+            SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+            SET @estadoResultado = 0;
+        END
+
+        IF @estadoResultado = 1 AND @fechaHoraFin <= @fechaHoraInicio
+        BEGIN
+            EXEC dbo.usp_obtener_mensaje_catalogo
+                @p_codigo = 'SES_004',
+                @p_param1 = 'fechaHoraFin',
+                @p_param2 = 'fechaHoraInicio',
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
+
+            SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+            SET @estadoResultado = 0;
+        END
+
+        -- PASO 3: Cálculo transaccional del correlativo de sesión e inserción
+        -- (ownership transaccional: propia o savepoint bajo transacción externa)
+        IF @estadoResultado = 1
+        BEGIN
+            IF @@TRANCOUNT = 0
+            BEGIN
+                BEGIN TRANSACTION;
+                SET @transaccionPropia = 1;
+            END
+            ELSE
+            BEGIN
+                SAVE TRANSACTION usp_crear_sesion;
+                SET @savepointCreado = 1;
+            END
+
+            SELECT @numeroSiguiente = COALESCE(MAX(numero), 0) + 1
+            FROM [dbo].[Sesion] WITH (UPDLOCK, HOLDLOCK)
+            WHERE grupo = @idGrupoDefecto;
+
+            SET @codigoSesion = CASE
+                WHEN @numeroSiguiente < 100 THEN CONCAT('SES-', RIGHT('0' + CAST(@numeroSiguiente AS VARCHAR(10)), 2))
+                ELSE CONCAT('SES-', CAST(@numeroSiguiente AS VARCHAR(10)))
+            END;
 
             INSERT INTO dbo.Sesion (
                 id, nombre, numero, codigo, numeroSemana, grupo,
@@ -103,9 +165,17 @@ BEGIN
                 @codigoSesion,
                 @numeroSiguiente,
                 @idGrupoDefecto,
-                CASE WHEN @fechaHoraInicio IS NOT NULL THEN @fechaHoraInicio ELSE CURRENT_TIMESTAMP END,
-                CASE WHEN @fechaHoraFin IS NOT NULL THEN @fechaHoraFin ELSE DATEADD(HOUR, 2, CURRENT_TIMESTAMP) END
+                @fechaHoraInicio,
+                @fechaHoraFin
             );
+
+            IF @transaccionPropia = 1
+            BEGIN
+                IF XACT_STATE() = 1
+                    COMMIT TRANSACTION;
+                ELSE IF XACT_STATE() <> 0
+                    ROLLBACK TRANSACTION;
+            END
 
             EXEC dbo.usp_obtener_mensaje_catalogo
                 @p_codigo = 'GEN_004',
@@ -118,6 +188,25 @@ BEGIN
 
     END TRY
     BEGIN CATCH
+        -- BLOQUE CATCH: Captura centralizada de excepciones y reversión respetando ownership transaccional
+        DECLARE @estadoTransaccionCatch INT = XACT_STATE();
+
+        IF @transaccionPropia = 1
+        BEGIN
+            IF @estadoTransaccionCatch <> 0
+                ROLLBACK TRANSACTION;
+        END
+        ELSE IF @savepointCreado = 1 AND @estadoTransaccionCatch = 1
+        BEGIN
+            ROLLBACK TRANSACTION usp_crear_sesion;
+        END
+
+        -- Transacción externa condenada (XACT_STATE = -1) que no nos pertenece: propagar al propietario
+        IF @transaccionPropia = 0 AND @estadoTransaccionCatch = -1
+        BEGIN
+            THROW;
+        END
+
         EXEC dbo.usp_obtener_mensaje_catalogo
             @p_codigo = 'SYS_001',
             @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,

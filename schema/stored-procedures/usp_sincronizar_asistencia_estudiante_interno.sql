@@ -20,14 +20,14 @@ AS
     DECLARE @idCorrelacionDefecto    UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idCorrelacion, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
     DECLARE @idEstudianteDefecto     UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idEstudiante, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
     DECLARE @idSesionDefecto         UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idSesion, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
-    DECLARE @codigoEstadoDefecto     NVARCHAR(5) = TRIM(dbo.ufn_obtener_parametro_texto(@codigoEstado, 'GENERAL', 'CADENA_VACIA'));
+    DECLARE @codigoEstadoDefecto     NVARCHAR(5) = UPPER(TRIM(dbo.ufn_obtener_parametro_texto(@codigoEstado, 'GENERAL', 'CADENA_VACIA')));
+    DECLARE @codigoCanonico          NVARCHAR(5);
 
     DECLARE @idGrupo                 UNIQUEIDENTIFIER;
     DECLARE @fechaInicioSesion       DATETIME2;
     DECLARE @fechaFinSesion          DATETIME2;
     DECLARE @idEstudianteGrupo        UNIQUEIDENTIFIER;
     DECLARE @idRazonCausa            UNIQUEIDENTIFIER;
-    DECLARE @nombreEstado            NVARCHAR(50);
     DECLARE @asistio                 BIT;
     DECLARE @idAsistencia            UNIQUEIDENTIFIER;
     DECLARE @idDetalleAsistencia     UNIQUEIDENTIFIER;
@@ -50,13 +50,7 @@ BEGIN
             @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT, 
             @estadoResultado = @estadoResultado OUTPUT;
 
-        -- PASO 2: Estandarización de código de estado por defecto
-        IF @estadoResultado = 1 AND (@codigoEstadoDefecto IS NULL OR @codigoEstadoDefecto = '')
-        BEGIN
-            SET @codigoEstadoDefecto = 'A';
-        END
-
-        -- PASO 3: Verificación de la sesión de clase y obtención de franja horaria
+        -- PASO 2: Verificación de la sesión de clase y obtención de franja horaria
         IF @estadoResultado = 1
         BEGIN
             SELECT TOP 1 
@@ -79,14 +73,16 @@ BEGIN
             END
         END
 
-        -- PASO 4: Verificación de la matrícula del estudiante en el grupo
+        -- PASO 3: Verificación de la matrícula activa del estudiante en el grupo
         IF @estadoResultado = 1
         BEGIN
             SELECT TOP 1 
-                @idEstudianteGrupo = id
-            FROM dbo.EstudianteGrupo
-            WHERE estudiante = @idEstudianteDefecto 
-              AND grupo = @idGrupo;
+                @idEstudianteGrupo = eg.id
+            FROM dbo.EstudianteGrupo eg WITH (UPDLOCK, HOLDLOCK)
+            INNER JOIN dbo.EstadoEstudianteGrupo eeg ON eeg.id = eg.estado
+            WHERE eg.estudiante = @idEstudianteDefecto 
+              AND eg.grupo = @idGrupo
+              AND eeg.codigo = 'A';
 
             IF @idEstudianteGrupo IS NULL
             BEGIN
@@ -102,39 +98,39 @@ BEGIN
             END
         END
 
-        -- PASO 5: Resolución de la razón de causa/asistencia en dbo.RazonCausa
+        -- PASO 4: Resolución de la razón de causa/asistencia en dbo.RazonCausa.
+        -- RazonCausa es un CATALOGO CERRADO: un código desconocido NO crea filas (RC_001, sin escritura).
         IF @estadoResultado = 1
         BEGIN
-            SELECT TOP 1 @idRazonCausa = id 
-            FROM dbo.RazonCausa 
-            WHERE codigo = @codigoEstadoDefecto
-               OR (@codigoEstadoDefecto = 'A' AND codigo = 'AN')
-               OR (@codigoEstadoDefecto = 'F' AND codigo = 'SJC');
+            SET @codigoCanonico = @codigoEstadoDefecto;
+
+            SELECT TOP 1 @idRazonCausa = id
+            FROM dbo.RazonCausa
+            WHERE codigo = @codigoCanonico
+              AND codigo IN ('AN', 'SJC', 'EX');
 
             IF @idRazonCausa IS NULL
             BEGIN
-                SET @idRazonCausa = NEWID();
-                SET @nombreEstado = 
-                    CASE @codigoEstadoDefecto
-                        WHEN 'A' THEN 'Asistió'
-                        WHEN 'F' THEN 'Faltó'
-                        WHEN 'T' THEN 'Tarde'
-                        WHEN 'J' THEN 'Justificado'
-                        ELSE 'Otro/Desconocido'
-                    END;
+                EXEC dbo.usp_obtener_mensaje_catalogo
+                    @p_codigo = 'RC_001',
+                    @p_param1 = @codigoEstadoDefecto,
+                    @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                    @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
 
-                INSERT INTO dbo.RazonCausa (id, nombre, codigo)
-                VALUES (@idRazonCausa, @nombreEstado, @codigoEstadoDefecto);
+                SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+                SET @estadoResultado = 0;
             END
-
-            SET @asistio = CASE WHEN @codigoEstadoDefecto IN ('A', 'T', 'AN') THEN 1 ELSE 0 END;
+            ELSE
+            BEGIN
+                SET @asistio = CASE WHEN @codigoCanonico = 'AN' THEN 1 ELSE 0 END;
+            END
         END
 
-        -- PASO 6: Sincronización de cabecera y detalle de asistencia
+        -- PASO 5: Sincronización de cabecera y detalle de asistencia
         IF @estadoResultado = 1
         BEGIN
             SELECT TOP 1 @idAsistencia = id
-            FROM dbo.Asistencia
+            FROM dbo.Asistencia WITH (UPDLOCK, HOLDLOCK)
             WHERE estudianteGrupo = @idEstudianteGrupo 
               AND sesion = @idSesionDefecto;
 
@@ -146,12 +142,13 @@ BEGIN
             END
 
             SELECT TOP 1 @idDetalleAsistencia = id
-            FROM dbo.DetalleAsistencia
+            FROM dbo.DetalleAsistencia WITH (UPDLOCK, HOLDLOCK)
             WHERE asistencia = @idAsistencia;
 
             IF @idDetalleAsistencia IS NULL
             BEGIN
-                SELECT @nuevoCodigo = dbo.ufn_obtener_parametro_int(MAX(codigo), 'GENERAL', 'ENTERO_CERO') + 1 FROM dbo.DetalleAsistencia;
+                SELECT @nuevoCodigo = dbo.ufn_obtener_parametro_int(MAX(codigo), 'GENERAL', 'ENTERO_CERO') + 1
+                FROM dbo.DetalleAsistencia WITH (UPDLOCK, HOLDLOCK);
                 SET @idDetalleAsistencia = NEWID();
 
                 INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin)

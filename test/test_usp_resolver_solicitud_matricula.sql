@@ -5,6 +5,8 @@ SET NOCOUNT ON;
 SET XACT_ABORT OFF;
 
 PRINT 'TEST START: test_usp_resolver_solicitud_matricula';
+DECLARE @idUsuarioCoordinador UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_coordinador_identidad WHERE estaActivoUsuario = 1);
+IF @idUsuarioCoordinador IS NULL THROW 51603, 'TEST FAILED: SolicitudMatricula no tiene coordinador ejecutor fixture.', 1;
 
 BEGIN TRANSACTION;
 BEGIN TRY
@@ -21,7 +23,8 @@ BEGIN TRY
         @idCoordinador = '19191919-1919-1919-1919-191919191919',
         @accion = N'APROBAR',
         @respuestaCoordinador = N'Aprobado por QA',
-        @idCorrelacion = '20202020-2020-2020-2020-202020202020';
+        @idCorrelacion = '20202020-2020-2020-2020-202020202020',
+        @idUsuarioEjecutor = @idUsuarioCoordinador;
 
     IF NOT EXISTS (
         SELECT 1

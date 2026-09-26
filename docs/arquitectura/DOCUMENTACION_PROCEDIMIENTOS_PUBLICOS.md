@@ -151,20 +151,28 @@ Esta documentación especifica la arquitectura, reglas de negocio, contrato de f
 - **Caso de Uso de Negocio**: Orquestador de registro masivo de asistencias por lote JSON. Permite procesar en una sola transacción la lista completa de asistencias para todos los estudiantes matriculados en una sesión de clase.
 - **Parámetros de Entrada**:
   - `@idSesion UNIQUEIDENTIFIER`: ID de la sesión de clase.
-  - `@asistenciaJSON NVARCHAR(MAX)`: Carga útil en formato JSON con la lista de objetos `[{ "idEstudiante": "...", "estado": "..." }]`.
+  - `@asistenciaJSON NVARCHAR(MAX)`: Carga útil en formato JSON con la lista de objetos `[{ "idEstudiante": "...", "estado": "AN|SJC|EX" }]`. **Estados públicos: `AN` (asistencia normal), `SJC` (sin justa causa), `EX` (excusa)**; se normalizan con `TRIM` + `UPPER`. `A`, `F`, `T`, `J`, `ABC`, vacío o ausente son inválidos (`RC_001`); no hay conversión `A → AN` / `F → SJC` en el batch.
   - `@idCorrelacion UNIQUEIDENTIFIER`: ID de correlación de trazabilidad.
-- **Resultset Devuelto**:
+  - `@idUsuarioEjecutor UNIQUEIDENTIFIER = NULL`: **`Usuario.id`** del docente autenticado (no `Docente.id`). **Requerido semánticamente**: *opcional en firma ≠ opcional en contrato*. `NULL` u omitido → `estadoResultado = 0` (`GEN_002`, campo `idUsuarioEjecutor`), sin escrituras y sin saltarse RBAC/titularidad.
+- **Resultset Devuelto** (una única fila, sin cambios):
   - `idCorrelacion UNIQUEIDENTIFIER`
   - `mensajeUsuarioResultado NVARCHAR(4000)`
   - `mensajeTecnicoResultado NVARCHAR(4000)`
   - `estadoResultado BIT`
+- **Seguridad**: RBAC perfil `DOCENTE` y titularidad de la sesión (`Sesion → Grupo → Docente.id → uv_docente_identidad → idUsuario = @idUsuarioEjecutor`).
+- **Atomicidad**: el lote se valida completo antes de escribir; un fallo revierte todo el lote (transacción propia o `SAVE TRANSACTION` bajo transacción externa).
+- **RazonCausa**: catálogo cerrado; ningún código desconocido crea filas en `dbo.RazonCausa`.
+- **Lectura**: el estado se consulta vía `dbo.uv_detalle_asistencia.codigoRazonCausa` (y `dbo.uv_razon_causa.codigo`).
 - **Procedimientos Internos y Vistas Invocados**:
   - `dbo.usp_validar_id_correlacion_esta_presente_interno`
+  - `dbo.usp_validar_permiso_rbac_usuario_interno`
   - `dbo.usp_validar_sesion_exista_por_id_interno`
+  - `dbo.usp_validar_titularidad_jerarquica_interno` (`SESION`)
   - `OPENJSON`
   - `dbo.usp_validar_estudiante_pertenece_a_grupo_de_sesion_interno`
   - `dbo.usp_sincronizar_asistencia_estudiante_interno`
-- **Códigos del Catálogo Consumidos**: `GEN_004`, `SYS_001`.
+- **Códigos del Catálogo Consumidos**: `GEN_002`, `RC_001`, `SES_001`, `VAL_003`, `EST_004`, `GEN_004`, `SYS_001`.
+- Detalle completo: [`docs/stored-procedures/usp_registrar_asistencias_sesion.md`](docs/stored-procedures/usp_registrar_asistencias_sesion.md).
 
 ---
 

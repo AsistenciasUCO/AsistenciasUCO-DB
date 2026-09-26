@@ -23,3 +23,12 @@ CREATE TABLE [dbo].[Grupo] (
 ALTER TABLE [dbo].[Grupo] ADD CONSTRAINT [PK__Grupo__3213E83FFA8811CC] PRIMARY KEY CLUSTERED ([id]);
 END
 GO
+
+IF EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID('dbo.Grupo')
+      AND name IN (N'au' + N'la')
+)
+    THROW 50005, 'SCHEMA_CONTRACT_CONFLICT: dbo.Grupo contains ghost columns outside DB-GP-001.', 1;
+GO

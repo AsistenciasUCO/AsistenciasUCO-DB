@@ -27,6 +27,9 @@ AS
 
     DECLARE @fechaHoraInicio      DATETIME2;
     DECLARE @fechaHoraFin         DATETIME2;
+    DECLARE @fechaHoraInicioLocal DATETIME2;
+    DECLARE @fechaHoraFinLocal    DATETIME2;
+    DECLARE @zonaHorariaSqlServer SYSNAME;
     DECLARE @numSemana            INT;
     DECLARE @codigoVerif          NVARCHAR(50);
     DECLARE @nombreSesion         NVARCHAR(50);
@@ -67,11 +70,25 @@ BEGIN
             @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT, 
             @estadoResultado = @estadoResultado OUTPUT;
 
-        -- PASO 1.5: Validación del usuario ejecutor si es suministrado
-        IF @estadoResultado = 1 AND @idUsuarioEjecutor IS NOT NULL
+        -- PASO 1.5: El ejecutor (Usuario.id) es obligatorio y nunca puede saltar seguridad.
+        IF @estadoResultado = 1 AND @idUsuarioEjecutor IS NULL
         BEGIN
-            EXEC dbo.usp_validar_usuario_existe_por_id_interno
+            EXEC dbo.usp_obtener_mensaje_catalogo
+                @p_codigo = 'GEN_002',
+                @p_param1 = 'idUsuarioEjecutor',
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
+
+            SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+            SET @estadoResultado = 0;
+        END
+
+        -- PASO 1.6: Validación del usuario ejecutor y perfil docente
+        IF @estadoResultado = 1
+        BEGIN
+            EXEC dbo.usp_validar_permiso_rbac_usuario_interno
                 @idUsuario = @idUsuarioEjecutorDefecto,
+                @codigoPerfilRequerido = 'DOCENTE',
                 @idCorrelacion = @idCorrelacionDefecto,
                 @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                 @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
@@ -86,6 +103,19 @@ BEGIN
                 @idCorrelacion = @idCorrelacionDefecto, 
                 @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT, 
                 @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT, 
+                @estadoResultado = @estadoResultado OUTPUT;
+        END
+
+        -- PASO 2.1: Titularidad del docente ejecutor sobre el grupo
+        IF @estadoResultado = 1
+        BEGIN
+            EXEC dbo.usp_validar_titularidad_jerarquica_interno
+                @idUsuario = @idUsuarioEjecutorDefecto,
+                @idEntidadPadre = @idGrupoDefecto,
+                @tipoEntidadPadre = 'GRUPO',
+                @idCorrelacion = @idCorrelacionDefecto,
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
                 @estadoResultado = @estadoResultado OUTPUT;
         END
 
@@ -111,13 +141,45 @@ BEGIN
                 @estadoResultado = @estadoResultado OUTPUT;
         END
 
+        -- PASO 4.5: Zona horaria institucional válida para convertir horario local a UTC.
+        IF @estadoResultado = 1
+        BEGIN
+            SELECT TOP 1 @zonaHorariaSqlServer = CONVERT(SYSNAME, valor)
+            FROM dbo.CatalogoParametro
+            WHERE grupo = 'TIEMPO'
+              AND clave = 'ZONA_HORARIA_SQLSERVER'
+              AND estaActivo = 1;
+
+            IF @zonaHorariaSqlServer IS NULL
+               OR NOT EXISTS (SELECT 1 FROM sys.time_zone_info WHERE [name] = @zonaHorariaSqlServer)
+            BEGIN
+                EXEC dbo.usp_obtener_mensaje_catalogo
+                    @p_codigo = 'GEN_001',
+                    @p_param1 = 'TIEMPO/ZONA_HORARIA_SQLSERVER',
+                    @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                    @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
+
+                SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+                SET @estadoResultado = 0;
+            END
+        END
+
         -- PASO 5: Generación recurrente de sesiones de clase según el periodo académico y franjas horarias
         IF @estadoResultado = 1
         BEGIN
             SELECT TOP 1 @idPeriodo = periodoAcademico FROM dbo.Grupo WHERE id = @idGrupoDefecto;
             SELECT TOP 1 @fechaInicio = fechaInicio, @fechaFin = fechaFin FROM dbo.PeriodoAcademico WHERE id = @idPeriodo;
 
-            SELECT @maxNumeroSesion = MAX(numero) FROM dbo.Sesion WHERE grupo = @idGrupoDefecto;
+            SET @currentDate = @fechaInicio;
+            SET @sesionesCreadas = 0;
+
+            BEGIN TRANSACTION;
+
+            -- Correlativo protegido dentro de la transacción para evitar carreras con usp_crear_sesion
+            SELECT @maxNumeroSesion = MAX(numero)
+            FROM dbo.Sesion WITH (UPDLOCK, HOLDLOCK)
+            WHERE grupo = @idGrupoDefecto;
+
             IF @maxNumeroSesion IS NULL
             BEGIN
                 SET @numeroSesion = 1;
@@ -126,11 +188,6 @@ BEGIN
             BEGIN
                 SET @numeroSesion = @maxNumeroSesion + 1;
             END
-
-            SET @currentDate = @fechaInicio;
-            SET @sesionesCreadas = 0;
-
-            BEGIN TRANSACTION;
 
             WHILE @currentDate <= @fechaFin
             BEGIN
@@ -171,8 +228,10 @@ BEGIN
                         FROM @HorariosOrdenados
                         WHERE secuencia = @hIterador;
 
-                        SET @fechaHoraInicio = CAST(CAST(@currentDate AS DATETIME) + CAST(@horaInicio AS DATETIME) AS DATETIME2);
-                        SET @fechaHoraFin = CAST(CAST(@currentDate AS DATETIME) + CAST(@horaFin AS DATETIME) AS DATETIME2);
+                        SET @fechaHoraInicioLocal = CAST(CONCAT(CONVERT(CHAR(10), @currentDate, 23), 'T', CONVERT(CHAR(8), @horaInicio, 108)) AS DATETIME2);
+                        SET @fechaHoraFinLocal = CAST(CONCAT(CONVERT(CHAR(10), @currentDate, 23), 'T', CONVERT(CHAR(8), @horaFin, 108)) AS DATETIME2);
+                        SET @fechaHoraInicio = CAST(@fechaHoraInicioLocal AT TIME ZONE @zonaHorariaSqlServer AT TIME ZONE 'UTC' AS DATETIME2);
+                        SET @fechaHoraFin = CAST(@fechaHoraFinLocal AT TIME ZONE @zonaHorariaSqlServer AT TIME ZONE 'UTC' AS DATETIME2);
 
                         -- Inserción controlada evitando duplicación de fechas/horas
                         IF NOT EXISTS (

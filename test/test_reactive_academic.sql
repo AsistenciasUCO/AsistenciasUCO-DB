@@ -8,6 +8,8 @@ SELECT TOP 1 @student = id, @faculty = idFacultad, @institution = idInstitucion
 FROM dbo.uv_estudiante WHERE estaActivoEstudiante = 1 ORDER BY id;
 DECLARE @programType UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_tipo_programa);
 DECLARE @coordinator UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_coordinador_identidad WHERE estaActivoUsuario = 1);
+DECLARE @coordinatorUser UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_coordinador_identidad WHERE id = @coordinator);
+DECLARE @deanUser UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_decano_identidad WHERE estaActivoUsuario = 1);
 DECLARE @assignment UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_asignatura);
 DECLARE @period UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_periodo_academico ORDER BY anio DESC);
 DECLARE @teacher UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_docente);
@@ -20,7 +22,7 @@ DECLARE @groupCode INT = 50000 + ABS(CHECKSUM(NEWID()) % 10000);
 DECLARE @groupCodeText NVARCHAR(50) = CONVERT(NVARCHAR(50), @groupCode);
 DECLARE @corr UNIQUEIDENTIFIER, @userMsg NVARCHAR(4000), @techMsg NVARCHAR(4000);
 IF @student IS NULL OR @faculty IS NULL OR @programType IS NULL OR @coordinator IS NULL OR
-   @assignment IS NULL OR @period IS NULL OR @teacher IS NULL
+   @coordinatorUser IS NULL OR @deanUser IS NULL OR @assignment IS NULL OR @period IS NULL OR @teacher IS NULL
     THROW 51990, 'TEST FAILED: REACTIVE_ACADEMIC fixture missing.', 1;
 CREATE TABLE #academicResult (idCorrelacion UNIQUEIDENTIFIER NULL, mensajeUsuarioResultado NVARCHAR(MAX),
     mensajeTecnicoResultado NVARCHAR(MAX), estadoResultado INT NOT NULL);
@@ -33,7 +35,7 @@ BEGIN TRY
     EXEC dbo.usp_crear_programa_academico
         @idPrograma = @programRequested, @codigo = 101, @nombre = @programName,
         @idCoordinador = @coordinator, @idFacultad = @faculty, @idTipoPrograma = @programType,
-        @idCorrelacion = @corr;
+        @idCorrelacion = @corr, @idUsuarioEjecutor = @deanUser;
     IF (SELECT COUNT(*) FROM #academicResult WHERE idCorrelacion = @corr AND estadoResultado = 1
         AND mensajeUsuarioResultado = @userMsg
         AND mensajeTecnicoResultado = CONCAT(@techMsg, ' Correlacion: ', @corr)) <> 1
@@ -53,7 +55,7 @@ BEGIN TRY
     EXEC dbo.usp_crear_programa_academico
         @idPrograma = @program, @codigo = 101, @nombre = @programName,
         @idCoordinador = @coordinator, @idFacultad = @faculty, @idTipoPrograma = @programType,
-        @idCorrelacion = @corr;
+        @idCorrelacion = @corr, @idUsuarioEjecutor = @deanUser;
     IF (SELECT COUNT(*) FROM #academicResult WHERE idCorrelacion = @corr AND estadoResultado = 1
         AND mensajeUsuarioResultado = @userMsg) <> 1 OR
         (SELECT COUNT(*) FROM dbo.Programa WHERE id = @program) <> 1
@@ -71,7 +73,7 @@ BEGIN TRY
     EXEC dbo.usp_crear_grupo
         @idGrupo = @groupRequested, @idAsignatura = @assignment, @idPeriodoAcademico = @period,
         @codigo = @groupCode, @nombre = N'Grupo QA Reactivo', @idDocente = @teacher,
-        @aula = NULL, @idCorrelacion = @corr;
+        @idCorrelacion = @corr, @idUsuarioEjecutor = @coordinatorUser;
     IF (SELECT COUNT(*) FROM #academicResult WHERE idCorrelacion = @corr AND estadoResultado = 1
         AND mensajeUsuarioResultado = @userMsg) <> 1
         THROW 51997, 'TEST FAILED: GROUP_UPSERT_CREATE wrong canonical result.', 1;
@@ -86,7 +88,7 @@ BEGIN TRY
     EXEC dbo.usp_actualizar_grupo
         @idGrupo = @group, @codigo = @groupCode,
         @nombre = N'Grupo QA Reactivo Editado', @idDocente = @teacher,
-        @cupoMaximo = 30, @aula = NULL, @idCorrelacion = @corr;
+        @cupoMaximo = 30, @idCorrelacion = @corr, @idUsuarioEjecutor = @coordinatorUser;
     IF (SELECT COUNT(*) FROM #academicResult WHERE idCorrelacion = @corr AND estadoResultado = 1
         AND mensajeUsuarioResultado = @userMsg) <> 1 OR
         NOT EXISTS (SELECT 1 FROM dbo.uv_grupo WHERE id = @group

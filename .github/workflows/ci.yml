@@ -16,16 +16,22 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Start MSSQL Docker Container
+        env:
+          MSSQL_SA_PASSWORD: ${{ secrets.MSSQL_SA_PASSWORD }}
         run: |
+          test -n "$MSSQL_SA_PASSWORD"
           docker run -d --name sqlserver \
             -e "ACCEPT_EULA=Y" \
-            -e "MSSQL_SA_PASSWORD=Rionegro2233+" \
+            -e "MSSQL_SA_PASSWORD=$MSSQL_SA_PASSWORD" \
             -p 1433:1433 \
             mcr.microsoft.com/mssql/server:2022-latest
 
       - name: Wait for MSSQL Engine Readiness
         shell: pwsh
+        env:
+          MSSQL_SA_PASSWORD: ${{ secrets.MSSQL_SA_PASSWORD }}
         run: |
+          if (-not $env:MSSQL_SA_PASSWORD) { throw "MSSQL_SA_PASSWORD secret is required." }
           $maxAttempts = 30
           $attempt = 0
           $ready = $false
@@ -33,7 +39,7 @@ jobs:
               $attempt++
               Write-Host "Waiting for MSSQL Server engine... (Attempt $attempt/$maxAttempts)"
               Start-Sleep -Seconds 2
-              $check = docker exec sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "Rionegro2233+" -C -Q "SELECT 1;" 2>&1
+              $check = docker exec sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P $env:MSSQL_SA_PASSWORD -C -Q "SELECT 1;" 2>&1
               if ($LASTEXITCODE -eq 0) {
                   $ready = $true
                   Write-Host "MSSQL Server Engine is READY!" -ForegroundColor Green
@@ -45,13 +51,17 @@ jobs:
 
       - name: Deploy Database Schema (deploy_schema.ps1)
         shell: pwsh
+        env:
+          MSSQL_SA_PASSWORD: ${{ secrets.MSSQL_SA_PASSWORD }}
         run: |
-          ./deploy_schema.ps1 -ContainerName "sqlserver" -Password "Rionegro2233+"
+          ./deploy_schema.ps1 -ContainerName "sqlserver"
 
       - name: Execute DB Quality Gate (test_summary.ps1)
         shell: pwsh
+        env:
+          MSSQL_SA_PASSWORD: ${{ secrets.MSSQL_SA_PASSWORD }}
         run: |
-          ./test_summary.ps1 -ContainerName "sqlserver" -Password "Rionegro2233+"
+          ./test_summary.ps1 -ContainerName "sqlserver"
 
       - name: SonarCloud Analysis
         uses: SonarSource/sonarcloud-github-action@master

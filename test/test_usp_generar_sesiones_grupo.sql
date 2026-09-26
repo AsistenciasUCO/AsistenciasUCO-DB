@@ -6,10 +6,20 @@ SET XACT_ABORT OFF;
 DECLARE @institution UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_institucion);
 DECLARE @assignment UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_asignatura);
 DECLARE @teacher UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_docente);
+DECLARE @teacherUser UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_docente WHERE id = @teacher);
 DECLARE @period UNIQUEIDENTIFIER = NEWID(), @group UNIQUEIDENTIFIER = NEWID();
 DECLARE @missingGroup UNIQUEIDENTIFIER = NEWID(), @corr UNIQUEIDENTIFIER = NEWID();
-DECLARE @firstDay DATE = CAST(GETDATE() AS DATE);
-IF @institution IS NULL OR @assignment IS NULL OR @teacher IS NULL
+DECLARE @firstDay DATE = CAST(
+    SYSUTCDATETIME() AT TIME ZONE 'UTC' AT TIME ZONE COALESCE(
+        (SELECT TOP 1 valor
+         FROM dbo.CatalogoParametro
+         WHERE grupo = 'TIEMPO'
+           AND clave = 'ZONA_HORARIA_SQLSERVER'
+           AND estaActivo = 1),
+        'SA Pacific Standard Time'
+    ) AS DATE
+);
+IF @institution IS NULL OR @assignment IS NULL OR @teacher IS NULL OR @teacherUser IS NULL
     THROW 51700, 'TEST FAILED: SESSION_GENERATION fixture missing.', 1;
 
 CREATE TABLE #generationResult (
@@ -37,7 +47,7 @@ BEGIN TRY
     EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = 'GEN_004', @p_param1 = 'GeneracionSesionesGrupo',
         @mensajeUsuarioResultado = @userMsg OUTPUT, @mensajeTecnicoResultado = @techMsg OUTPUT;
     INSERT INTO #generationResult
-    EXEC dbo.usp_generar_sesiones_grupo @idGrupo = @group, @idCorrelacion = @corr;
+    EXEC dbo.usp_generar_sesiones_grupo @idGrupo = @group, @idCorrelacion = @corr, @idUsuarioEjecutor = @teacherUser;
     IF (SELECT COUNT(*) FROM #generationResult WHERE idCorrelacion = @corr AND estadoResultado = 1
         AND mensajeUsuarioResultado = @userMsg
         AND mensajeTecnicoResultado = CONCAT(@techMsg, ' Correlacion: ', @corr)) <> 1
@@ -46,12 +56,21 @@ BEGIN TRY
         THROW 51703, 'TEST FAILED: SESSION_GENERATION did not create eight visible sessions.', 1;
     IF EXISTS (SELECT 1 FROM dbo.Sesion WHERE grupo = @group GROUP BY fechaHoraInicio, fechaHoraFin HAVING COUNT(*) > 1)
         THROW 51704, 'TEST FAILED: SESSION_GENERATION created duplicate times.', 1;
+    IF NOT EXISTS (
+        SELECT 1
+        FROM dbo.Sesion
+        WHERE grupo = @group
+          AND CAST(fechaHoraInicio AS TIME) = '13:00'
+          AND fechaHoraInicio = DATEADD(HOUR, 13, CAST(@firstDay AS DATETIME2))
+    )
+        THROW 51712, 'TEST FAILED: UTC_SESSION_GENERATION did not persist 08:00 America/Bogota as 13:00 UTC.', 1;
     PRINT 'TEST_PASS:SESSION_GENERATION_SUCCESS';
+    PRINT 'TEST_PASS:UTC_SESSION_GENERATION';
 
     TRUNCATE TABLE #generationResult;
     SET @corr = NEWID();
     INSERT INTO #generationResult
-    EXEC dbo.usp_generar_sesiones_grupo @idGrupo = @group, @idCorrelacion = @corr;
+    EXEC dbo.usp_generar_sesiones_grupo @idGrupo = @group, @idCorrelacion = @corr, @idUsuarioEjecutor = @teacherUser;
     IF (SELECT COUNT(*) FROM #generationResult WHERE idCorrelacion = @corr AND estadoResultado = 1
         AND mensajeUsuarioResultado = @userMsg) <> 1
         THROW 51705, 'TEST FAILED: SESSION_GENERATION repeat returned wrong result.', 1;
@@ -65,7 +84,7 @@ BEGIN TRY
         @p_param1 = @missingGroup, @mensajeUsuarioResultado = @userMsg OUTPUT,
         @mensajeTecnicoResultado = @techMsg OUTPUT;
     INSERT INTO #generationResult
-    EXEC dbo.usp_generar_sesiones_grupo @idGrupo = @missingGroup, @idCorrelacion = @corr;
+    EXEC dbo.usp_generar_sesiones_grupo @idGrupo = @missingGroup, @idCorrelacion = @corr, @idUsuarioEjecutor = @teacherUser;
     IF (SELECT COUNT(*) FROM #generationResult WHERE idCorrelacion = @corr AND estadoResultado = 0
         AND mensajeUsuarioResultado = @userMsg
         AND mensajeTecnicoResultado = CONCAT(@techMsg, ' Correlacion: ', @corr)) <> 1

@@ -25,6 +25,8 @@ BEGIN
     DECLARE @sevUsr VARCHAR(20) = NULL;
     DECLARE @tipoTec VARCHAR(50) = NULL;
     DECLARE @sevTec VARCHAR(20) = NULL;
+    DECLARE @codigoResultado VARCHAR(100) = CASE WHEN @codigoLimpio = '' THEN 'DESCONOCIDO' ELSE @codigoLimpio END;
+    DECLARE @detalleTecnico NVARCHAR(3900) = NULL;
 
     -- Consulta EXCLUSIVA mediante VISTA uv_mensaje_usuario
     SELECT 
@@ -57,14 +59,16 @@ BEGIN
     -- Gestión interna de NULOS y Fallbacks para Mensaje Técnico
     IF @rawTecnico IS NULL
     BEGIN
-        SET @mensajeTecnicoResultado = CONCAT('Mensaje técnico no configurado para el código: ', ISNULL(@codigoLimpio, 'DESCONOCIDO'));
+        SET @detalleTecnico = CONCAT('Mensaje técnico no configurado para el código: ', @codigoResultado);
         SET @tipoTec = 'SYSTEM_ERROR';
         SET @sevTec  = 'CRITICO';
     END
     ELSE
     BEGIN
-        SET @mensajeTecnicoResultado = dbo.ufn_reemplazar_plantilla_mensaje(@rawTecnico, @p_param1, @p_param2, @p_param3);
+        SET @detalleTecnico = dbo.ufn_reemplazar_plantilla_mensaje(@rawTecnico, @p_param1, @p_param2, @p_param3);
     END
+
+    SET @mensajeTecnicoResultado = CONCAT('DBCODE=', @codigoResultado, '|', @detalleTecnico);
 
     -- Asignación de tipoMensaje y severidad garantizando NO NULOS
     SET @tipoMensajeResultado = ISNULL(@tipoUsr, ISNULL(@tipoTec, 'BUSINESS_ERROR'));

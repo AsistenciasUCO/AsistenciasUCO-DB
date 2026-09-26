@@ -8,6 +8,7 @@ GO
 CREATE OR ALTER  VIEW [dbo].[uv_razon_causa]
 AS
 SELECT  id,
-		nombre
+		nombre,
+		codigo
 FROM	RazonCausa
 GO
