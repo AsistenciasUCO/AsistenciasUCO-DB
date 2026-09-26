@@ -65,7 +65,7 @@ foreach ($id in $resultIds) {
         $resultFailures += "$id missing result, catalog expectation, or state assertion"
         continue
     }
-    $rows = @([regex]::Matches($block.Groups[1].Value, '(?m)^([0-9a-fA-F-]{36})\|([^|]*)\|([^|]*)\|\s*([01])\s*$'))
+    $rows = @([regex]::Matches($block.Groups[1].Value, '(?m)^([0-9a-fA-F-]{36})\|([^|]*)\|(.*)\|\s*([01])\s*$'))
     if ($rows.Count -ne 1) {
         $resultFailures += "$id expected one canonical row; found $($rows.Count)"
         continue
@@ -260,6 +260,8 @@ $criticalIds = @(
     'UTC_CATALOG_TIMESTAMPS', 'UTC_AUDIT_TIMESTAMP', 'PUBLIC_SECURITY_EXECUTOR_REQUIRED',
     'SESSION_IDDOCENTE_REMOVED', 'PUBLIC_CANONICAL_RESULTSET',
     'CATALOG_PARAMETER_CACHE_CONTRACT', 'CATALOG_MESSAGE_CACHE_CONTRACT',
+    'TECHNICAL_CODE_CHANNEL', 'TECHNICAL_CODE_CHANNEL_FALLBACK',
+    'SEC_001_PREFIX', 'SEC_002_PREFIX', 'ATT_PREFIX', 'SES_PREFIX', 'RC_001_PREFIX', 'GEN_002_PREFIX', 'EST_004_PREFIX',
     'NO_HARDCODED_DB_PASSWORD', 'AULA_ACTIVE_SQL_REFERENCES_ZERO', 'NORMATIVE_MODEL_GHOST_FIELDS_ZERO',
     'PUBLIC_SP_INVENTORY', 'PUBLIC_VIEW_INVENTORY',
     'USER_SYNC_SUCCESS', 'USER_SYNC_INVALID', 'DEAN_SUCCESS',

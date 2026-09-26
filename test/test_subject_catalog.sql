@@ -103,7 +103,7 @@ BEGIN TRY
         THROW 51981, 'TEST FAILED: CATALOG_INSERT is not idempotent.', 1;
     EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = @messageCode,
         @mensajeUsuarioResultado = @userMsg OUTPUT, @mensajeTecnicoResultado = @techMsg OUTPUT;
-    IF @userMsg <> N'QA catalog message' OR @techMsg <> N'QA catalog message'
+    IF @userMsg <> N'QA catalog message' OR @techMsg <> CONCAT(N'DBCODE=', @messageCode, N'|QA catalog message')
         THROW 51982, 'TEST FAILED: CATALOG_GET returned wrong content.', 1;
 END TRY
 BEGIN CATCH

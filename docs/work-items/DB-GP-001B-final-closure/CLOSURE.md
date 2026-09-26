@@ -9,9 +9,9 @@ The DB Golden Path is frozen and ready as contract-first input for backend align
 ## Final Gate Evidence
 
 ```text
-TOTAL_EXPECTED=115
-TOTAL_EXECUTED=116
-PASSED=115
+TOTAL_EXPECTED=127
+TOTAL_EXECUTED=128
+PASSED=127
 FAILED=0
 SKIPPED=1
 ALLOWED_SKIPPED=1
@@ -27,7 +27,7 @@ DB GATE PASS
 
 - Contract: `docs/contracts/DB_BASELINE_CONTRACT.md`
 - SHA-256 file: `docs/contracts/DB_BASELINE_CONTRACT.sha256`
-- SHA-256: `1fd728e43d2bdbdc6b395bc5aad9021105117281c7c18b64afc39a6d45937103` (ver `## DB Baseline Seal` para procedencia)
+- SHA-256: see `docs/contracts/DB_BASELINE_CONTRACT.sha256`
 
 ## Shape
 
@@ -50,15 +50,25 @@ REPEAT_GATE=PASS
 CATALOG_FIXTURE_SURVIVES=1
 ```
 
-## Old Dev Instance
-
-`sql_server_asistencias` has historical drift and requires rebuild from the baseline source-of-truth.
+## Local Development Baseline
 
 ```text
-DEV_INSTANCE_REBUILD_REQUIRED
+Container: sql_server_asistencias
+Database: gestionasistenciadb
+State: ALIGNED_WITH_FROZEN_BASELINE
+Temporary validation container: REMOVED
+DBCODE: ENABLED
+Golden Path: FROZEN
+Backend integration target: sql_server_asistencias / gestionasistenciadb
 ```
 
-No destructive cleanup was run against that instance.
+`sql_server_asistencias` was rebuilt at database level from the baseline source-of-truth. The historical drift state is closed.
+
+```text
+DEV_INSTANCE_ALIGNED
+```
+
+The container was retained; only `gestionasistenciadb` was recreated. A local pre-sync backup was created outside the repository before recreation.
 
 ## Remaining Blockers
 
@@ -81,9 +91,9 @@ Fix adicional de arnes de pruebas (no afecta esquema/SPs de negocio):
 ### Final Gate Evidence (post-hotfix)
 
 ```text
-TOTAL_EXPECTED=115
-TOTAL_EXECUTED=119
-PASSED=118
+TOTAL_EXPECTED=127
+TOTAL_EXECUTED=128
+PASSED=127
 FAILED=0
 SKIPPED=1
 ALLOWED_SKIPPED=1
@@ -97,12 +107,12 @@ DB GATE PASS
 
 ## DB Baseline Seal
 
-`SESSION_SEQUENCE_USES_MAX_NOT_COUNT`, `SESSION_CODE_OVER_99` y `SESSION_CREATE_NO_DUPLICATE_NUMBER_CODE` promovidos a `$criticalIds` en `test_summary.ps1`. `TOTAL_EXPECTED` sube de 115 a 118. No se modifico logica de `schema/**` en este paso (docs/gate only).
+`SESSION_SEQUENCE_USES_MAX_NOT_COUNT`, `SESSION_CODE_OVER_99`, `SESSION_CREATE_NO_DUPLICATE_NUMBER_CODE` y el canal tecnico `DBCODE=<codigo>|...` estan promovidos a `$criticalIds` en `test_summary.ps1`. `TOTAL_EXPECTED` vigente: 127.
 
 ```text
-TOTAL_EXPECTED=118
-TOTAL_EXECUTED=119
-PASSED=118
+TOTAL_EXPECTED=127
+TOTAL_EXECUTED=128
+PASSED=127
 FAILED=0
 SKIPPED=1
 ALLOWED_SKIPPED=1
@@ -114,7 +124,7 @@ UNAUTHORIZED_SKIPS=0
 DB GATE PASS
 ```
 
-- Contract SHA-256 (final): `1fd728e43d2bdbdc6b395bc5aad9021105117281c7c18b64afc39a6d45937103`
+- Contract SHA-256 (final): see `docs/contracts/DB_BASELINE_CONTRACT.sha256`
 - GENERATED_FROM_COMMIT: `UNCOMMITTED_WORKTREE`
 
 ```text

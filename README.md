@@ -6,6 +6,22 @@ Este repositorio contiene el diseño lógico, la estructura y los objetos progra
 
 ---
 
+## LOCAL DEVELOPMENT BASELINE
+
+```text
+Container: sql_server_asistencias
+Database: gestionasistenciadb
+State: ALIGNED_WITH_FROZEN_BASELINE
+Temporary validation container: REMOVED
+DBCODE: ENABLED
+Golden Path: FROZEN
+Backend integration target: sql_server_asistencias / gestionasistenciadb
+```
+
+La base local oficial de desarrollo es `gestionasistenciadb` dentro de `sql_server_asistencias`. Debe desplegarse desde el codigo SQL versionado actual del repositorio, no copiando archivos fisicos de otra instancia.
+
+---
+
 ## 🛠️ Stack Tecnológico
 * **Motor:** SQL Server 2022+ (Compatibilidad Nivel 160)
 * **Entorno Local:** Docker & Docker Desktop
@@ -41,7 +57,7 @@ El proyecto utiliza un **enfoque modular por objetos**. En lugar de crear archiv
 Si aún no tienes el contenedor activo, créalo ejecutando el siguiente comando en PowerShell:
 
 ```powershell
-docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=TuPasswordSeguro123" -p 1433:1433 --name sql_server_asistencias -d mcr.microsoft.com/mssql/server:2022-latest
+docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=<MSSQL_SA_PASSWORD>" -p 1433:1433 --name sql_server_asistencias -d mcr.microsoft.com/mssql/server:2022-latest
 ```
 
 ---
@@ -52,14 +68,14 @@ docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=TuPasswordSeguro123" -p 1433
 Para compilar y aplicar todas las tablas, funciones, vistas y procedimientos almacenados en la base de datos en Docker, ejecuta:
 
 ```powershell
-.\deploy_schema.ps1
+.\deploy_schema.ps1 -ContainerName "sql_server_asistencias"
 ```
 
-### 🔹 Ejecutar la Suite de Pruebas Automáticas (`test_suite.sql`)
-Para validar los 6 caminos del orquestador (`usp_registrar_estudiante_en_grupo_usuario_no_existente`), ejecuta el siguiente comando en PowerShell:
+### 🔹 Ejecutar el Quality Gate (`test_summary.ps1`)
+Para validar el baseline completo congelado, ejecuta:
 
 ```powershell
-Get-Content -Path .\test_suite.sql -Raw | docker exec -i sql_server_asistencias /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "TuPasswordSeguro123" -C -y 35 -Y 35
+.\test_summary.ps1 -ContainerName "sql_server_asistencias"
 ```
 
 ### 🔹 Reiniciar y Limpiar la Base de Datos desde Cero
@@ -67,11 +83,11 @@ Si deseas simular una instalación fresca y verificar el esquema completo:
 
 ```powershell
 # 1. Recrear Base de Datos Vacía en Docker
-docker exec -i sql_server_asistencias /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "TuPasswordSeguro123" -C -d master -Q "ALTER DATABASE gestionasistenciadb SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE gestionasistenciadb; CREATE DATABASE gestionasistenciadb;"
+docker exec -i sql_server_asistencias /opt/mssql-tools18/bin/sqlcmd -S localhost -C -d master -Q "ALTER DATABASE gestionasistenciadb SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE gestionasistenciadb; CREATE DATABASE gestionasistenciadb;"
 
 # 2. Desplegar todo el esquema
-.\deploy_schema.ps1
+.\deploy_schema.ps1 -ContainerName "sql_server_asistencias"
 
 # 3. Correr Pruebas
-Get-Content -Path .\test_suite.sql -Raw | docker exec -i sql_server_asistencias /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "TuPasswordSeguro123" -C -y 35 -Y 35
+.\test_summary.ps1 -ContainerName "sql_server_asistencias"
 ```

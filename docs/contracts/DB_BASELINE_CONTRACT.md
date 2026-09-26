@@ -23,6 +23,20 @@ Todo SP publico de negocio retorna una unica fila con columnas, en orden exacto:
 
 `dbo.usp_obtener_mensaje_catalogo` es helper tecnico y queda excluido del contrato publico.
 
+## Technical Error Code Channel
+
+`mensajeTecnicoResultado` usa el formato contractual:
+
+`DBCODE=<catalog-code>|<technical-detail>`
+
+El prefijo `DBCODE=<catalog-code>|` es machine-readable y contractual. `<catalog-code>` proviene directamente del codigo catalogado recibido por `dbo.usp_obtener_mensaje_catalogo`; no se infiere desde texto.
+
+El contenido posterior a `|` puede cambiar sin cambiar el codigo. El backend NO debe inferir codigos mediante frases del mensaje humano o tecnico.
+
+Si un codigo existe pero no tiene mensaje tecnico configurado, `mensajeTecnicoResultado` conserva el codigo recibido y retorna:
+
+`DBCODE=<catalog-code>|Mensaje técnico no configurado...`
+
 ## Security
 
 `idUsuarioEjecutor` representa `Usuario.id`.
@@ -154,6 +168,8 @@ Lectura via views: `uv_asistencia`, `uv_detalle_asistencia`, `uv_razon_causa`.
 El codigo estable para backend es `uv_detalle_asistencia.codigoRazonCausa`.
 
 Las views devuelven filas persistidas; no crean filas para estudiantes sin registro.
+
+La ausencia de fila en las views de asistencia no equivale a `AN`; solamente una fila persistida con razon `AN` representa asistencia.
 
 ## Golden Path Read Projections
 
@@ -294,13 +310,43 @@ Functions:
 - `ufn_obtener_parametro_int`
 - `ufn_obtener_detalle_error`
 
+## Local Development Baseline
+
+Container:
+
+`sql_server_asistencias`
+
+Database:
+
+`gestionasistenciadb`
+
+State:
+
+`ALIGNED_WITH_FROZEN_BASELINE`
+
+Temporary validation container:
+
+`REMOVED`
+
+DBCODE:
+
+`ENABLED`
+
+Golden Path:
+
+`FROZEN`
+
+Backend integration target:
+
+`sql_server_asistencias / gestionasistenciadb`
+
 ## Validation
 
-Final DB gate, fresh deploy plus repeat deploy on `gp001_sql_fresh`:
+Final DB gate on official local development database `sql_server_asistencias / gestionasistenciadb`:
 
-- `TOTAL_EXPECTED=118`
-- `TOTAL_EXECUTED=119`
-- `PASSED=118`
+- `TOTAL_EXPECTED=127`
+- `TOTAL_EXECUTED=128`
+- `PASSED=127`
 - `FAILED=0`
 - `SKIPPED=1`
 - `ALLOWED_SKIPPED=1`
@@ -312,9 +358,13 @@ Final DB gate, fresh deploy plus repeat deploy on `gp001_sql_fresh`:
 
 Only allowed skip: `XACT_STATE_MINUS_ONE_RUNTIME`.
 
-Catalog fixture between deploys:
+Additional final checks on official local development database:
 
-- `CATALOG_FIXTURE_SURVIVES=1`
+- `DBCODE SEC_001=PASS`
+- `DBCODE SEC_002=PASS`
+- `GHOST_COLUMN_COUNT=0`
+- `ATTENDANCE_CONCURRENT_UPSERT=PASS`
+- `SESSION_SEQUENCE_USES_MAX_NOT_COUNT=PASS`
 
 Table shape report:
 
@@ -330,8 +380,8 @@ DB_CONTRACT_VERSION: v1
 
 GENERATED_FROM_COMMIT: UNCOMMITTED_WORKTREE
 
-GENERATED_AT_UTC: 2026-09-23T07:06:09Z
+GENERATED_AT_UTC: 2026-09-23T18:52:28Z
 
-DB_GATE_RESULT: PASS_FRESH_AND_REPEAT_ON_CLEAN_DB
+DB_GATE_RESULT: PASS_ON_OFFICIAL_LOCAL_DB
 
 TABLE_SHAPE_HASH: 337d39f7997e8b224028e20b194be15918c5136b1fa55ff8b40f9f768efe43d1

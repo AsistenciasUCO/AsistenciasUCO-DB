@@ -98,6 +98,93 @@ IF (SELECT COUNT(1) FROM sys.columns WHERE object_id = OBJECT_ID('dbo.uv_mensaje
     THROW 52008, 'TEST FAILED: CATALOG_MESSAGE_CACHE_CONTRACT missing message view columns.', 1;
 PRINT 'TEST_PASS:CATALOG_MESSAGE_CACHE_CONTRACT';
 
+DECLARE @technicalCodeCases TABLE (
+    codigo VARCHAR(100) NOT NULL PRIMARY KEY,
+    param1 NVARCHAR(500) NULL,
+    param2 NVARCHAR(500) NULL
+);
+
+INSERT @technicalCodeCases (codigo, param1, param2)
+VALUES
+    ('SEC_001', CONVERT(NVARCHAR(36), NEWID()), NULL),
+    ('SEC_002', CONVERT(NVARCHAR(36), NEWID()), NULL),
+    ('ATT_001', NULL, NULL),
+    ('ATT_002', NULL, NULL),
+    ('ATT_003', CONVERT(NVARCHAR(36), NEWID()), NULL),
+    ('SES_001', CONVERT(NVARCHAR(36), NEWID()), NULL),
+    ('SES_003', CONVERT(NVARCHAR(36), NEWID()), NULL),
+    ('SES_004', CONVERT(NVARCHAR(30), SYSUTCDATETIME(), 126), CONVERT(NVARCHAR(30), DATEADD(HOUR, -1, SYSUTCDATETIME()), 126)),
+    ('RC_001', N'ZZZ', NULL),
+    ('GEN_002', N'idUsuarioEjecutor', NULL),
+    ('EST_004', CONVERT(NVARCHAR(36), NEWID()), CONVERT(NVARCHAR(36), NEWID()));
+
+DECLARE @prefixFailures TABLE (
+    codigo VARCHAR(100) NOT NULL,
+    actual NVARCHAR(4000) NULL
+);
+DECLARE @caseCodigo VARCHAR(100), @caseParam1 NVARCHAR(500), @caseParam2 NVARCHAR(500);
+DECLARE code_cursor CURSOR LOCAL FAST_FORWARD FOR
+    SELECT codigo, param1, param2 FROM @technicalCodeCases ORDER BY codigo;
+OPEN code_cursor;
+FETCH NEXT FROM code_cursor INTO @caseCodigo, @caseParam1, @caseParam2;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    DECLARE @caseUser NVARCHAR(4000), @caseTech NVARCHAR(4000);
+    EXEC dbo.usp_obtener_mensaje_catalogo
+        @p_codigo = @caseCodigo,
+        @p_param1 = @caseParam1,
+        @p_param2 = @caseParam2,
+        @mensajeUsuarioResultado = @caseUser OUTPUT,
+        @mensajeTecnicoResultado = @caseTech OUTPUT;
+
+    IF @caseTech NOT LIKE CONCAT('DBCODE=', @caseCodigo, '|%')
+        INSERT @prefixFailures (codigo, actual) VALUES (@caseCodigo, @caseTech);
+
+    FETCH NEXT FROM code_cursor INTO @caseCodigo, @caseParam1, @caseParam2;
+END
+CLOSE code_cursor;
+DEALLOCATE code_cursor;
+
+IF EXISTS (SELECT 1 FROM @prefixFailures)
+BEGIN
+    DECLARE @prefixFailure NVARCHAR(4000) = (
+        SELECT TOP 1 CONCAT('TEST FAILED: TECHNICAL_CODE_CHANNEL ', codigo, ' actual=', COALESCE(actual, N'NULL'))
+        FROM @prefixFailures
+        ORDER BY codigo
+    );
+    THROW 52011, @prefixFailure, 1;
+END
+PRINT 'TEST_PASS:TECHNICAL_CODE_CHANNEL';
+PRINT 'TEST_PASS:SEC_001_PREFIX';
+PRINT 'TEST_PASS:SEC_002_PREFIX';
+PRINT 'TEST_PASS:ATT_PREFIX';
+PRINT 'TEST_PASS:SES_PREFIX';
+PRINT 'TEST_PASS:RC_001_PREFIX';
+PRINT 'TEST_PASS:GEN_002_PREFIX';
+PRINT 'TEST_PASS:EST_004_PREFIX';
+
+BEGIN TRANSACTION;
+BEGIN TRY
+    DECLARE @fallbackCode VARCHAR(100) = 'QA_TECH_FALLBACK';
+    DECLARE @fallbackUser NVARCHAR(4000), @fallbackTech NVARCHAR(4000);
+    INSERT dbo.CatalogoMensajeUsuario (codigo, tipoMensaje, severidad, contenido, estaActivo, fechaCreacion, fechaModificacion)
+    VALUES (@fallbackCode, 'BUSINESS_ERROR', 'MEDIO', N'QA fallback usuario.', 1, SYSUTCDATETIME(), SYSUTCDATETIME());
+
+    EXEC dbo.usp_obtener_mensaje_catalogo
+        @p_codigo = @fallbackCode,
+        @mensajeUsuarioResultado = @fallbackUser OUTPUT,
+        @mensajeTecnicoResultado = @fallbackTech OUTPUT;
+
+    IF @fallbackTech NOT LIKE CONCAT('DBCODE=', @fallbackCode, '|Mensaje técnico no configurado%')
+        THROW 52012, 'TEST FAILED: TECHNICAL_CODE_CHANNEL_FALLBACK lost catalog code.', 1;
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+    THROW;
+END CATCH;
+ROLLBACK TRANSACTION;
+PRINT 'TEST_PASS:TECHNICAL_CODE_CHANNEL_FALLBACK';
+
 DECLARE @badResultSets TABLE (
     procedureName SYSNAME NOT NULL,
     reason NVARCHAR(4000) NOT NULL

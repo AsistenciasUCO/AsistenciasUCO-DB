@@ -1,11 +1,51 @@
 # DB-GP-001B Final Database Closure - Validation
 
+## Current Local Development Baseline
+
+```text
+Container: sql_server_asistencias
+Database: gestionasistenciadb
+State: ALIGNED_WITH_FROZEN_BASELINE
+Temporary validation container: REMOVED
+DBCODE: ENABLED
+Golden Path: FROZEN
+Backend integration target: sql_server_asistencias / gestionasistenciadb
+```
+
+Final official local gate:
+
+```text
+TOTAL_EXPECTED=127
+TOTAL_EXECUTED=128
+PASSED=127
+FAILED=0
+SKIPPED=1
+ALLOWED_SKIPPED=1
+CRITICAL_MISSING=0
+SQLCMD_EXIT_CODE=0
+SQL_ERROR_COUNT=0
+UNAUTHORIZED_SKIPS=0
+@@TRANCOUNT=0
+DB GATE PASS
+```
+
+Additional official local checks:
+
+```text
+DBCODE SEC_001=PASS
+DBCODE SEC_002=PASS
+GHOST_COLUMN_COUNT=0
+TEMPORARY_CONTAINER_gp001_sql_fresh=REMOVED
+```
+
+## Historical Clean-Container Validation
+
 ## Environment
 
 - Repository: `gestion-asistencia-db`
 - Validation container: `gp001_sql_fresh`
 - Database: `gestionasistenciadb`
-- Old drifted dev instance: `sql_server_asistencias` not modified
+- Superseded by official local instance: `sql_server_asistencias`
 
 ## Final Validation Sequence
 
