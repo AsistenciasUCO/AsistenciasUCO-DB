@@ -15,10 +15,7 @@ if (-not $ContainerName) {
     $ContainerName = if ($env:SQL_CONTAINER_NAME) { $env:SQL_CONTAINER_NAME } else { "sqlserver" }
 }
 if (-not $Password) {
-    $Password = if ($env:SQL_CONTAINER_PASSWORD) { $env:SQL_CONTAINER_PASSWORD } elseif ($env:MSSQL_SA_PASSWORD) { $env:MSSQL_SA_PASSWORD } else { $null }
-}
-if (-not $Password) {
-    throw "SQL password is required. Pass -Password or set SQL_CONTAINER_PASSWORD/MSSQL_SA_PASSWORD."
+    $Password = if ($env:SQL_CONTAINER_PASSWORD) { $env:SQL_CONTAINER_PASSWORD } elseif ($env:MSSQL_SA_PASSWORD) { $env:MSSQL_SA_PASSWORD } else { "Rionegro2233+" }
 }
 
 
