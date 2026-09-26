@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte Comparativo: feat/db-golden-path-baseline-freeze vs develop</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0b0f19;
+            --bg-secondary: #111827;
+            --bg-card: #1f2937;
+            --accent-cyan: #06b6d4;
+            --accent-blue: #3b82f6;
+            --accent-purple: #8b5cf6;
+            --accent-green: #10b981;
+            --accent-amber: #f59e0b;
+            --accent-red: #ef4444;
+            --text-main: #f9fafb;
+            --text-muted: #9ca3af;
+            --border-color: #374151;
+            --font-sans: 'Outfit', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            line-height: 1.6;
+            padding: 2rem 1rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(59, 130, 246, 0.15));
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2.5rem;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 1rem;
+        }
+
+        .badge-cyan {
+            background: rgba(6, 182, 212, 0.2);
+            color: var(--accent-cyan);
+            border: 1px solid rgba(6, 182, 212, 0.4);
+        }
+
+        .badge-green {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--accent-green);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+        }
+
+        .badge-amber {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--accent-amber);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+        }
+
+        h1 {
+            font-size: 2.25rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+            background: linear-gradient(to right, #60a5fa, #38bdf8, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .grid-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1.25rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-3px);
+            border-color: var(--accent-cyan);
+        }
+
+        .stat-card .label {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-card .value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--accent-cyan);
+        }
+
+        .section-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        h2 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.75rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            font-size: 0.95rem;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: rgba(31, 41, 55, 0.6);
+            color: var(--accent-cyan);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.05em;
+        }
+
+        tr:hover td {
+            background-color: rgba(31, 41, 55, 0.4);
+        }
+
+        code {
+            font-family: var(--font-mono);
+            background: rgba(31, 41, 55, 0.8);
+            color: #38bdf8;
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.85em;
+        }
+
+        .alert-box {
+            background: rgba(245, 158, 11, 0.1);
+            border-left: 4px solid var(--accent-amber);
+            padding: 1.25rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+        }
+
+        .alert-box h4 {
+            color: var(--accent-amber);
+            margin-bottom: 0.5rem;
+        }
+
+        ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+
+        li {
+            position: relative;
+            padding-left: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        li::before {
+            content: "➔";
+            position: absolute;
+            left: 0;
+            color: var(--accent-cyan);
+        }
+
+        footer {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin-top: 3rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <span class="badge badge-cyan">Análisis Arquitectónico de Git (Actualizado)</span>
+            <h1>Reporte Comparativo: feat/db-golden-path-baseline-freeze vs develop</h1>
+            <p class="subtitle">Análisis técnico de integración, baseline del Golden Path, fix reciente y compatibilidad con las 6 Skills de Base de Datos</p>
+        </header>
+
+        <div class="grid-stats">
+            <div class="stat-card">
+                <div class="label">Último Commit en Feature</div>
+                <div class="value" style="font-family: var(--font-mono); font-size: 1.5rem;">6882ac0</div>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">Fix de tests y mensajes técnicos (Catálogo)</p>
+            </div>
+            <div class="stat-card">
+                <div class="label">Cobertura de Pruebas en Feature</div>
+                <div class="value" style="color: var(--accent-green);">128 Tests</div>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">DB GATE PASS (+10 tests adicionales pasados)</p>
+            </div>
+            <div class="stat-card">
+                <div class="label">Compatibilidad con Skills</div>
+                <div class="value" style="color: var(--accent-blue);">100% Alta</div>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">Alineado con las 6 Skills del proyecto</p>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <h2>📦 1. Resumen de Cambios Recientes (Commit 6882ac0)</h2>
+            <p>La rama <code>origin/feat/db-golden-path-baseline-freeze</code> ha recibido una actualización reciente con el commit <strong><code>6882ac0</code></strong> (<em>"documentacion actualizada y correccion en test"</em>):</p>
+            <ul style="margin-top: 1rem;">
+                <li><strong>Canal Técnico de Mensajería (Estandarización de Excepciones):</strong> Ajuste en <code>usp_obtener_mensaje_catalogo.sql</code> para anteponer obligatoriamente el formato <code>DBCODE=&lt;codigo&gt;|</code> en <code>@mensajeTecnicoResultado</code> (ej. <code>DBCODE=SEC_001|...</code>).</li>
+                <li><strong>Nuevas Pruebas de Contrato Técnico (+10 tests):**</strong> Incorporación en <code>test/test_contract_closure.sql</code> de la suite <code>TECHNICAL_CODE_CHANNEL</code>, <code>TECHNICAL_CODE_CHANNEL_FALLBACK</code> y validadores de prefijo para códigos <code>SEC_*</code>, <code>ATT_*</code>, <code>SES_*</code>, <code>RC_*</code>, <code>GEN_*</code>, <code>EST_*</code>.</li>
+                <li><strong>Incremento de Cobertura en Runner (test_summary.ps1):</strong> Elevación de la meta de validación automatizada de 118 a <strong>128 tests pasados al 100%</strong>.</li>
+                <li><strong>Ajustes de Documentación y SHA256:</strong> Actualización en <code>docs/contracts/DB_BASELINE_CONTRACT.md</code> y refresco de firma hash SHA256.</li>
+            </ul>
+        </div>
+
+        <div class="section-card">
+            <h2>⚔️ 2. Tabla Comparativa: feat/db-golden-path-baseline-freeze vs. develop</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Característica / Dimensión</th>
+                        <th>Rama <code>develop</code></th>
+                        <th>Rama <code>feat/db-golden-path-baseline-freeze</code> (commit 6882ac0)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Capa de Seguridad RBAC</strong></td>
+                        <td><span class="badge badge-green">Implementada</span> Vistas autorizadas <code>uv_auth_*</code> y <code>SESSION_CONTEXT</code>.</td>
+                        <td><span class="badge badge-amber">No Presente</span> No incluye la capa <code>uv_auth_*</code> (se preservará de <code>develop</code>).</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Secuenciamiento de Sesiones</strong></td>
+                        <td><code>COUNT</code> simple sobre la tabla.</td>
+                        <td><span class="badge badge-green">Protegido</span> <code>COALESCE(MAX) + UPDLOCK/HOLDLOCK</code> e índices <code>UNIQUE</code>.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Canal de Código Técnico (DBCODE)</strong></td>
+                        <td>Respuesta estándar del catálogo de mensajes.</td>
+                        <td><span class="badge badge-green">Estandarizado</span> Formato <code>DBCODE=&lt;codigo&gt;|...</code> en <code>usp_obtener_mensaje_catalogo</code>.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Volumen de Pruebas Unitarias</strong></td>
+                        <td>68-69 tests ejecutados en el runner.</td>
+                        <td><strong>128 tests críticos pasados al 100%</strong>.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Skills del Proyecto (.agents/skills/)</strong></td>
+                        <td><span class="badge badge-green">6 Skills creadas</span> y organizadas.</td>
+                        <td>No contiene la carpeta de skills.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Estructura de Documentación</strong></td>
+                        <td>Organizada en subcarpetas (<code>arquitectura/</code>, <code>modelos/</code>, etc.).</td>
+                        <td>Estructura plana con <code>DB_BASELINE_CONTRACT.md</code>.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section-card">
+            <h2>🛡️ 3. Validación Frente a las 6 Skills de Base de Datos</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Skill Canónica</th>
+                        <th>Estado de Compatibilidad</th>
+                        <th>Observaciones de Integración</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>procedimientos-internos-condiciones</code></td>
+                        <td><span class="badge badge-green">100% Cumplido</span></td>
+                        <td>Mantiene 3 parámetros <code>OUTPUT</code>, firma UUID <code>id*</code> y no usa <code>ISNULL/COALESCE</code> en argumentos.</td>
+                    </tr>
+                    <tr>
+                        <td><code>procedimientos-externos-condiciones</code></td>
+                        <td><span class="badge badge-green">100% Cumplido</span></td>
+                        <td>Sin parámetros <code>OUTPUT</code> en cabecera y retorno de Resultset Unificado.</td>
+                    </tr>
+                    <tr>
+                        <td><code>consistencia-tablas</code></td>
+                        <td><span class="badge badge-green">Cumplido</span></td>
+                        <td>Cambios DDL en <code>Sesion.sql</code> respaldados por contrato oficial y suite de pruebas.</td>
+                    </tr>
+                    <tr>
+                        <td><code>vista-consulta-con-validaciones</code></td>
+                        <td><span class="badge badge-cyan">Compatible</span></td>
+                        <td>Las vistas <code>uv_auth_*</code> de <code>develop</code> se mantendrán vivas sin ningún conflicto.</td>
+                    </tr>
+                    <tr>
+                        <td><code>cobertura-pruebas-objetos-bd</code></td>
+                        <td><span class="badge badge-green">Excepcional</span></td>
+                        <td>Eleva la cobertura a 128 tests automatizados en el runner de integración.</td>
+                    </tr>
+                    <tr>
+                        <td><code>consulta-a-bd</code></td>
+                        <td><span class="badge badge-green">100% Cumplido</span></td>
+                        <td>Los procedimientos consultan la información a través de las vistas base <code>uv_*</code> (ej. <code>uv_mensaje_usuario</code>).</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section-card">
+            <h2>⚠️ 4. Puntos de Atención para la Futura Integración (Merge)</h2>
+            <div class="alert-box">
+                <h4>Resolución de Conflictos Menores al Fusionar en develop:</h4>
+                <p>Al momento de integrar esta rama con <code>develop</code>, se deberán atender únicamente 3 puntos de unión menores:</p>
+            </div>
+            <ul>
+                <li><strong>Unión en <code>test_suite.sql</code>:</strong> Fusionar las líneas de llamadas a las pruebas de RBAC de <code>develop</code> (<code>test_authorized_views_rbac.sql</code>) con las nuevas pruebas de la rama feature (<code>test_contract_closure.sql</code>, <code>test_titularidad_jerarquica.sql</code> y <code>TECHNICAL_CODE_CHANNEL</code>).</li>
+                <li><strong>Unión en <code>test_summary.ps1</code>:</strong> Conservar la métrica ampliada de 128+ tests incorporando los tokens de aprobación <code>RBAC_*</code>.</li>
+                <li><strong>Preservación de Vistas Autorizadas:</strong> Conservar los archivos <code>schema/views/uv_auth_*.sql</code> y <code>schema/functions/ufn_*_contexto.sql</code> presentes en <code>develop</code>.</li>
+            </ul>
+        </div>
+
+        <footer>
+            <p>Reporte actualizado automáticamente — Repositorio <code>gestionasistenciadb</code> — 2026</p>
+        </footer>
+    </div>
+</body>
+</html>
