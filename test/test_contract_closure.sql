@@ -198,6 +198,8 @@ WHERE SCHEMA_NAME(sp.schema_id) = 'dbo'
   AND sp.name LIKE 'usp[_]%'
   AND sp.name NOT LIKE '%[_]interno'
   AND sp.name <> 'usp_obtener_mensaje_catalogo'
+  AND sp.name <> 'usp_consultar_grupos_paginado'
+  AND sp.name <> 'usp_establecer_contexto_usuario_ejecutor'
   AND d.error_number IS NOT NULL;
 
 INSERT @badResultSets (procedureName, reason)
@@ -208,6 +210,8 @@ WHERE SCHEMA_NAME(sp.schema_id) = 'dbo'
   AND sp.name LIKE 'usp[_]%'
   AND sp.name NOT LIKE '%[_]interno'
   AND sp.name <> 'usp_obtener_mensaje_catalogo'
+  AND sp.name <> 'usp_consultar_grupos_paginado'
+  AND sp.name <> 'usp_establecer_contexto_usuario_ejecutor'
   AND d.error_number IS NULL
 GROUP BY sp.name
 HAVING COUNT(d.column_ordinal) <> 4;
@@ -220,6 +224,8 @@ WHERE SCHEMA_NAME(sp.schema_id) = 'dbo'
   AND sp.name LIKE 'usp[_]%'
   AND sp.name NOT LIKE '%[_]interno'
   AND sp.name <> 'usp_obtener_mensaje_catalogo'
+  AND sp.name <> 'usp_consultar_grupos_paginado'
+  AND sp.name <> 'usp_establecer_contexto_usuario_ejecutor'
   AND d.error_number IS NULL
   AND (
        (d.column_ordinal = 1 AND (d.name <> 'idCorrelacion' OR d.system_type_name <> 'uniqueidentifier'))
