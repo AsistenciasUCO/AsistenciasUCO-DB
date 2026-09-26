@@ -26,6 +26,9 @@ if (-not $Password) {
 if (-not $Password) {
     throw "SQL password is required. Create a local '.env' file from '.env.template', set SQL_CONTAINER_PASSWORD/MSSQL_SA_PASSWORD, or pass -Password."
 }
+if ($Password -ceq 'CHANGE_ME') {
+    throw "SQL password is still the 'CHANGE_ME' placeholder. Set a real local value in '.env' (ignored by Git)."
+}
 
 Write-Host "Iniciando despliegue de arquitectura por objeto (/schema)..." -ForegroundColor Cyan
 

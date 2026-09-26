@@ -190,6 +190,12 @@ DECLARE @badResultSets TABLE (
     reason NVARCHAR(4000) NOT NULL
 );
 
+-- Exclusiones normativas de la regla MUTATION_COMMAND_RESULTSET (4 columnas canonicas):
+--   usp_obtener_mensaje_catalogo             helper tecnico de catalogo (contrato publico lo excluye).
+--   usp_consultar_grupos_paginado            READ_QUERY_RESULTSET: devuelve filas de datos + totalRegistros;
+--                                            NON_GOLDEN_PATH_EXTENSION, no es un SP de comando/mutacion.
+--   usp_establecer_contexto_usuario_ejecutor helper de SESSION_CONTEXT: no devuelve resultset.
+-- El resultset canonico de 4 columnas es exclusivo de los SP de comando/mutacion del Golden Path.
 INSERT @badResultSets (procedureName, reason)
 SELECT sp.name, CONCAT('describe_error=', COALESCE(CONVERT(NVARCHAR(20), d.error_number), N'NULL'), ': ', COALESCE(d.error_message, N''))
 FROM sys.procedures sp

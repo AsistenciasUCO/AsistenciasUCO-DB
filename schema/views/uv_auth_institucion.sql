@@ -12,8 +12,9 @@ SELECT  i.id,
         i.estaActivaInstitucion,
         i.estaActivaTextoInstitucion
 FROM    dbo.uv_institucion i
-WHERE   dbo.ufn_obtener_usuario_ejecutor_contexto() IS NULL
-   OR   EXISTS (
+WHERE   dbo.ufn_obtener_usuario_ejecutor_contexto() IS NOT NULL   -- fail closed: sin contexto => 0 filas
+   AND  (
+            EXISTS (
             SELECT 1 FROM dbo.Administrador a WHERE a.usuario = dbo.ufn_obtener_usuario_ejecutor_contexto() AND a.institucion = i.id
         )
    OR   EXISTS (
@@ -47,5 +48,6 @@ WHERE   dbo.ufn_obtener_usuario_ejecutor_contexto() IS NULL
             INNER JOIN dbo.Programa pr ON pe.programa = pr.id
             INNER JOIN dbo.Facultad f ON pr.facultad = f.id
             WHERE e.usuario = dbo.ufn_obtener_usuario_ejecutor_contexto() AND f.institucion = i.id
+        )
         );
 GO

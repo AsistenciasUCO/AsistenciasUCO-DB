@@ -30,8 +30,9 @@ SELECT  e.id,
         e.estaActivoEstudiante,
         e.estaActivoTextoEstudiante
 FROM    dbo.uv_estudiante e
-WHERE   dbo.ufn_obtener_usuario_ejecutor_contexto() IS NULL
-   OR   EXISTS (
+WHERE   dbo.ufn_obtener_usuario_ejecutor_contexto() IS NOT NULL   -- fail closed: sin contexto => 0 filas
+   AND  (
+            EXISTS (
             SELECT 1 FROM dbo.Administrador a WHERE a.usuario = dbo.ufn_obtener_usuario_ejecutor_contexto() AND a.institucion = e.idInstitucion
         )
    OR   EXISTS (
@@ -43,5 +44,6 @@ WHERE   dbo.ufn_obtener_usuario_ejecutor_contexto() IS NULL
    OR   EXISTS (
             SELECT 1 FROM dbo.Docente doc INNER JOIN dbo.Grupo g ON doc.id = g.docente WHERE doc.usuario = dbo.ufn_obtener_usuario_ejecutor_contexto() AND g.id = e.idGrupo
         )
-   OR   e.idUsuario = dbo.ufn_obtener_usuario_ejecutor_contexto();
+   OR   e.idUsuario = dbo.ufn_obtener_usuario_ejecutor_contexto()
+        );
 GO

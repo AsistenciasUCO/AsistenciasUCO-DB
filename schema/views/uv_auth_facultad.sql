@@ -16,8 +16,9 @@ SELECT  f.id,
         f.estaActivaFacultad,
         f.estaActivaTextoFacultad
 FROM    dbo.uv_facultad f
-WHERE   dbo.ufn_obtener_usuario_ejecutor_contexto() IS NULL
-   OR   EXISTS (
+WHERE   dbo.ufn_obtener_usuario_ejecutor_contexto() IS NOT NULL   -- fail closed: sin contexto => 0 filas
+   AND  (
+            EXISTS (
             SELECT 1 FROM dbo.Administrador a WHERE a.usuario = dbo.ufn_obtener_usuario_ejecutor_contexto() AND a.institucion = f.idInstitucion
         )
    OR   EXISTS (
@@ -36,5 +37,6 @@ WHERE   dbo.ufn_obtener_usuario_ejecutor_contexto() IS NULL
             INNER JOIN dbo.PlanEstudio pe ON spe.planEstudio = pe.id
             INNER JOIN dbo.Programa pr ON pe.programa = pr.id
             WHERE doc.usuario = dbo.ufn_obtener_usuario_ejecutor_contexto() AND pr.facultad = f.id
+        )
         );
 GO

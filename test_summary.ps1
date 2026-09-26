@@ -20,6 +20,9 @@ if (-not $Password) {
 if (-not $Password) {
     throw "SQL password is required. Create a local '.env' file from '.env.template', set SQL_CONTAINER_PASSWORD/MSSQL_SA_PASSWORD, or pass -Password."
 }
+if ($Password -ceq 'CHANGE_ME') {
+    throw "SQL password is still the 'CHANGE_ME' placeholder. Set a real local value in '.env' (ignored by Git)."
+}
 
 
 
@@ -198,32 +201,44 @@ finally {
     }
 }
 
-$secretScanFiles = @(
-    (Join-Path $PSScriptRoot 'deploy_schema.ps1'),
-    (Join-Path $PSScriptRoot 'test_summary.ps1')
-)
-$workflowDir = Join-Path $PSScriptRoot '.github/workflows'
-if (Test-Path $workflowDir) {
-    $secretScanFiles += @(Get-ChildItem $workflowDir -File -Recurse | ForEach-Object { $_.FullName })
-}
-$hardcodedPasswordHits = @()
-foreach ($scanFile in $secretScanFiles) {
-    if (-not (Test-Path $scanFile)) { continue }
-    $lineNo = 0
-    foreach ($line in Get-Content $scanFile) {
-        $lineNo++
-        if ($line -match '(?i)(MSSQL_SA_PASSWORD|SQL_CONTAINER_PASSWORD|Password)\s*[:=]\s*[''"][^$][^''"]+[''"]') {
-            $hardcodedPasswordHits += "${scanFile}:$lineNo"
-        }
-    }
-}
-if ($hardcodedPasswordHits.Count -eq 0) {
+# Secret hygiene (DB-GP-001C): scans scripts, workflows, env templates and versioned config.
+# Findings are reported as file:line:type only; the secret value is never printed.
+. (Join-Path $PSScriptRoot 'scripts/secret-hygiene.ps1')
+$secretScanList = @(Get-SecretScanFiles -Root $PSScriptRoot)
+$secretFindings = @(Invoke-SecretHygieneScan -Root $PSScriptRoot)
+if ($secretFindings.Count -eq 0) {
     $clientPassed += 'NO_HARDCODED_DB_PASSWORD'
     Write-Host 'TEST_PASS:NO_HARDCODED_DB_PASSWORD'
 }
 else {
-    $resultFailures += "NO_HARDCODED_DB_PASSWORD hits=$($hardcodedPasswordHits -join ',')"
+    $resultFailures += "NO_HARDCODED_DB_PASSWORD hits=$(($secretFindings | ForEach-Object { "$($_.File):$($_.Line):$($_.Type)" }) -join ',')"
 }
+$mustScan = @('deploy_schema.ps1', 'test_summary.ps1', '.env.template', '.env.example')
+$missingScan = @($mustScan | Where-Object { $_ -notin $secretScanList }) + @(if (-not ($secretScanList | Where-Object { $_ -like '.github/workflows/*' })) { '.github/workflows/**' })
+if ($missingScan.Count -eq 0) {
+    $clientPassed += 'SECRET_GATE_COVERS_ENV_TEMPLATES'
+    Write-Host 'TEST_PASS:SECRET_GATE_COVERS_ENV_TEMPLATES'
+}
+else { $resultFailures += "SECRET_GATE_COVERS_ENV_TEMPLATES not scanned: $($missingScan -join ',')" }
+$selfCheck = Test-SecretGateSelfCheck
+if ($selfCheck.DetectsUnsafeEnvTemplate -and $selfCheck.DetectsQuotedScriptLiteral) {
+    $clientPassed += 'SECRET_GATE_DETECTS_UNSAFE_TEMPLATE'
+    Write-Host 'TEST_PASS:SECRET_GATE_DETECTS_UNSAFE_TEMPLATE'
+}
+else { $resultFailures += 'SECRET_GATE_DETECTS_UNSAFE_TEMPLATE gate did not detect a synthetic unsafe fixture' }
+if ($selfCheck.AcceptsPlaceholder) {
+    $clientPassed += 'SECRET_GATE_ACCEPTS_PLACEHOLDER'
+    Write-Host 'TEST_PASS:SECRET_GATE_ACCEPTS_PLACEHOLDER'
+}
+else { $resultFailures += 'SECRET_GATE_ACCEPTS_PLACEHOLDER gate rejected a safe placeholder fixture' }
+
+# Golden Path freeze manifest (contract + Golden Path object sources + addendum).
+$manifestOutput = @(& (Join-Path $PSScriptRoot 'scripts/freeze-manifest.ps1') -Mode Verify 2>&1 | ForEach-Object { "$_" })
+if ($LASTEXITCODE -eq 0) {
+    $clientPassed += 'GOLDEN_PATH_FREEZE_MANIFEST_VERIFIED'
+    Write-Host 'TEST_PASS:GOLDEN_PATH_FREEZE_MANIFEST_VERIFIED'
+}
+else { $resultFailures += "GOLDEN_PATH_FREEZE_MANIFEST_VERIFIED $($manifestOutput -join ',')" }
 
 $activeAulaHits = @()
 foreach ($path in @('schema', 'test', 'migrations')) {
@@ -301,7 +316,16 @@ $criticalIds = @(
     'COORDINATOR_SUCCESS', 'COORDINATOR_PROGRAM_MISSING', 'COORDINATOR_FACULTY_MISSING', 'COORDINATOR_SCOPE_MISMATCH',
     'MATRICULA_NOT_IMPLEMENTED', 'SUITE_TRANCOUNT_ZERO',
     'USP_CONSULTAR_GRUPOS_PAGINADO_SUCCESS', 'USP_CONSULTAR_GRUPOS_PAGINADO_FILTER_AND_PAGINATION',
-    'USP_CONSULTAR_GRUPOS_PAGINADO_INVALID_USER', 'USP_CONSULTAR_GRUPOS_PAGINADO_CONTEXT_CLEANUP'
+    'USP_CONSULTAR_GRUPOS_PAGINADO_INVALID_USER', 'USP_CONSULTAR_GRUPOS_PAGINADO_CONTEXT_CLEANUP',
+    'USP_CONSULTAR_GRUPOS_PAGINADO_CONTEXT_PREVIOUS_VALUE_RESTORED', 'USP_CONSULTAR_GRUPOS_PAGINADO_CONTEXT_RESTORED_ON_EXCEPTION',
+    'USP_CONSULTAR_GRUPOS_PAGINADO_NO_CONTEXT_LEAK',
+    'RBAC_AUTH_VIEWS_FAIL_CLOSED_DEFINITION', 'RBAC_NULL_CONTEXT_NO_ROWS', 'RBAC_UNKNOWN_CONTEXT_NO_ROWS',
+    'RBAC_ADMIN_INSTITUTION_ISOLATION', 'RBAC_INACTIVE_USER_NO_BROADER_SCOPE', 'RBAC_DECANO_FACULTY_ISOLATION',
+    'RBAC_COORDINADOR_PROGRAM_ISOLATION', 'RBAC_DOCENTE_GROUP_ISOLATION', 'RBAC_ESTUDIANTE_ENROLLED_GROUP_ISOLATION',
+    'RBAC_RESET_CONTEXT',
+    'GOLDEN_PATH_VIEW_SHAPES_FROZEN', 'GOLDEN_PATH_SP_SIGNATURES_FROZEN', 'GOLDEN_PATH_MUTATION_RESULTSET_FROZEN',
+    'GOLDEN_PATH_FREEZE_MANIFEST_VERIFIED',
+    'SECRET_GATE_COVERS_ENV_TEMPLATES', 'SECRET_GATE_DETECTS_UNSAFE_TEMPLATE', 'SECRET_GATE_ACCEPTS_PLACEHOLDER'
 )
 $sqlPasses = @([regex]::Matches($outputStr, '(?m)^TEST_PASS:([A-Z0-9_]+)\s*$') | ForEach-Object { $_.Groups[1].Value })
 $passed = @($sqlPasses) + @($clientPassed)

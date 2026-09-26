@@ -22,9 +22,11 @@ SELECT  d.id,
         d.estaActivoDecano,
         d.estaActivoTextoDecano
 FROM    dbo.uv_decano d
-WHERE   dbo.ufn_obtener_usuario_ejecutor_contexto() IS NULL
-   OR   EXISTS (
+WHERE   dbo.ufn_obtener_usuario_ejecutor_contexto() IS NOT NULL   -- fail closed: sin contexto => 0 filas
+   AND  (
+            EXISTS (
             SELECT 1 FROM dbo.Administrador a WHERE a.usuario = dbo.ufn_obtener_usuario_ejecutor_contexto() AND a.institucion = d.idInstitucion
         )
-   OR   d.idUsuario = dbo.ufn_obtener_usuario_ejecutor_contexto();
+   OR   d.idUsuario = dbo.ufn_obtener_usuario_ejecutor_contexto()
+        );
 GO

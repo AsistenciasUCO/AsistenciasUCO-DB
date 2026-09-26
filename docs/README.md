@@ -44,6 +44,7 @@ Catálogos estandarizados consumidos por los procedimientos almacenados y lógic
 Informes de auditoría y análisis arquitectónicos realizados sobre la base de datos:
 
 - 🌐 [**`reporte_analisis_arquitectura_rbac.html`**](file:///c:/Users/Jhon/Documents/IngSistUco/TrabajoGrado/Repositorio_GestionAsistenciadb/docs/reportes/reporte_analisis_arquitectura_rbac.html): Reporte técnico de la arquitectura de Vistas Autorizadas (`uv_auth_*`) y RBAC.
+- 🔒 [**`arquitectura/DB_SESSION_CONTEXT_Y_VISTAS_AUTORIZADAS.md`**](arquitectura/DB_SESSION_CONTEXT_Y_VISTAS_AUTORIZADAS.md): Politica fail-closed de `uv_auth_*`, ciclo de vida de `SESSION_CONTEXT` y clasificacion de extensiones `develop` (DB-GP-001C).
 - 📄 [**`reporte_auditoria_roles_permisos_jerarquia_develop.md`**](file:///c:/Users/Jhon/Documents/IngSistUco/TrabajoGrado/Repositorio_GestionAsistenciadb/docs/reportes/reporte_auditoria_roles_permisos_jerarquia_develop.md): Auditoría de roles y custodia jerárquica.
 - 📄 [**`reporte_comparativo_transacciones_especificacion.md`**](file:///c:/Users/Jhon/Documents/IngSistUco/TrabajoGrado/Repositorio_GestionAsistenciadb/docs/reportes/reporte_comparativo_transacciones_especificacion.md): Análisis comparativo de cobertura transaccional.
 - 📄 [**`reporte_historias_de_usuario_cobertura_develop.md`**](file:///c:/Users/Jhon/Documents/IngSistUco/TrabajoGrado/Repositorio_GestionAsistenciadb/docs/reportes/reporte_historias_de_usuario_cobertura_develop.md): Reporte de cobertura de HUs en la base de datos.

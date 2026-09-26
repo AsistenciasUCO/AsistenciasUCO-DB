@@ -20,6 +20,19 @@ Backend integration target: sql_server_asistencias / gestionasistenciadb
 
 La base local oficial de desarrollo es `gestionasistenciadb` dentro de `sql_server_asistencias`. Debe desplegarse desde el codigo SQL versionado actual del repositorio, no copiando archivos fisicos de otra instancia.
 
+## FREEZE STATUS (DB-GP-001C)
+
+```text
+DB Golden Path: FROZEN (docs/contracts/DB_BASELINE_CONTRACT.md, sin cambios)
+develop extensions: FROZEN as of final commit (docs/contracts/DB_DEVELOP_FREEZE_ADDENDUM.md)
+uv_auth_*: FAIL_CLOSED (sin SESSION_CONTEXT => 0 filas)
+Manifest: docs/contracts/DB_DEVELOP_FREEZE_MANIFEST.sha256 (verificado por test_summary.ps1)
+```
+
+El backend solo puede depender del contrato aprobado (`DB_BASELINE_CONTRACT.md`) salvo que un nuevo work item de alineacion adopte una extension. Todo cambio de esquema posterior al freeze requiere un nuevo work item / decision de contrato. Ver `docs/arquitectura/DB_SESSION_CONTEXT_Y_VISTAS_AUTORIZADAS.md`.
+
+Secretos: copie `.env.template` a `.env` (ignorado por Git) y reemplace `CHANGE_ME`. Nunca versione una contrasena; el gate `NO_HARDCODED_DB_PASSWORD` escanea scripts, workflows y plantillas `.env*`.
+
 ---
 
 ## 🛠️ Stack Tecnológico
