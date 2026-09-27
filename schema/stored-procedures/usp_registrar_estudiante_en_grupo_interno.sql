@@ -81,6 +81,16 @@ BEGIN
 
         IF @estadoResultado = 1 
         BEGIN
+            EXEC dbo.usp_validar_cupo_disponible_grupo_interno 
+                @idGrupo = @idGrupoDefecto, 
+                @idCorrelacion = @idCorrelacionDefecto, 
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT, 
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT, 
+                @estadoResultado = @estadoResultado OUTPUT;
+        END
+
+        IF @estadoResultado = 1 
+        BEGIN
             EXEC dbo.usp_validar_cruce_horario_estudiante_interno 
                 @idEstudiante = @idEstudianteDefecto, 
                 @idGrupo = @idGrupoDefecto, 

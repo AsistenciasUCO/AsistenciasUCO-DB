@@ -51,17 +51,20 @@ BEGIN
         -- PASO 3: Validación de cupo límite frente a estudiantes inscritos
         IF @estadoResultado = 1
         BEGIN
+            DECLARE @cuposRestantes INT = 0;
+
             SELECT TOP 1 
                 @cantidadEstudiantes = estudiantesActivos,
-                @cupoMaximo = capacidadMaximaPermitida
+                @cupoMaximo = capacidadMaximaPermitida,
+                @cuposRestantes = cuposDisponibles
             FROM dbo.uv_grupo
             WHERE id = @idGrupoDefecto;
 
-            IF @cantidadEstudiantes >= @cupoMaximo AND @cupoMaximo > 0
+            IF @cuposRestantes <= 0
             BEGIN
                 EXEC dbo.usp_obtener_mensaje_catalogo
-                    @p_codigo = 'VAL_003',
-                    @p_param1 = 'Cupo Maximo Grupo Excedido',
+                    @p_codigo = 'ERR_CUPO_SUPERADO',
+                    @p_param1 = @idGrupoDefecto,
                     @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                     @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
 
