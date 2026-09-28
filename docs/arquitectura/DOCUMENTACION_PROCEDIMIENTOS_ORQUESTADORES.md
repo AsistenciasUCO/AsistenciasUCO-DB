@@ -155,6 +155,8 @@ Esta documentación especifica la arquitectura, reglas de negocio, contrato de f
 ---
 
 ### 7. `dbo.usp_registrar_estudiante_en_grupo_usuario_no_existente`
+> **SUPERSEDED (LB-002.1C-A):** SP eliminado en `daeac11`; el vigente es `dbo.usp_registrar_estudiante_en_grupo` (firma y comportamiento distintos). Ver `docs/work-items/LB-002.1C-A-db-contract-baseline-recovery/REPORT.md`. El texto siguiente es historico.
+
 - **Propósito**: Orquesta el flujo completo de registro de un nuevo estudiante en un grupo académico cuando el usuario no existe previamente en la plataforma.
 - **Parámetros de Entrada**:
   - `@idTipoIdIdentificacion UNIQUEIDENTIFIER`, `@numeroIdentificacion INT`

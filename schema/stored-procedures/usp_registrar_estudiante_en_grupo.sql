@@ -76,6 +76,19 @@ BEGIN
                 @estadoResultado = @estadoResultado OUTPUT;
         END
 
+        -- PASO 1.9: Validar cupo disponible antes de sincronizar identidad.
+        -- usp_validar_grupo_exista_por_id_interno ya no valida cupo (sesiones se pueden programar en grupos llenos);
+        -- la matrícula debe rechazarse aquí para no dejar Usuario/Estudiante parciales.
+        IF @estadoResultado = 1
+        BEGIN
+            EXEC dbo.usp_validar_cupo_disponible_grupo_interno
+                @idGrupo = @idGrupoDefecto,
+                @idCorrelacion = @idCorrelacionDefecto,
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+                @estadoResultado = @estadoResultado OUTPUT;
+        END
+
         -- PASO 2: Sincronización de identidad (Usuario y Estudiante) e inscripción en grupo
         IF @estadoResultado = 1
         BEGIN

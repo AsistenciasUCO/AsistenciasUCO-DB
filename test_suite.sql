@@ -19,6 +19,7 @@ PRINT '======================================================================';
 :r /tmp/test/test_usp_crear_actualizar_grupo.sql
 :r /tmp/test/test_usp_crear_actualizar_sesion.sql
 :r /tmp/test/test_usp_generar_sesiones_grupo.sql
+:r /tmp/test/test_group_capacity_decoupling.sql
 :r /tmp/test/test_titularidad_jerarquica.sql
 :r /tmp/test/test_attendance_commands.sql
 :r /tmp/test/test_attendance_review.sql
