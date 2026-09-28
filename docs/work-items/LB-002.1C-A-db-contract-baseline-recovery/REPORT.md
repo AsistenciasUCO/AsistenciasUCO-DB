@@ -4,13 +4,18 @@
 DB BASE SHA:      6c120ca5b3eea191924163472b1f3a16edc6e2ff  (origin/sergio; el remoto no avanzo tras la apertura de la fase)
 DB BASE BRANCH:   sergio
 WORKTREE CLEAN AT START: YES
-FINAL PRE-COMMIT TREE: HEAD = 6c120ca + 8 archivos de esta fase (ver seccion 10); el SHA final se informa en la entrega del cierre
+LB-002.1C-A IMPLEMENTATION/CLOSURE COMMIT: 0798b994cc074a4315916a0b45e662d1708c6ab2  (base 6c120ca + 8 archivos de esta fase, ver seccion 10)
+PUSHED: YES   (HEAD == origin/sergio al cierre)
 
 RESULT: B
 CURRENT PUBLIC CONTRACT IS NOT EQUIVALENT
-BACKEND ALIGNMENT POSSIBLE: NO
-DB CONTRACT CHANGE REQUIRED: YES
+BACKEND DIRECT ALIGNMENT POSSIBLE: NO
+CONTRACT DECISION REQUIRED: YES
+DB CONTRACT CHANGE REQUIRED: TO_BE_DETERMINED_AFTER_BACKEND_AS_IS
+DB PRODUCTION CHANGE AUTHORIZED: NO
+BACKEND PRODUCTION CHANGE AUTHORIZED: NO
 STATUS: DECISION_REQUIRED
+NEXT AUTHORIZED PHASE: LB-002.1C-B1 - BACKEND AS-IS CONTRACT ANALYSIS (registrarEstudianteEnGrupo)
 
 FINAL CLOSURE (cierre formal de 1C-A):
 PUBLIC STUDENT-GROUP WIRE/ABI CHANGED IN 1C-A:   NO
@@ -116,9 +121,11 @@ STATUS: REMOVED_FROM_DB / DOCUMENTATION_STALE
 | Ownership transaccional | `BEGIN TRAN` / `SAVE TRAN`, `COMMIT`/`ROLLBACK`, `XACT_STATE` | ninguno | **NO** | escrituras parciales ante fallo tardio/excepcion | riesgo de `Usuario`/`Estudiante` huerfanos |
 | Auditoria | ninguna | ninguna | YES | - | ninguno |
 
-**Conclusion:** el backend **no** puede migrar legitimamente de `..._usuario_no_existente` a `usp_registrar_estudiante_en_grupo` sin perder reglas funcionales (tipo de documento, actualizacion por documento, atomicidad, validacion de programa, codigos `DBCODE`, operador COORDINADOR). No se alinea el backend ni se cambia el contrato en esta fase.
+**Conclusion:** el contrato publico actual **no es equivalente** al contrato que esperaba el backend historico (`..._usuario_no_existente`), por lo que el backend no puede migrar directamente a `usp_registrar_estudiante_en_grupo` sin perder reglas funcionales (tipo de documento, actualizacion por documento, atomicidad, validacion de programa, codigos `DBCODE`, operador COORDINADOR). Esto **no** afirma que el contrato DB actual sea incorrecto por si mismo: primero debe investigarse que capability requiere el consumidor productivo actual. No se alinea el backend ni se cambia el contrato en esta fase.
 
-Decisiones para `LB-002.1C-B` (no ejecutadas aqui): (a) tipo de documento explicito o `CC` fijo; (b) modelo de autorizacion (perfil de ejecutor, titularidad); (c) ownership transaccional del SP publico; (d) `ERR_PROGRAMA_GRUPO_NO_ENCONTRADO` y `DBCODE` de exito; (e) actualizacion de datos de usuario existente.
+Puntos de decision de contrato (no ejecutados aqui; a resolver con el insumo de `LB-002.1C-B1`): (a) tipo de documento explicito o `CC` fijo; (b) modelo de autorizacion (perfil de ejecutor, titularidad); (c) ownership transaccional del SP publico; (d) `ERR_PROGRAMA_GRUPO_NO_ENCONTRADO` y `DBCODE` de exito; (e) actualizacion de datos de usuario existente.
+
+Siguiente paso autorizado: **`LB-002.1C-B1` - BACKEND AS-IS CONTRACT ANALYSIS (`registrarEstudianteEnGrupo`)**. Su finalidad es solo determinar: consumer productivo real; endpoint; use case; port; adapter; firma SQL esperada; parametros realmente utilizados; reglas de negocio que el backend aun espera; pruebas de integracion que fallan; minimo cambio contractual necesario. B1 **no** implica automaticamente cambiar la DB. TD-043 sigue abierto.
 
 ## 6. Regresion de cupo (cambio `6c120ca`)
 
@@ -169,7 +176,10 @@ Brecha conocida, sin test dedicado: "estudiante ya existente **no** matriculado 
 
 ```text
 PREVIOUS FROZEN TIP:   9b2b993 (docs) / dcc69f1 (FINAL_DEVELOP_COMMIT, ultimo cambio de esquema/tests/gates)
-CURRENT REVIEWED TIP:  6c120ca (+ cambios sin commit de esta fase)
+BASE SHA:              6c120ca5b3eea191924163472b1f3a16edc6e2ff
+LB-002.1C-A COMMIT:    0798b994cc074a4315916a0b45e662d1708c6ab2 (implementacion/cierre; PUSHED: YES; HEAD == origin/sergio al cierre)
+POST-FREEZE REVIEWED TIP: ADVANCED BY LB-002.1C-A (0798b99)
+DB-GP-001C ORIGINAL FREEZE: UNCHANGED (FINAL_DEVELOP_COMMIT dcc69f1 no se reescribe)
 REASON FOR ADVANCE:    6c120ca desacopla cupo de grupo (sesiones en grupos llenos); esta fase corrige su regresion en la matricula
 GOLDEN PATH CONTRACT CHANGED: NO
 PUBLIC STUDENT-GROUP WIRE/ABI CHANGED IN 1C-A: NO   (firma, resultset, DBCODEs y RBAC identicos a 9b2b993)
@@ -261,7 +271,7 @@ capacity regression fixed = YES                       partial Usuario/Estudiante
 full group allows session = VERIFIED                  full group rejects enrollment = VERIFIED (ERR_CUPO_SUPERADO, sin residuos)
 public SP ABI/wire changed = NO                       public SP behavior corrected = YES
 legacy/current contract equivalence = NO              transaction ownership fully certified = NO
-backend alignment directly possible = NO              DECISION_REQUIRED = vigente (LB-002.1C-B)
+backend alignment directly possible = NO              CONTRACT DECISION REQUIRED = YES (DB change: TO_BE_DETERMINED_AFTER_BACKEND_AS_IS; next: LB-002.1C-B1)
 TD-043 = OPEN                                         GLOBAL -Pintegration = NOT_GREEN_TD043
 ```
 

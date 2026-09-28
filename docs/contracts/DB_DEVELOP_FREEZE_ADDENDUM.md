@@ -55,7 +55,12 @@ Detalle y evidencia: `docs/work-items/LB-002.1C-A-db-contract-baseline-recovery/
 
 ```text
 PREVIOUS FROZEN TIP:   9b2b993 (docs)  /  dcc69f19ffe3c246b78fa1996299ad97df229bbf (FINAL_DEVELOP_COMMIT)
-CURRENT REVIEWED TIP:  6c120ca5b3eea191924163472b1f3a16edc6e2ff (+ cambios sin commit de LB-002.1C-A)
+BASE SHA:              6c120ca5b3eea191924163472b1f3a16edc6e2ff
+LB-002.1C-A IMPLEMENTATION/CLOSURE COMMIT: 0798b994cc074a4315916a0b45e662d1708c6ab2
+PUSHED:                YES
+REVIEWED REMOTE STATE AT CLOSURE: HEAD == origin/sergio
+DB-GP-001C ORIGINAL FREEZE:       UNCHANGED   (FINAL_DEVELOP_COMMIT historico no se reescribe)
+POST-FREEZE REVIEWED TIP:         ADVANCED BY LB-002.1C-A
 REASON FOR ADVANCE:    6c120ca desacopla "grupo valido" de "cupo para matricular" (sesiones programables en grupos llenos);
                        LB-002.1C-A corrige su regresion (cupo validado antes de escribir en usp_registrar_estudiante_en_grupo)
 GOLDEN PATH CONTRACT CHANGED:          NO   (DB_BASELINE_CONTRACT.md sha 45e48c5a... y manifest de 10 archivos intactos)
@@ -73,5 +78,9 @@ GOLDEN PATH EFFECTIVE BEHAVIOR:        usp_crear_sesion y usp_generar_sesiones_g
                                        desde 6c120ca un grupo lleno pero habilitado ya no bloquea (fuente y firma de los SP congelados sin cambio)
 GATE ACTUAL:                           TOTAL_EXPECTED=154 (151 + 3 de test_group_capacity_decoupling.sql); las cifras 127/128 del contrato son historicas v1
 STUDENT-GROUP CANONICAL COMMAND:       dbo.usp_registrar_estudiante_en_grupo (el legacy ..._usuario_no_existente fue eliminado en daeac11)
-CURRENT PUBLIC CONTRACT IS NOT EQUIVALENT TO LEGACY: STATUS = DECISION_REQUIRED (LB-002.1C-B)
+CURRENT PUBLIC CONTRACT IS NOT EQUIVALENT TO THE CONTRACT THE HISTORICAL BACKEND EXPECTED: STATUS = DECISION_REQUIRED
+CONTRACT DECISION REQUIRED:            YES
+DB CONTRACT CHANGE REQUIRED:           TO_BE_DETERMINED_AFTER_BACKEND_AS_IS
+DB / BACKEND PRODUCTION CHANGE AUTHORIZED: NO / NO
+NEXT AUTHORIZED PHASE:                 LB-002.1C-B1 - BACKEND AS-IS CONTRACT ANALYSIS (registrarEstudianteEnGrupo); no implica cambiar la DB
 ```
