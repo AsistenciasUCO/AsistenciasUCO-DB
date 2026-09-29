@@ -46,6 +46,8 @@ Esta documentación especifica la arquitectura, reglas de negocio, contrato de f
 ---
 
 ### 1. `dbo.usp_registrar_estudiante_en_grupo_usuario_no_existente`
+> **SUPERSEDED (LB-002.1C-A):** este SP fue eliminado de `schema/` en `daeac11` y no existe en la DB. El comando publico vigente es `dbo.usp_registrar_estudiante_en_grupo` con otra firma (sin `@idTipoIdIdentificacion`, con `@idUsuarioEjecutor`) y sin ownership transaccional. Contrato real y matriz de diferencias: `docs/work-items/LB-002.1C-A-db-contract-baseline-recovery/REPORT.md`. El texto siguiente es historico.
+
 - **Caso de Uso de Negocio**: Orquestador principal de auto-registro e inscripción. Permite el registro completo de un estudiante en un grupo académico cuando el usuario no existe previamente en el sistema (o actualiza datos si ya existe), asegurando la creación del usuario, la asignación del perfil estudiante, la inscripción en el grupo y la vinculación al programa académico correspondiente.
 - **Parámetros de Entrada**:
   - `@idTipoIdIdentificacion UNIQUEIDENTIFIER`: ID del tipo de documento.

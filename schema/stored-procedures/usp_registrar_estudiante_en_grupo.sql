@@ -16,7 +16,8 @@ CREATE OR ALTER PROCEDURE [dbo].[usp_registrar_estudiante_en_grupo]
     @correo                  NVARCHAR(100),
     @password                NVARCHAR(500),
     @idCorrelacion           UNIQUEIDENTIFIER,
-    @idUsuarioEjecutor       UNIQUEIDENTIFIER = NULL
+    @idUsuarioEjecutor       UNIQUEIDENTIFIER = NULL,
+    @idTipoIdIdentificacion  UNIQUEIDENTIFIER = NULL
 )
 AS
     -- 1. Estandarización e inicialización de variables utilizando funciones de catálogo (Sin ISNULL)
@@ -41,7 +42,7 @@ BEGIN
             @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
             @estadoResultado = @estadoResultado OUTPUT;
 
-        -- PASO 1.5: Validación de perfil RBAC del usuario ejecutor si es suministrado
+        -- PASO 1.5: Validación de perfil RBAC del usuario ejecutor (obligatorio)
         IF @estadoResultado = 1 AND @idUsuarioEjecutor IS NULL
         BEGIN
             EXEC dbo.usp_obtener_mensaje_catalogo
@@ -58,7 +59,7 @@ BEGIN
         BEGIN
             EXEC dbo.usp_validar_permiso_rbac_usuario_interno
                 @idUsuario = @idUsuarioEjecutorDefecto,
-                @codigoPerfilRequerido = 'ESTUDIANTE',
+                @codigoPerfilRequerido = 'ESTUDIANTE,DOCENTE,COORDINADOR,ADMINISTRADOR',
                 @idCorrelacion = @idCorrelacionDefecto,
                 @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                 @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
@@ -76,12 +77,28 @@ BEGIN
                 @estadoResultado = @estadoResultado OUTPUT;
         END
 
+        -- PASO 1.9: Validar cupo disponible antes de sincronizar identidad.
+        -- usp_validar_grupo_exista_por_id_interno ya no valida cupo (sesiones se pueden programar en grupos llenos);
+        -- la matrícula debe rechazarse aquí para no dejar Usuario/Estudiante parciales.
+        IF @estadoResultado = 1
+        BEGIN
+            EXEC dbo.usp_validar_cupo_disponible_grupo_interno
+                @idGrupo = @idGrupoDefecto,
+                @idCorrelacion = @idCorrelacionDefecto,
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+                @estadoResultado = @estadoResultado OUTPUT;
+        END
+
         -- PASO 2: Sincronización de identidad (Usuario y Estudiante) e inscripción en grupo
         IF @estadoResultado = 1
         BEGIN
-            DECLARE @idTipoIdCC UNIQUEIDENTIFIER;
-            SELECT TOP 1 @idTipoIdCC = id FROM dbo.TipoIdentificacion WHERE tipoIdentificacion = 'CC';
-            IF @idTipoIdCC IS NULL SELECT TOP 1 @idTipoIdCC = id FROM dbo.TipoIdentificacion;
+            DECLARE @idTipoIdTarget UNIQUEIDENTIFIER = @idTipoIdIdentificacion;
+            IF @idTipoIdTarget IS NULL
+            BEGIN
+                SELECT TOP 1 @idTipoIdTarget = id FROM dbo.TipoIdentificacion WHERE tipoIdentificacion = 'CC';
+                IF @idTipoIdTarget IS NULL SELECT TOP 1 @idTipoIdTarget = id FROM dbo.TipoIdentificacion;
+            END
 
             DECLARE @idUsuarioTarget UNIQUEIDENTIFIER;
             SELECT TOP 1 @idUsuarioTarget = id FROM dbo.Usuario WHERE correo = LOWER(TRIM(@correo));
@@ -89,7 +106,7 @@ BEGIN
             IF @idUsuarioTarget IS NULL
             BEGIN
                 EXEC dbo.usp_sincronizar_usuario_interno
-                    @idTipoIdIdentificacion = @idTipoIdCC,
+                    @idTipoIdIdentificacion = @idTipoIdTarget,
                     @numeroIdentificacion = @numeroIdentificacion,
                     @primerApellido = @primerApellido,
                     @segundoApellido = @segundoApellido,
