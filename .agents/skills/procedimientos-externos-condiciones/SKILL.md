@@ -12,7 +12,8 @@ Esta documentación especifica la arquitectura, reglas de negocio, contrato de f
 
 ### Reglas Estructurales Obligatorias (Modelo Canónico)
 1. **Inmutabilidad de Nombres Preexistentes**: Queda **estrictamente prohibido renombrar o alterar el nombre de los procedimientos almacenados, vistas, funciones o tablas preexistentes** en la base de datos. Todos los objetos ya creados deben conservar su nombre original sin modificaciones.
-2. **Firma de Cabecera Sin Parámetros OUTPUT**:
+2. **Respeto Estricto al Modelo Jerárquico RBAC**: Toda validación de perfil ejecutor en procedimientos almacenados públicos u orquestadores debe respetar las fronteras del **`modelo-jerarquico-rbac`** (ej. `Administrador` gestiona únicamente Decanos/Facultades/Periodos; `Coordinador` aprueba docentes en grupos mediante `usp_aprobar_docente_grupo` excluyendo al Administrador; `Docente` aprueba/registra estudiantes en sus grupos).
+3. **Firma de Cabecera Sin Parámetros OUTPUT**:
    - Los procedimientos públicos/orquestadores NO llevan parámetros de salida (`OUTPUT`) en su firma de cabecera.
    - Todo parámetro de entrada de tipo `UNIQUEIDENTIFIER` (UUID) inicia obligatoriamente con el prefijo `id` (`@idTipoIdIdentificacion`, `@idGrupo`, `@idCorrelacion`, `@idEstudianteGrupo`, `@idGrupoSesion`, `@idEstadoAsistencia`, `@idEstudiante`, `@idSesion`).
 2. **Zona de Declaración e Inicialización (`AS` ... `BEGIN`)**:
