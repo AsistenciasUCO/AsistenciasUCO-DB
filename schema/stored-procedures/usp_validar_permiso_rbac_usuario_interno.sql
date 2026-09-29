@@ -49,13 +49,16 @@ BEGIN
         END
 
         -- PASO 3: Validación del perfil / rol activo asignado en uv_usuario_perfil
+        -- Soporta tanto un rol individual ('DOCENTE') como múltiples roles separados por coma ('ESTUDIANTE,DOCENTE,COORDINADOR')
         IF @estadoResultado = 1 AND (@codigoPerfilDefecto IS NOT NULL AND @codigoPerfilDefecto <> '')
         BEGIN
             IF NOT EXISTS (
                 SELECT 1 
                 FROM dbo.uv_usuario_perfil up
+                INNER JOIN STRING_SPLIT(@codigoPerfilDefecto, ',') s ON 
+                    up.codigoPerfil = TRIM(s.value) 
+                    OR UPPER(up.nombrePerfil) LIKE CONCAT('%', UPPER(TRIM(s.value)), '%')
                 WHERE up.idUsuario = @idUsuarioDefecto
-                  AND (up.codigoPerfil = @codigoPerfilDefecto OR UPPER(up.nombrePerfil) LIKE CONCAT('%', UPPER(@codigoPerfilDefecto), '%'))
             )
             BEGIN
                 EXEC dbo.usp_obtener_mensaje_catalogo
