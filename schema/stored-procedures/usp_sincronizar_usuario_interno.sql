@@ -16,6 +16,7 @@ CREATE OR ALTER PROCEDURE [dbo].[usp_sincronizar_usuario_interno]
     @correo                 NVARCHAR(255),
     @password               NVARCHAR(500),
     @idCorrelacion          UNIQUEIDENTIFIER,
+    @estaActivo             BIT = 1,
     @mensajeUsuarioResultado NVARCHAR(4000) OUTPUT,
     @mensajeTecnicoResultado NVARCHAR(4000) OUTPUT,
     @estadoResultado        BIT OUTPUT
@@ -24,6 +25,7 @@ AS
 -- 1. Estandarización e inicialización de variables utilizando funciones de catálogo (Sin ISNULL)
 DECLARE @idCorrelacionDefecto            UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idCorrelacion, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
 DECLARE @idTipoIdIdentificacionDefecto   UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idTipoIdIdentificacion, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
+DECLARE @estaActivoDefecto               BIT = dbo.ufn_obtener_parametro_int(@estaActivo, 'GENERAL', 'ENTERO_UNO');
 
     DECLARE @numeroIdentificacionDefecto     INT = dbo.ufn_obtener_parametro_int(@numeroIdentificacion, 'GENERAL', 'ENTERO_CERO');
     DECLARE @primerApellidoDefecto           NVARCHAR(255) = UPPER(TRIM(dbo.ufn_obtener_parametro_texto(@primerApellido, 'GENERAL', 'CADENA_VACIA')));
@@ -174,7 +176,7 @@ BEGIN
                 NEWID(), @idTipoIdIdentificacionDefecto, @numeroIdentificacionDefecto,
                 @primerApellidoDefecto, @segundoApellidoDefecto,
                 @primerNombreDefecto, @segundoNombreDefecto,
-                @correoDefecto, 0, 1, @passwordDefecto
+                @correoDefecto, 0, @estaActivoDefecto, @passwordDefecto
             );
 
         EXEC dbo.usp_obtener_mensaje_catalogo

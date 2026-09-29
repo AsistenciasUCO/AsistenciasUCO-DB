@@ -10,6 +10,7 @@ CREATE OR ALTER PROCEDURE [dbo].[usp_registrar_estudiante_en_grupo_interno]
     @idEstudiante            UNIQUEIDENTIFIER,
     @idGrupo                 UNIQUEIDENTIFIER,
     @idCorrelacion           UNIQUEIDENTIFIER,
+    @codigoEstado            NVARCHAR(10) = 'A',
     @mensajeUsuarioResultado NVARCHAR(4000) OUTPUT,
     @mensajeTecnicoResultado NVARCHAR(4000) OUTPUT,
     @estadoResultado         BIT OUTPUT
@@ -38,12 +39,15 @@ BEGIN
             @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT, 
             @estadoResultado = @estadoResultado OUTPUT;
 
-        -- PASO 2: Obtener identificador del Estado Activo ('A') para EstudianteGrupo
+        -- PASO 2: Obtener identificador del Estado para EstudianteGrupo
         IF @estadoResultado = 1
         BEGIN
+            DECLARE @codigoEstadoDefecto NVARCHAR(10) = UPPER(TRIM(dbo.ufn_obtener_parametro_texto(@codigoEstado, 'GENERAL', 'CADENA_VACIA')));
+            IF @codigoEstadoDefecto = '' SET @codigoEstadoDefecto = 'A';
+
             SELECT @idEstadoActivo = id 
             FROM dbo.uv_estado_estudiante_grupo 
-            WHERE codigo = 'A';
+            WHERE codigo = @codigoEstadoDefecto;
 
             IF @idEstadoActivo IS NULL
             BEGIN

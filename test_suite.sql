@@ -14,7 +14,9 @@ PRINT '======================================================================';
 :r /tmp/test/test_reactive_academic.sql
 :r /tmp/test/test_mass_period_close.sql
 :r /tmp/test/test_usp_registrar_estudiante_en_grupo_usuario_no_existente.sql
+:r /tmp/test/test_usp_registrar_estudiante_en_grupo_autonomo.sql
 :r /tmp/test/test_usp_registrar_docente_en_grupo_usuario_no_existente.sql
+:r /tmp/test/test_usp_registrar_docente_en_grupo_autonomo.sql
 :r /tmp/test/test_transaction_ownership.sql
 :r /tmp/test/test_usp_crear_actualizar_grupo.sql
 :r /tmp/test/test_usp_crear_actualizar_sesion.sql
