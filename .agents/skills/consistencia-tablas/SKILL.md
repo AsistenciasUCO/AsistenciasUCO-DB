@@ -10,9 +10,10 @@ description: >-
 
 El modelo de datos físico ubicado en la carpeta `schema/tables/` representa la estructura canónica y consolidada de las entidades de dominio de la base de datos `gestionasistenciadb`.
 
-### Regla Principal de Invariabilidad Estructural
-1. **Protección de Atributos Existentes**: Por norma general, **no se deben agregar nuevos atributos, alterar tipos de datos ni modificar la estructura de las tablas de dominio** de forma arbitraria.
-2. **Solución en Capas de Lectura**: Las necesidades de consulta, agregación, cálculo o formato deben resolverse mediante las capas de vistas base (`uv_*`), vistas autorizadas (`uv_auth_*`) o lógica del Backend/API, preservando la integridad del Modelo Entidad-Relación (MER).
+### Regla Principal de Invariabilidad Estructural y Nomenclatura
+1. **Inmutabilidad de Nombres Preexistentes**: Queda **estrictamente prohibido modificar o renombrar las tablas, columnas e identificadores** que ya se encuentran creados en la base de datos. Todos los nombres de las tablas y atributos preexistentes deben mantenerse intactos.
+2. **Protección de Atributos Existentes**: Por norma general, **no se deben agregar nuevos atributos, alterar tipos de datos ni modificar la estructura de las tablas de dominio** de forma arbitraria.
+3. **Solución en Capas de Lectura**: Las necesidades de consulta, agregación, cálculo o formato deben resolverse mediante las capas de vistas base (`uv_*`), vistas autorizadas (`uv_auth_*`) o lógica del Backend/API, preservando la integridad del Modelo Entidad-Relación (MER).
 
 ---
 

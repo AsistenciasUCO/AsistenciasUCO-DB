@@ -11,7 +11,8 @@ description: >-
 Esta documentación especifica la arquitectura, reglas de negocio, contrato de firma, parámetros de catálogo consumidos y flujo de control para **todos los Procedimientos Almacenados con sufijo `_interno`** en la base de datos `gestionasistenciadb`.
 
 ### Reglas Estructurales Obligatorias
-1. **Nombres de Variables UUID**: Toda variable, parámetro o columna `UNIQUEIDENTIFIER` inicia obligatoriamente con el prefijo `id` (ej. `@idTipoIdIdentificacion`, `@idCorrelacion`, `@idDocente`, `@idGrupo`, `@idEstudiante`, `@idPrograma`, `@idSesion`, `@idPerfil`).
+1. **Inmutabilidad de Nombres Preexistentes**: Queda **estrictamente prohibido renombrar o modificar los nombres de los procedimientos almacenados internos (`*_interno`), tablas, vistas o funciones ya existentes**. La nomenclatura de los objetos creados es inmutable.
+2. **Nombres de Variables UUID**: Toda variable, parámetro o columna `UNIQUEIDENTIFIER` inicia obligatoriamente con el prefijo `id` (ej. `@idTipoIdIdentificacion`, `@idCorrelacion`, `@idDocente`, `@idGrupo`, `@idEstudiante`, `@idPrograma`, `@idSesion`, `@idPerfil`).
 2. **Parámetros de Salida Unificados**: Todo procedimiento expone exactamente:
    - `@mensajeUsuarioResultado NVARCHAR(4000) OUTPUT`
    - `@mensajeTecnicoResultado NVARCHAR(4000) OUTPUT`

@@ -16,7 +16,10 @@ Garantiza que toda información leída por la aplicación cumpla con el modelo d
 
 ## Reglas Estructurales Obligatorias
 
-### 1. Convención de Nomenclatura y Prefijo `uv_auth_*`
+### 1. Inmutabilidad de Nombres Preexistentes
+* **Prohibición de Renombrado**: Queda **estrictamente prohibido modificar los nombres de las vistas autorizadas, vistas base, tablas, funciones o procedimientos almacenados ya creados**. La nomenclatura de todos los objetos existentes es inalterable.
+
+### 2. Convención de Nomenclatura y Prefijo `uv_auth_*`
 * Toda vista expuesta al consumo externo (Frontend / API) que requiera control de acceso debe iniciar obligatoriamente con el prefijo `uv_auth_` seguido del nombre de la entidad en singular (ej. `uv_auth_institucion`, `uv_auth_facultad`, `uv_auth_decano`, `uv_auth_programa`, `uv_auth_coordinador`, `uv_auth_docente`, `uv_auth_estudiante`, `uv_auth_grupo`, `uv_auth_sesion`, `uv_auth_asistencia`, `uv_auth_solicitud_revision_asistencia`, `uv_auth_periodo_academico`).
 
 ### 2. Doble Validación Obligatoria: Rol (RBAC) + Autorización por Ámbito

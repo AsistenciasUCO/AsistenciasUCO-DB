@@ -11,7 +11,8 @@ description: >-
 Esta documentación especifica la arquitectura, reglas de negocio, contrato de firma, estructura del resultset unificado y flujo de control para **todos los Procedimientos Almacenados Públicos u Orquestadores** (aquellos sin el sufijo `_interno`) en la base de datos `gestionasistenciadb`.
 
 ### Reglas Estructurales Obligatorias (Modelo Canónico)
-1. **Firma de Cabecera Sin Parámetros OUTPUT**:
+1. **Inmutabilidad de Nombres Preexistentes**: Queda **estrictamente prohibido renombrar o alterar el nombre de los procedimientos almacenados, vistas, funciones o tablas preexistentes** en la base de datos. Todos los objetos ya creados deben conservar su nombre original sin modificaciones.
+2. **Firma de Cabecera Sin Parámetros OUTPUT**:
    - Los procedimientos públicos/orquestadores NO llevan parámetros de salida (`OUTPUT`) en su firma de cabecera.
    - Todo parámetro de entrada de tipo `UNIQUEIDENTIFIER` (UUID) inicia obligatoriamente con el prefijo `id` (`@idTipoIdIdentificacion`, `@idGrupo`, `@idCorrelacion`, `@idEstudianteGrupo`, `@idGrupoSesion`, `@idEstadoAsistencia`, `@idEstudiante`, `@idSesion`).
 2. **Zona de Declaración e Inicialización (`AS` ... `BEGIN`)**:

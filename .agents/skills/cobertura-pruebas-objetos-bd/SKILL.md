@@ -11,7 +11,8 @@ description: >-
 Esta documentación establece la directiva obligatoria de pruebas unitarias para la base de datos `gestionasistenciadb`.
 
 ### Regla Fundamental
-> **Por cada Procedimiento Almacenado (`usp_*` / `*_interno`), Vista (`uv_*` / `uv_auth_*`) o Función (`ufn_*` / `fn_*`) que sea creado o modificado en `schema/`, es estrictamente obligatorio crear o actualizar su script de pruebas unitarias en `test/` garantizando la cobertura de TODOS los caminos lógicos posibles.**
+> **1. Inmutabilidad de Nombres Preexistentes: Queda estrictamente prohibido renombrar o alterar el nombre de tablas, vistas, funciones o procedimientos almacenados que ya se encuentren creados.**
+> **2. Cobertura Obligatoria: Por cada Procedimiento Almacenado (`usp_*` / `*_interno`), Vista (`uv_*` / `uv_auth_*`) o Función (`ufn_*` / `fn_*`) que sea creado o modificado en `schema/`, es estrictamente obligatorio crear o actualizar su script de pruebas unitarias en `test/` garantizando la cobertura de TODOS los caminos lógicos posibles.**
 
 ---
 

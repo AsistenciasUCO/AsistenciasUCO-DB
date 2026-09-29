@@ -11,7 +11,8 @@ description: >-
 Esta documentación establece la directiva obligatoria de acceso a datos de lectura en la base de datos `gestionasistenciadb`.
 
 ### 🛡️ Regla Fundamental
-> **Todas las consultas de lectura (`SELECT`) a la base de datos deben realizarse exclusivamente por medio de la Capa de Vistas (`uv_*` o `uv_auth_*`). Queda estrictamente prohibido realizar consultas directas sobre las tablas físicas del Modelo Entidad-Relación (MER).**
+> **1. Inmutabilidad de Nombres Preexistentes: Queda estrictamente prohibido cambiar o renombrar las tablas, vistas (`uv_*` / `uv_auth_*`), funciones (`ufn_*`) y procedimientos almacenados (`usp_*` / `*_interno`) que ya hayan sido creados en la base de datos.**
+> **2. Acceso por Vistas: Todas las consultas de lectura (`SELECT`) a la base de datos deben realizarse exclusivamente por medio de la Capa de Vistas (`uv_*` o `uv_auth_*`). Queda estrictamente prohibido realizar consultas directas sobre las tablas físicas del Modelo Entidad-Relación (MER).**
 
 ---
 
