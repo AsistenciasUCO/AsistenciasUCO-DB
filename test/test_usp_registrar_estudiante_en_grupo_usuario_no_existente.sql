@@ -10,7 +10,7 @@ DECLARE @numero INT = 1000000000 + ABS(CHECKSUM(NEWID()) % 500000000);
 DECLARE @corr UNIQUEIDENTIFIER = NEWID();
 DECLARE @usuario UNIQUEIDENTIFIER;
 DECLARE @estudiante UNIQUEIDENTIFIER;
-DECLARE @idUsuarioEstudianteEjecutor UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_estudiante_identidad WHERE estaActivoUsuario = 1);
+DECLARE @idUsuarioEstudianteEjecutor UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_docente_identidad WHERE estaActivoUsuario = 1);
 
 IF @tipoId IS NULL OR @grupo IS NULL OR @idUsuarioEstudianteEjecutor IS NULL THROW 51100, 'TEST FAILED: STUDENT_SUCCESS fixture missing.', 1;
 
@@ -109,7 +109,7 @@ DECLARE @missingGroup UNIQUEIDENTIFIER = NEWID(), @corr UNIQUEIDENTIFIER = NEWID
 DECLARE @correo NVARCHAR(255) = CONCAT(N'qa.student.missing.', REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), N'@test.local');
 DECLARE @numero INT = 1000000000 + ABS(CHECKSUM(NEWID()) % 500000000);
 DECLARE @userMsg NVARCHAR(4000), @techMsg NVARCHAR(4000);
-DECLARE @idUsuarioEstudianteEjecutor UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_estudiante_identidad WHERE estaActivoUsuario = 1);
+DECLARE @idUsuarioEstudianteEjecutor UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_docente_identidad WHERE estaActivoUsuario = 1);
 DECLARE @usersBefore INT = (SELECT COUNT(*) FROM dbo.Usuario);
 DECLARE @studentsBefore INT = (SELECT COUNT(*) FROM dbo.Estudiante);
 DECLARE @linksBefore INT = (SELECT COUNT(*) FROM dbo.EstudianteGrupo);
@@ -151,7 +151,7 @@ DECLARE @period UNIQUEIDENTIFIER = NEWID(), @closedGroup UNIQUEIDENTIFIER = NEWI
 DECLARE @correo NVARCHAR(255) = CONCAT(N'qa.student.closed.', REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), N'@test.local');
 DECLARE @numero INT = 1000000000 + ABS(CHECKSUM(NEWID()) % 500000000);
 DECLARE @userMsg NVARCHAR(4000), @techMsg NVARCHAR(4000);
-DECLARE @idUsuarioEstudianteEjecutor UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_estudiante_identidad WHERE estaActivoUsuario = 1);
+DECLARE @idUsuarioEstudianteEjecutor UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_docente_identidad WHERE estaActivoUsuario = 1);
 IF @baseGroup IS NULL OR @institution IS NULL OR @idUsuarioEstudianteEjecutor IS NULL THROW 51110, 'TEST FAILED: STUDENT_GROUP_DISABLED fixture missing.', 1;
 BEGIN TRANSACTION;
 BEGIN TRY
@@ -210,7 +210,7 @@ DECLARE @fullGroup UNIQUEIDENTIFIER = NEWID(), @corr UNIQUEIDENTIFIER = NEWID();
 DECLARE @correo NVARCHAR(255) = CONCAT(N'qa.student.full.', REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), N'@test.local');
 DECLARE @numero INT = 1000000000 + ABS(CHECKSUM(NEWID()) % 500000000);
 DECLARE @userMsg NVARCHAR(4000), @techMsg NVARCHAR(4000);
-DECLARE @idUsuarioEstudianteEjecutor UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_estudiante_identidad WHERE estaActivoUsuario = 1);
+DECLARE @idUsuarioEstudianteEjecutor UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_docente_identidad WHERE estaActivoUsuario = 1);
 IF @baseGroup IS NULL OR @existingStudent IS NULL OR @activeState IS NULL OR @idUsuarioEstudianteEjecutor IS NULL
     THROW 51113, 'TEST FAILED: STUDENT_CAPACITY_EXCEEDED fixture missing.', 1;
 BEGIN TRANSACTION;
