@@ -1,0 +1,107 @@
+﻿USE [gestionasistenciadb];
+GO
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
+
+-- ============================================================================
+-- usp_consultar_programas_paginado
+--
+-- Clasificacion:
+--   NON_GOLDEN_PATH_EXTENSION        Consulta paginada institucional
+--   READ_QUERY_RESULTSET             Retorna conjunto de filas + totalRegistros
+--
+-- Proposito:
+--   Catálogo paginado de programas académicos institucionales consumiendo uv_programa.
+-- ============================================================================
+CREATE OR ALTER PROCEDURE [dbo].[usp_consultar_programas_paginado]
+(
+    @idUsuarioEjecutor       UNIQUEIDENTIFIER,
+    @idCorrelacion           UNIQUEIDENTIFIER,
+    @idFacultad              UNIQUEIDENTIFIER = NULL,
+    @filtroTexto             NVARCHAR(100)    = NULL,
+    @estaActivo              BIT              = NULL,
+    @numeroPagina            INT              = 1,
+    @tamanoPagina            INT              = 10
+)
+AS
+    -- 1. Declaraciones previas (AS ... BEGIN)
+    DECLARE @idCorrelacionDefecto UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idCorrelacion, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
+    DECLARE @idUsuarioDefecto     UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idUsuarioEjecutor, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
+    DECLARE @guidVacio            UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(NULL, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
+
+    -- Paginación normalizada
+    DECLARE @pagina INT = IIF(@numeroPagina IS NULL OR @numeroPagina < 1, 1, @numeroPagina);
+    DECLARE @tamano INT = IIF(@tamanoPagina IS NULL OR @tamanoPagina < 1, 10, IIF(@tamanoPagina > 100, 100, @tamanoPagina));
+    DECLARE @offset INT = (@pagina - 1) * @tamano;
+
+    -- Filtros normalizados
+    DECLARE @filtroFacId UNIQUEIDENTIFIER = @idFacultad;
+    DECLARE @filtroTextoNormalizado NVARCHAR(102) = IIF(TRIM(@filtroTexto) IS NULL OR TRIM(@filtroTexto) = '', NULL, CONCAT('%', TRIM(@filtroTexto), '%'));
+    DECLARE @filtroActivo BIT = @estaActivo;
+
+    -- Control de diagnóstico
+    DECLARE @mensajeUsuarioResultado NVARCHAR(4000) = dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA');
+    DECLARE @mensajeTecnicoResultado NVARCHAR(4000) = dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA');
+    DECLARE @estadoResultado BIT = 1;
+
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    BEGIN TRY
+        -- Paso 1: Validación obligatoria de identificador de correlación
+        EXEC dbo.usp_validar_id_correlacion_esta_presente_interno
+            @idCorrelacion = @idCorrelacionDefecto,
+            @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+            @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+            @estadoResultado = @estadoResultado OUTPUT;
+
+        -- Paso 2: Validación obligatoria de usuario ejecutor
+        IF @estadoResultado = 1 AND (@idUsuarioDefecto IS NULL OR @idUsuarioDefecto = @guidVacio)
+        BEGIN
+            EXEC dbo.usp_obtener_mensaje_catalogo
+                @p_codigo = 'VAL_001',
+                @p_param1 = 'UsuarioEjecutor',
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
+
+            SET @estadoResultado = 0;
+        END
+
+        IF @estadoResultado = 0
+        BEGIN
+            THROW 51000, @mensajeTecnicoResultado, 1;
+        END
+
+        -- Paso 3: Consulta optimizada de programas
+        SELECT
+            pr.id,
+            pr.nombrePrograma,
+            pr.idFacultad,
+            pr.nombreFacultad,
+            pr.idInstitucion,
+            pr.nombreInstitucion,
+            pr.idCoordinador,
+            pr.nombreCoordinador,
+            pr.estaActivoPrograma,
+            COUNT(1) OVER() AS totalRegistros
+        FROM dbo.uv_programa pr
+        WHERE (@filtroFacId IS NULL OR pr.idFacultad = @filtroFacId)
+          AND (@filtroActivo IS NULL OR pr.estaActivoPrograma = @filtroActivo)
+          AND (
+              @filtroTextoNormalizado IS NULL
+              OR pr.nombrePrograma LIKE @filtroTextoNormalizado
+              OR pr.nombreCoordinador LIKE @filtroTextoNormalizado
+          )
+        ORDER BY pr.nombrePrograma ASC, pr.id ASC
+        OFFSET @offset ROWS
+        FETCH NEXT @tamano ROWS ONLY;
+
+    END TRY
+    BEGIN CATCH
+        THROW;
+    END CATCH;
+END;
+GO

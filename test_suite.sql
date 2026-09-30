@@ -28,6 +28,11 @@ PRINT '======================================================================';
 :r /tmp/test/test_golden_path_immutability.sql
 :r /tmp/test/test_authorized_views_rbac.sql
 :r /tmp/test/test_usp_consultar_grupos_paginado.sql
+:r /tmp/test/test_usp_consultar_estudiantes_paginado.sql
+:r /tmp/test/test_usp_consultar_estudiantes_grupo_paginado.sql
+:r /tmp/test/test_usp_consultar_docentes_paginado.sql
+:r /tmp/test/test_usp_consultar_sesiones_y_asistencias_paginado.sql
+:r /tmp/test/test_usp_consultar_catalogos_y_revisiones_paginado.sql
 
 IF @@TRANCOUNT <> 0
 BEGIN
