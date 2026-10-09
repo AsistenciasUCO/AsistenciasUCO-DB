@@ -86,6 +86,12 @@ USING (VALUES
     ('ERR_SOLICITUD_MATRICULA_NO_IMPLEMENTADA', 'BUSINESS_ERROR', 'MEDIO', 'La gestión de solicitudes de matrícula aún no se encuentra disponible.'),
 
     -- Errores de Sistema
+    ('CAT_001', 'SYSTEM_ERROR', 'CRITICO', 'Contrato de catalogo incompleto: falta el estado requerido [{}] en dbo.Estado.'),
+    ('PER_001', 'BUSINESS_ERROR', 'MEDIO', 'El periodo academico [{}] no existe en el sistema.'),
+    ('PLA_001', 'BUSINESS_ERROR', 'MEDIO', 'El numero de plan de estudio (inp) [{}] es invalido: debe ser un entero positivo.'),
+    ('IDN_001', 'BUSINESS_ERROR', 'ALTO', 'Conflicto de identidad: el correo y la identificacion no pertenecen a un unico usuario existente; no se registra la matricula.'),
+    ('SUC_REGISTRO_PLAN_ESTUDIO', 'SUCCESS', 'BAJO', 'Plan de estudio registrado correctamente: {}.'),
+    ('SUC_ACTUALIZACION_PLAN_ESTUDIO', 'SUCCESS', 'BAJO', 'Plan de estudio actualizado correctamente: {}.'),
     ('SYS_001', 'SYSTEM_ERROR', 'CRITICO', 'Ocurrió un error inesperado al procesar la solicitud.'),
     ('ERR_INESPERADO_REGISTRO_ESTUDIANTE', 'SYSTEM_ERROR', 'CRITICO', 'Hubo un error inesperado al procesar el registro completo del estudiante.'),
     ('ERR_INESPERADO_REGISTRO_DOCENTE', 'SYSTEM_ERROR', 'CRITICO', 'Hubo un error inesperado al procesar el registro completo del docente.'),
@@ -190,8 +196,14 @@ USING (VALUES
     ('ERR_SOLICITUD_MATRICULA_NO_IMPLEMENTADA', 'BUSINESS_ERROR', 'MEDIO', 'Capability SolicitudMatricula is not implemented in the current schema.'),
 
     -- Errores de Sistema
+    ('CAT_001', 'SYSTEM_ERROR', 'CRITICO', 'Contrato de catalogo incompleto: falta el estado requerido [{}] en dbo.Estado.'),
+    ('PER_001', 'BUSINESS_ERROR', 'MEDIO', 'El periodo academico [{}] no existe en el sistema.'),
+    ('PLA_001', 'BUSINESS_ERROR', 'MEDIO', 'El numero de plan de estudio (inp) [{}] es invalido: debe ser un entero positivo.'),
+    ('IDN_001', 'BUSINESS_ERROR', 'ALTO', 'Conflicto de identidad: el correo y la identificacion no pertenecen a un unico usuario existente; no se registra la matricula.'),
+    ('SUC_REGISTRO_PLAN_ESTUDIO', 'SUCCESS', 'BAJO', 'Plan de estudio registrado correctamente: {}.'),
+    ('SUC_ACTUALIZACION_PLAN_ESTUDIO', 'SUCCESS', 'BAJO', 'Plan de estudio actualizado correctamente: {}.'),
     ('SYS_001', 'SYSTEM_ERROR', 'CRITICO', 'Excepción de sistema no controlada capturada en bloque CATCH: {}.'),
-    ('ERR_INESPERADO_REGISTRO_ESTUDIANTE', 'SYSTEM_ERROR', 'CRITICO', 'Error critico en orquestador [usp_registrar_estudiante_en_grupo_usuario_no_existente]: {}.'),
+    ('ERR_INESPERADO_REGISTRO_ESTUDIANTE', 'SYSTEM_ERROR', 'CRITICO', 'Error critico en orquestador [usp_registrar_estudiante_en_grupo]: {}.'),
     ('ERR_INESPERADO_REGISTRO_DOCENTE', 'SYSTEM_ERROR', 'CRITICO', 'Error critico en orquestador [usp_registrar_docente_en_grupo_usuario_no_existente]: {}.'),
     ('ERR_INESPERADO_REGISTRO_ASISTENCIA', 'SYSTEM_ERROR', 'CRITICO', 'Error critico en orquestador [usp_registrar_asistencia_estudiante]: {}.'),
 

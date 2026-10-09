@@ -19,10 +19,13 @@ AS
     DECLARE @idActorDefecto           NVARCHAR(100)    = TRIM(@idActor);
 
     DECLARE @idPeriodoTarget               UNIQUEIDENTIFIER;
+    DECLARE @transaccionPropia             BIT = 0;
+    DECLARE @savepointCreado               BIT = 0;
     DECLARE @idEstadoFinalizado            UNIQUEIDENTIFIER;
     DECLARE @idEstadoCanceladoInasistencia UNIQUEIDENTIFIER;
     DECLARE @totalEstudiantes              INT = 0;
     DECLARE @totalReprobados               INT = 0;
+    DECLARE @estadoTransaccionCatch        INT;
 
     -- Variables locales de respuesta
     DECLARE @mensajeUsuarioResultado NVARCHAR(4000) = dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA');
@@ -66,27 +69,33 @@ BEGIN
         -- PASO 2: Buscar período académico objetivo consultando uv_periodo_academico
         IF @estadoResultado = 1
         BEGIN
-            IF @codigoPeriodoDefecto IS NOT NULL AND @codigoPeriodoDefecto <> ''
+            -- Contrato (TD-058): el codigo solicitado es obligatorio y opera EXCLUSIVAMENTE sobre ese periodo.
+            -- Sin fallback al periodo mas reciente: codigo ausente -> GEN_002; codigo inexistente -> PER_001.
+            IF @codigoPeriodoDefecto IS NULL OR @codigoPeriodoDefecto = ''
             BEGIN
-                SELECT TOP 1 @idPeriodoTarget = id
-                FROM [dbo].[uv_periodo_academico]
-                WHERE nombre = @codigoPeriodoDefecto 
-                   OR CAST(codigo AS NVARCHAR(50)) = @codigoPeriodoDefecto
-                ORDER BY anio DESC;
-            END
+                EXEC dbo.usp_obtener_mensaje_catalogo
+                    @p_codigo = 'GEN_002',
+                    @p_param1 = 'codigoPeriodo',
+                    @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                    @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
 
-            IF @idPeriodoTarget IS NULL
+                SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+                SET @estadoResultado = 0;
+            END
+            ELSE
             BEGIN
                 SELECT TOP 1 @idPeriodoTarget = id
                 FROM [dbo].[uv_periodo_academico]
+                WHERE nombre = @codigoPeriodoDefecto
+                   OR CAST(codigo AS NVARCHAR(50)) = @codigoPeriodoDefecto
                 ORDER BY anio DESC, codigo DESC;
             END
 
-            IF @idPeriodoTarget IS NULL
+            IF @estadoResultado = 1 AND @idPeriodoTarget IS NULL
             BEGIN
                 EXEC dbo.usp_obtener_mensaje_catalogo
-                    @p_codigo = 'VAL_002',
-                    @p_param1 = 'PeriodoAcademico',
+                    @p_codigo = 'PER_001',
+                    @p_param1 = @codigoPeriodoDefecto,
                     @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                     @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
 
@@ -101,7 +110,17 @@ BEGIN
             SELECT TOP 1 @idEstadoFinalizado = id FROM dbo.EstadoEstudianteGrupo WHERE codigo = 'F' ORDER BY id ASC;
             SELECT TOP 1 @idEstadoCanceladoInasistencia = id FROM dbo.EstadoEstudianteGrupo WHERE codigo = 'CI' ORDER BY id ASC;
 
-            BEGIN TRANSACTION;
+            -- Ownership transaccional: propia o savepoint bajo transaccion externa (nunca commit ajeno).
+            IF @@TRANCOUNT = 0
+            BEGIN
+                BEGIN TRANSACTION;
+                SET @transaccionPropia = 1;
+            END
+            ELSE
+            BEGIN
+                SAVE TRANSACTION sp_cierre_masivo;
+                SET @savepointCreado = 1;
+            END
 
             -- 1. Conteo de estudiantes procesados
             SELECT @totalEstudiantes = COUNT(eg.id)
@@ -177,7 +196,17 @@ BEGIN
                 CONCAT('{"procesados":', @totalEstudiantes, ',"reprobadosPorFallas":', @totalReprobados, '}')
             );
 
-            COMMIT TRANSACTION;
+            IF @transaccionPropia = 1
+            BEGIN
+                IF XACT_STATE() = 1 AND @estadoResultado = 1
+                BEGIN
+                    COMMIT TRANSACTION;
+                END
+                ELSE IF XACT_STATE() <> 0
+                BEGIN
+                    ROLLBACK TRANSACTION;
+                END
+            END
 
             EXEC dbo.usp_obtener_mensaje_catalogo
                 @p_codigo = 'GEN_004',
@@ -190,8 +219,23 @@ BEGIN
 
     END TRY
     BEGIN CATCH
-        IF @@TRANCOUNT > 0
+        -- Rollback solo de lo que este SP posee: su transaccion o su savepoint (nunca la transaccion externa).
+        SET @estadoTransaccionCatch = XACT_STATE();
+
+        IF @transaccionPropia = 1 AND @estadoTransaccionCatch <> 0
+        BEGIN
             ROLLBACK TRANSACTION;
+        END
+        ELSE IF @savepointCreado = 1 AND @estadoTransaccionCatch = 1
+        BEGIN
+            ROLLBACK TRANSACTION sp_cierre_masivo;
+        END
+
+        -- Transaccion externa condenada que no nos pertenece: propagar al propietario.
+        IF @transaccionPropia = 0 AND @estadoTransaccionCatch = -1
+        BEGIN
+            THROW;
+        END
 
         EXEC dbo.usp_obtener_mensaje_catalogo
             @p_codigo = 'SYS_001',

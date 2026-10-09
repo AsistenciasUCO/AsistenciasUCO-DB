@@ -27,6 +27,9 @@ AS
     DECLARE @mensajeUsuarioResultado NVARCHAR(4000) = dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA');
     DECLARE @mensajeTecnicoResultado NVARCHAR(4000) = dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA');
     DECLARE @estadoResultado BIT = 1;
+    DECLARE @transaccionPropia BIT = 0;
+    DECLARE @savepointCreado   BIT = 0;
+    DECLARE @estadoTransaccionCatch INT;
 
 BEGIN
     SET NOCOUNT ON;
@@ -107,9 +110,22 @@ BEGIN
             END
         END
 
-        -- PASO 5: Registro de la asistencia auto-gestionada por el estudiante (Estado AN - Asistió)
+        -- PASO 5: Registro de la asistencia auto-gestionada por el estudiante (Estado AN - Asistió).
+        -- Atomico (TD-056): Asistencia y DetalleAsistencia se confirman juntos o no se persiste ninguno.
+        -- Ownership: transaccion propia si no hay externa; savepoint si la hay (nunca commit/rollback ajeno).
         IF @estadoResultado = 1
         BEGIN
+            IF @@TRANCOUNT = 0
+            BEGIN
+                BEGIN TRANSACTION;
+                SET @transaccionPropia = 1;
+            END
+            ELSE
+            BEGIN
+                SAVE TRANSACTION sp_asistencia_autonomo;
+                SET @savepointCreado = 1;
+            END
+
             EXEC dbo.usp_sincronizar_asistencia_estudiante_interno
                 @idEstudiante = @idEstudianteDefecto,
                 @idSesion = @idSesionDefecto,
@@ -118,6 +134,30 @@ BEGIN
                 @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                 @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
                 @estadoResultado = @estadoResultado OUTPUT;
+
+            IF @transaccionPropia = 1
+            BEGIN
+                IF XACT_STATE() = 1 AND @estadoResultado = 1
+                BEGIN
+                    COMMIT TRANSACTION;
+                END
+                ELSE IF XACT_STATE() <> 0
+                BEGIN
+                    ROLLBACK TRANSACTION;
+                END
+            END
+            ELSE IF @savepointCreado = 1 AND @estadoResultado = 0
+            BEGIN
+                IF XACT_STATE() = 1
+                BEGIN
+                    ROLLBACK TRANSACTION sp_asistencia_autonomo;
+                END
+                -- Transaccion externa condenada: no admite savepoint; se propaga para que su propietario la revierta.
+                ELSE IF XACT_STATE() = -1
+                BEGIN
+                    THROW 51000, 'Transaccion externa condenada durante el registro de asistencia; el llamador debe revertirla.', 1;
+                END
+            END
         END
 
         -- PASO 6: Evaluación de resultado final y generación de mensaje de éxito desde el Catálogo de Mensajes
@@ -134,7 +174,24 @@ BEGIN
 
     END TRY
     BEGIN CATCH
-        -- BLOQUE CATCH: Captura centralizada de excepciones inesperadas
+        -- BLOQUE CATCH: Captura centralizada de excepciones inesperadas.
+        -- Rollback solo de lo que este SP posee (su transaccion o su savepoint); la externa se propaga si esta condenada.
+        SET @estadoTransaccionCatch = XACT_STATE();
+
+        IF @transaccionPropia = 1 AND @estadoTransaccionCatch <> 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+        END
+        ELSE IF @savepointCreado = 1 AND @estadoTransaccionCatch = 1
+        BEGIN
+            ROLLBACK TRANSACTION sp_asistencia_autonomo;
+        END
+
+        IF @transaccionPropia = 0 AND @estadoTransaccionCatch = -1
+        BEGIN
+            THROW;
+        END
+
         EXEC dbo.usp_obtener_mensaje_catalogo
             @p_codigo = 'SYS_001',
             @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,

@@ -96,3 +96,82 @@ IF EXISTS (SELECT 1 FROM dbo.Grupo WHERE id = @group) OR
     THROW 52016, 'TEST FAILED: MASS_CLOSE leaked fixtures.', 1;
 IF @@TRANCOUNT <> 0 THROW 52017, 'TEST FAILED: MASS_CLOSE left transaction open.', 1;
 GO
+
+-- ---------------------------------------------------------------------------------------------
+-- TD-058: periodo solicitado inexistente -> PER_001, cero escrituras. Nunca sustituir por otro periodo.
+-- ---------------------------------------------------------------------------------------------
+SET NOCOUNT ON;
+DECLARE @adminUserUnknown UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_administrador WHERE estaActivoUsuario = 1);
+DECLARE @institutionUnknown UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_institucion);
+DECLARE @periodA UNIQUEIDENTIFIER = NEWID(), @periodB UNIQUEIDENTIFIER = NEWID();
+DECLARE @codeA INT = 710000 + ABS(CHECKSUM(NEWID()) % 10000), @codeB INT = 720000 + ABS(CHECKSUM(NEWID()) % 10000);
+DECLARE @codeMissing NVARCHAR(50) = N'PERIODO-QA-INEXISTENTE-' + LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8);
+DECLARE @corrUnknown UNIQUEIDENTIFIER = NEWID(), @msgUnknownUser NVARCHAR(4000), @msgUnknownTech NVARCHAR(4000);
+IF @adminUserUnknown IS NULL OR @institutionUnknown IS NULL THROW 52900, 'TEST FAILED: MASS_CLOSE_UNKNOWN_PERIOD fixture missing.', 1;
+
+CREATE TABLE #massUnknown (
+    idCorrelacion UNIQUEIDENTIFIER NULL,
+    mensajeUsuarioResultado NVARCHAR(MAX) NULL,
+    mensajeTecnicoResultado NVARCHAR(MAX) NULL,
+    estadoResultado INT NOT NULL
+);
+CREATE TABLE #massSnap (
+    fase VARCHAR(10) NOT NULL,
+    periodos INT NOT NULL, periodosChk INT NOT NULL,
+    grupos INT NOT NULL, gruposChk INT NOT NULL,
+    matriculas INT NOT NULL, matriculasChk INT NOT NULL,
+    auditorias INT NOT NULL,
+    detalles INT NOT NULL, detallesChk INT NOT NULL
+);
+
+BEGIN TRANSACTION;
+BEGIN TRY
+    -- Preparar dos periodos existentes (A y B) dentro de la transaccion de prueba.
+    INSERT dbo.PeriodoAcademico (id, institucion, nombre, codigo, fechaInicio, fechaFin, anio)
+    VALUES (@periodA, @institutionUnknown, N'Periodo QA A', @codeA, '2001-01-01', '2001-06-30', 2001),
+           (@periodB, @institutionUnknown, N'Periodo QA B', @codeB, '2002-01-01', '2002-06-30', 2002);
+
+    INSERT INTO #massSnap
+    SELECT 'before',
+        (SELECT COUNT(*) FROM dbo.PeriodoAcademico), (SELECT ISNULL(CHECKSUM_AGG(CHECKSUM(id, codigo, nombre)), 0) FROM dbo.PeriodoAcademico),
+        (SELECT COUNT(*) FROM dbo.Grupo), (SELECT ISNULL(CHECKSUM_AGG(CHECKSUM(id, cantidadEstudiantesFinalizaron, cantidadEstudiantesCancelaronAutomaticamente, cantidadEstudiantesCancelaronVoluntadPropia)), 0) FROM dbo.Grupo),
+        (SELECT COUNT(*) FROM dbo.EstudianteGrupo), (SELECT ISNULL(CHECKSUM_AGG(CHECKSUM(id, estado, grupo, estudiante)), 0) FROM dbo.EstudianteGrupo),
+        (SELECT COUNT(*) FROM dbo.AuditoriaEvento),
+        (SELECT COUNT(*) FROM dbo.DetalleAsistencia), (SELECT ISNULL(CHECKSUM_AGG(CHECKSUM(id, asistio, razonCausa)), 0) FROM dbo.DetalleAsistencia);
+
+    EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = 'PER_001', @p_param1 = @codeMissing,
+        @mensajeUsuarioResultado = @msgUnknownUser OUTPUT, @mensajeTecnicoResultado = @msgUnknownTech OUTPUT;
+
+    INSERT INTO #massUnknown EXEC dbo.usp_ejecutar_cierre_masivo_periodo
+        @codigoPeriodo = @codeMissing, @idActor = N'QA_LOCAL', @idCorrelacion = @corrUnknown,
+        @idUsuarioEjecutor = @adminUserUnknown;
+
+    IF NOT EXISTS (SELECT 1 FROM #massUnknown WHERE estadoResultado = 0 AND idCorrelacion = @corrUnknown
+        AND mensajeUsuarioResultado = @msgUnknownUser AND mensajeTecnicoResultado = CONCAT(@msgUnknownTech, ' Correlacion: ', @corrUnknown))
+        THROW 52901, 'TEST FAILED: MASS_CLOSE_UNKNOWN_PERIOD expected canonical PER_001 with estado 0.', 1;
+
+    INSERT INTO #massSnap
+    SELECT 'after',
+        (SELECT COUNT(*) FROM dbo.PeriodoAcademico), (SELECT ISNULL(CHECKSUM_AGG(CHECKSUM(id, codigo, nombre)), 0) FROM dbo.PeriodoAcademico),
+        (SELECT COUNT(*) FROM dbo.Grupo), (SELECT ISNULL(CHECKSUM_AGG(CHECKSUM(id, cantidadEstudiantesFinalizaron, cantidadEstudiantesCancelaronAutomaticamente, cantidadEstudiantesCancelaronVoluntadPropia)), 0) FROM dbo.Grupo),
+        (SELECT COUNT(*) FROM dbo.EstudianteGrupo), (SELECT ISNULL(CHECKSUM_AGG(CHECKSUM(id, estado, grupo, estudiante)), 0) FROM dbo.EstudianteGrupo),
+        (SELECT COUNT(*) FROM dbo.AuditoriaEvento),
+        (SELECT COUNT(*) FROM dbo.DetalleAsistencia), (SELECT ISNULL(CHECKSUM_AGG(CHECKSUM(id, asistio, razonCausa)), 0) FROM dbo.DetalleAsistencia);
+
+    IF EXISTS (SELECT 1 FROM #massSnap b INNER JOIN #massSnap a ON a.fase = 'after' WHERE b.fase = 'before'
+        AND (a.periodos <> b.periodos OR a.periodosChk <> b.periodosChk OR a.grupos <> b.grupos OR a.gruposChk <> b.gruposChk
+          OR a.matriculas <> b.matriculas OR a.matriculasChk <> b.matriculasChk OR a.auditorias <> b.auditorias
+          OR a.detalles <> b.detalles OR a.detallesChk <> b.detallesChk))
+        THROW 52902, 'TEST FAILED: MASS_CLOSE_UNKNOWN_PERIOD produced writes on existing data.', 1;
+    IF EXISTS (SELECT 1 FROM dbo.AuditoriaEvento WHERE correlationId = @corrUnknown)
+        THROW 52903, 'TEST FAILED: MASS_CLOSE_UNKNOWN_PERIOD wrote an audit event.', 1;
+    IF @@TRANCOUNT <> 1 THROW 52904, 'TEST FAILED: MASS_CLOSE_UNKNOWN_PERIOD changed the external transaction.', 1;
+    PRINT 'TEST_PASS:MASS_CLOSE_UNKNOWN_PERIOD_ZERO_WRITES';
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+    THROW;
+END CATCH;
+ROLLBACK TRANSACTION;
+IF @@TRANCOUNT <> 0 THROW 52905, 'TEST FAILED: MASS_CLOSE_UNKNOWN_PERIOD left transaction open.', 1;
+GO

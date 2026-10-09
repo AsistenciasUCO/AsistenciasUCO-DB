@@ -11,7 +11,7 @@ Este documento presenta la ruta de desarrollo organizada por fases lógicas, aso
 | **Fase 1: Cimientos** | 1-2 | **HU050** | Sistema | Sincronización de cuentas de usuarios externos a internos. | `usp_sincronizar_usuario_interno` | Alta | **Completado** |
 | | | **HU051** | Sistema | Registro automático de estudiantes en programas académicos. | `usp_registrar_estudiante_en_programa_interno` | Alta | **Completado** |
 | | | **HU052** | Docente | Registro de docentes en grupos con validación de existencia. | `usp_registrar_docente_en_grupo_usuario_no_existente` | Alta | **Completado** |
-| | | **HU053** | Estudiante | Registro e inscripción de estudiantes en grupos académicos. | `usp_registrar_estudiante_en_grupo_usuario_no_existente` | Alta | **Completado** |
+| | | **HU053** | Estudiante | Registro e inscripción de estudiantes en grupos académicos. | `usp_registrar_estudiante_en_grupo` | Alta | **Completado** |
 | **Fase 2: Captura** | 3-4 | **HU027** | Docente | Registrar la asistencia de un estudiante a una sesión. | `usp_registrar_asistencia_estudiante_clase_especifica` | Crítica | **Siguiente** |
 | | | **HU033** | Docente | Modificar la asistencia tomada a un alumno en particular. | `usp_registrar_asistencia_estudiante_clase_especifica` | Alta | Pendiente |
 | | | **HU028** | Docente | Crear/Abrir una sesión de clase para toma de asistencia. | Tabla `Sesion`, triggers y validaciones de rango. | Alta | Pendiente |

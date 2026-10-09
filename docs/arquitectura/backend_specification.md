@@ -1,5 +1,21 @@
 # Especificación Técnica: Procedimientos Almacenados y Endpoints del Sistema (Modelo Unificado Jerárquico)
 
+> ⚠️ DOCUMENTO HISTÓRICO / SUPERSEDED PARA CONTRATOS BACKEND ↔ DB
+>
+> Este documento conserva decisiones y diseños históricos.
+> NO debe utilizarse como fuente normativa para:
+> - nombres actuales de procedimientos públicos;
+> - firmas de procedimientos;
+> - roles/RBAC;
+> - titularidades;
+> - contratos Backend ↔ DB.
+>
+> Para la alineación actual usar como fuente de verdad:
+> - schema/stored-procedures/
+> - docs/arquitectura/DOCUMENTACION_PROCEDIMIENTOS_PUBLICOS.md
+> - docs/contracts/DB_DEVELOP_FREEZE_ADDENDUM.md
+> - tests contractuales vigentes.
+
 > [!IMPORTANT]
 > Este documento integra la **Especificación Técnica de Arquitectura Backend** alineada estrictamente con la **Jerarquía Institucional de Nodos Padre-Raíz**, la **Validación Granular de Roles (RBAC)** y el **Mecanismo de Registro Autónomo con Aprobación del Perfil Superior**.
 

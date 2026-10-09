@@ -26,6 +26,9 @@ AS
     DECLARE @idAsistencia        UNIQUEIDENTIFIER;
     DECLARE @codigoEstadoNuevo   NVARCHAR(5);
     DECLARE @idEstadoNuevo       UNIQUEIDENTIFIER;
+    DECLARE @transaccionPropia   BIT = 0;
+    DECLARE @savepointCreado     BIT = 0;
+    DECLARE @estadoTransaccionCatch INT;
 
     -- Variables locales de respuesta
     DECLARE @mensajeUsuarioResultado NVARCHAR(4000) = dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA');
@@ -102,10 +105,22 @@ BEGIN
             END
         END
 
-        -- PASO 3: Resolución atómica transaccional
+        -- PASO 3: Mapeo estricto de accion a estado del catalogo (APROBADA -> A, RECHAZADA -> R). Sin fallback (TD-057).
+        IF @estadoResultado = 1 AND @accionDefecto NOT IN ('APROBADA', 'RECHAZADA')
+        BEGIN
+            EXEC dbo.usp_obtener_mensaje_catalogo
+                @p_codigo = 'GEN_002',
+                @p_param1 = 'accion',
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
+
+            SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+            SET @estadoResultado = 0;
+        END
+
         IF @estadoResultado = 1
         BEGIN
-            SET @codigoEstadoNuevo = CASE WHEN @accionDefecto = 'APROBADA' THEN 'APRO' ELSE 'RECH' END;
+            SET @codigoEstadoNuevo = CASE WHEN @accionDefecto = 'APROBADA' THEN 'A' ELSE 'R' END;
 
             SELECT TOP 1 @idEstadoNuevo = id
             FROM dbo.Estado
@@ -113,10 +128,30 @@ BEGIN
 
             IF @idEstadoNuevo IS NULL
             BEGIN
-                SELECT TOP 1 @idEstadoNuevo = id FROM dbo.Estado ORDER BY id ASC;
-            END
+                EXEC dbo.usp_obtener_mensaje_catalogo
+                    @p_codigo = 'CAT_001',
+                    @p_param1 = @codigoEstadoNuevo,
+                    @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                    @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
 
-            BEGIN TRANSACTION;
+                SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+                SET @estadoResultado = 0;
+            END
+        END
+
+        IF @estadoResultado = 1
+        BEGIN
+            -- Ownership transaccional: propia si no hay transaccion externa; savepoint si la hay (nunca commit ajeno).
+            IF @@TRANCOUNT = 0
+            BEGIN
+                BEGIN TRANSACTION;
+                SET @transaccionPropia = 1;
+            END
+            ELSE
+            BEGIN
+                SAVE TRANSACTION sp_resolver_solicitud_revision;
+                SET @savepointCreado = 1;
+            END
 
             UPDATE dbo.SolicitudRevisionAsistencia
             SET estado = @idEstadoNuevo,
@@ -130,7 +165,10 @@ BEGIN
                 WHERE asistencia = @idAsistencia;
             END
 
-            COMMIT TRANSACTION;
+            IF @transaccionPropia = 1 AND XACT_STATE() = 1
+            BEGIN
+                COMMIT TRANSACTION;
+            END
 
             EXEC dbo.usp_obtener_mensaje_catalogo
                 @p_codigo = 'GEN_004',
@@ -143,8 +181,23 @@ BEGIN
 
     END TRY
     BEGIN CATCH
-        IF @@TRANCOUNT > 0
+        -- Rollback solo de lo que este SP posee: su transaccion o su savepoint (nunca la transaccion externa).
+        SET @estadoTransaccionCatch = XACT_STATE();
+
+        IF @transaccionPropia = 1 AND @estadoTransaccionCatch <> 0
+        BEGIN
             ROLLBACK TRANSACTION;
+        END
+        ELSE IF @savepointCreado = 1 AND @estadoTransaccionCatch = 1
+        BEGIN
+            ROLLBACK TRANSACTION sp_resolver_solicitud_revision;
+        END
+
+        -- Transaccion externa condenada que no nos pertenece: propagar al propietario.
+        IF @transaccionPropia = 0 AND @estadoTransaccionCatch = -1
+        BEGIN
+            THROW;
+        END
 
         EXEC dbo.usp_obtener_mensaje_catalogo
             @p_codigo = 'SYS_001',

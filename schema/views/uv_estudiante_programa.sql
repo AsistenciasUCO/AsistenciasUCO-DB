@@ -9,14 +9,16 @@ CREATE OR ALTER  VIEW [dbo].[uv_estudiante_programa]
 AS
 SELECT  id = ep.id,
     
-        idEstudiante = e.id,
-        nombreEstudiante = e.nombreCompleto,
+        idEstudiante = ei.id,
+        nombreEstudiante = ei.nombreCompleto,
         idPrograma = p.id,
         nombrePrograma = p.nombrePrograma
 
+-- Identidad estable: una fila por EstudiantePrograma.id.
+-- uv_estudiante expande estudiante x grupo x asignatura x programa y multiplicaba la fila.
 FROM		EstudiantePrograma ep
-INNER JOIN	uv_estudiante e 
-ON          ep.estudiante = e.id
+INNER JOIN	uv_estudiante_identidad ei
+ON          ep.estudiante = ei.id
 INNER JOIN	uv_programa p   
 ON          ep.programa = p.id
 GO

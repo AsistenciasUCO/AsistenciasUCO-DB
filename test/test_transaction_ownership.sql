@@ -35,7 +35,7 @@ BEGIN TRY
         @password = N'HashBackend_QaOwnership1234567890',
         @idGrupo = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         @idCorrelacion = @corrEst,
-        @idUsuarioEjecutor = @studentUser;
+        @idUsuarioEjecutor = @studentUser, @idTipoIdIdentificacion = @tipoId;
 
     IF @@TRANCOUNT <> @beforeEst THROW 51503, 'TEST FAILED: estudiante hizo rollback/commit total de transaccion externa.', 1;
     IF EXISTS (SELECT 1 FROM dbo.Usuario WHERE correo = @correoEst) THROW 51504, 'TEST FAILED: estudiante dejo Usuario parcial tras rollback a savepoint.', 1;
@@ -139,6 +139,5 @@ PRINT 'TEST PASS: ownership decano outer transaction preserved, savepoint rollba
 PRINT 'TEST_PASS:OWNERSHIP_DEAN';
 
 IF @@TRANCOUNT <> 0 THROW 51511, 'TEST FAILED: transaction ownership dejo transacciones abiertas.', 1;
-PRINT 'TEST_SKIP:XACT_STATE_MINUS_ONE_RUNTIME';
 PRINT 'TEST END: test_transaction_ownership';
 GO

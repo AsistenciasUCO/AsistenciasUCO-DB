@@ -12,8 +12,12 @@ PRINT '======================================================================';
 :r /tmp/test/test_user_dean_close.sql
 :r /tmp/test/test_subject_catalog.sql
 :r /tmp/test/test_reactive_academic.sql
+:r /tmp/test/test_public_providers_contract.sql
+:r /tmp/test/test_uv_estudiante_programa_identity.sql
+:r /tmp/test/test_usp_registrar_o_actualizar_plan_estudio.sql
 :r /tmp/test/test_mass_period_close.sql
-:r /tmp/test/test_usp_registrar_estudiante_en_grupo_usuario_no_existente.sql
+:r /tmp/test/test_usp_registrar_estudiante_en_grupo.sql
+:r /tmp/test/test_registrar_estudiante_en_grupo_contrato.sql
 :r /tmp/test/test_usp_registrar_estudiante_en_grupo_autonomo.sql
 :r /tmp/test/test_usp_registrar_docente_en_grupo_usuario_no_existente.sql
 :r /tmp/test/test_usp_registrar_docente_en_grupo_autonomo.sql
@@ -25,6 +29,8 @@ PRINT '======================================================================';
 :r /tmp/test/test_titularidad_jerarquica.sql
 :r /tmp/test/test_attendance_commands.sql
 :r /tmp/test/test_attendance_review.sql
+:r /tmp/test/test_attendance_review_states.sql
+:r /tmp/test/test_attendance_autonomous_atomic.sql
 :r /tmp/test/test_usp_crear_coordinador.sql
 :r /tmp/test/test_usp_resolver_solicitud_matricula.sql
 :r /tmp/test/test_golden_path_immutability.sql

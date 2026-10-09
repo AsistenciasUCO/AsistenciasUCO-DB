@@ -28,9 +28,12 @@ AS
 
     DECLARE @idAsistencia         UNIQUEIDENTIFIER;
     DECLARE @idEstudianteGrupo    UNIQUEIDENTIFIER;
-    DECLARE @nuevaSolicitudId     UNIQUEIDENTIFIER = NEWID();
+    DECLARE @transaccionPropia    BIT = 0;
+    DECLARE @savepointCreado      BIT = 0;
+    DECLARE @nuevaSolicitudId    UNIQUEIDENTIFIER = NEWID();
     DECLARE @nombreSolicitud      NVARCHAR(50);
     DECLARE @idEstadoPendiente    UNIQUEIDENTIFIER;
+    DECLARE @estadoTransaccionCatch INT;
 
     -- Variables locales de respuesta
     DECLARE @mensajeUsuarioResultado NVARCHAR(4000) = dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA');
@@ -117,15 +120,36 @@ BEGIN
             FROM dbo.Asistencia
             WHERE estudianteGrupo = @idEstudianteGrupo AND sesion = @idSesionDefecto;
 
-            SELECT TOP 1 @idEstadoPendiente = id FROM dbo.Estado WHERE codigo IN ('P', 'PEND') ORDER BY id ASC;
+            -- Estado inicial EXCLUSIVAMENTE 'P' (Pendiente). Sin fallback: catalogo incompleto = fallo controlado (TD-057).
+            SELECT TOP 1 @idEstadoPendiente = id FROM dbo.Estado WHERE codigo = 'P';
             IF @idEstadoPendiente IS NULL
             BEGIN
-                SELECT TOP 1 @idEstadoPendiente = id FROM dbo.Estado ORDER BY id ASC;
-            END
+                EXEC dbo.usp_obtener_mensaje_catalogo
+                    @p_codigo = 'CAT_001',
+                    @p_param1 = 'P (Pendiente) en dbo.Estado',
+                    @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                    @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
 
+                SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+                SET @estadoResultado = 0;
+            END
+        END
+
+        IF @estadoResultado = 1
+        BEGIN
             SET @nombreSolicitud = CONCAT('REC-', UPPER(SUBSTRING(CAST(@nuevaSolicitudId AS VARCHAR(36)), 1, 8)));
 
-            BEGIN TRANSACTION;
+            -- Ownership transaccional: propia si no hay transaccion externa; savepoint si la hay (nunca commit ajeno).
+            IF @@TRANCOUNT = 0
+            BEGIN
+                BEGIN TRANSACTION;
+                SET @transaccionPropia = 1;
+            END
+            ELSE
+            BEGIN
+                SAVE TRANSACTION sp_radicar_solicitud_revision;
+                SET @savepointCreado = 1;
+            END
 
             IF @idAsistencia IS NULL
             BEGIN
@@ -148,7 +172,11 @@ BEGIN
                 ''
             );
 
-            COMMIT TRANSACTION;
+            -- Solo cierra la transaccion que este SP abrio; con savepoint no se confirma la transaccion ajena.
+            IF @transaccionPropia = 1 AND XACT_STATE() = 1
+            BEGIN
+                COMMIT TRANSACTION;
+            END
 
             EXEC dbo.usp_obtener_mensaje_catalogo
                 @p_codigo = 'GEN_004',
@@ -161,8 +189,23 @@ BEGIN
 
     END TRY
     BEGIN CATCH
-        IF @@TRANCOUNT > 0
+        -- Rollback solo de lo que este SP posee: su transaccion o su savepoint (nunca la transaccion externa).
+        SET @estadoTransaccionCatch = XACT_STATE();
+
+        IF @transaccionPropia = 1 AND @estadoTransaccionCatch <> 0
+        BEGIN
             ROLLBACK TRANSACTION;
+        END
+        ELSE IF @savepointCreado = 1 AND @estadoTransaccionCatch = 1
+        BEGIN
+            ROLLBACK TRANSACTION sp_radicar_solicitud_revision;
+        END
+
+        -- Transaccion externa condenada que no nos pertenece: propagar al propietario.
+        IF @transaccionPropia = 0 AND @estadoTransaccionCatch = -1
+        BEGIN
+            THROW;
+        END
 
         EXEC dbo.usp_obtener_mensaje_catalogo
             @p_codigo = 'SYS_001',

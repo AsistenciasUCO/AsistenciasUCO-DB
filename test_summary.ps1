@@ -268,6 +268,22 @@ else {
     $resultFailures += "NORMATIVE_MODEL_GHOST_FIELDS_ZERO hits=$($normativeGhostHits.Count)"
 }
 
+# SP_FILENAME_OBJECT_MISMATCH: el archivo schema/stored-procedures/<nombre>.sql debe crear exactamente el objeto <nombre>.
+# Ejemplo que debe fallar: usp_registrar_estudiante_en_grupo.sql que crea usp_matricula_grupo.
+$spFilenameMismatches = @()
+foreach ($spFile in Get-ChildItem -Path (Join-Path $PSScriptRoot 'schema/stored-procedures') -Filter '*.sql') {
+    $spText = Get-Content -Path $spFile.FullName -Raw
+    foreach ($spMatch in [regex]::Matches($spText, '(?im)^\s*CREATE\s+(OR\s+ALTER\s+)?PROCEDURE\s+\[?dbo\]?\.\[?([A-Za-z0-9_]+)\]?')) {
+        $createdName = $spMatch.Groups[2].Value
+        if ($createdName -ne $spFile.BaseName) { $spFilenameMismatches += "$($spFile.Name) crea $createdName" }
+    }
+}
+if ($spFilenameMismatches.Count -eq 0) {
+    $clientPassed += 'SP_FILENAME_OBJECT_MISMATCH'
+    Write-Host 'TEST_PASS:SP_FILENAME_OBJECT_MISMATCH'
+}
+else { $resultFailures += "SP_FILENAME_OBJECT_MISMATCH $($spFilenameMismatches -join ',')" }
+
 $criticalIds = @(
     'SCHEMA_COLUMNS', 'PUBLIC_SIGNATURES', 'GROUP_PUBLIC_SIGNATURE', 'SESSION_PUBLIC_SIGNATURE', 'NO_SESSION_GHOST_FIELDS',
     'PUBLIC_VIEWS_REFRESH', 'BROKEN_DEPENDENCIES_ZERO',
@@ -279,6 +295,7 @@ $criticalIds = @(
     'SEC_001_PREFIX', 'SEC_002_PREFIX', 'ATT_PREFIX', 'SES_PREFIX', 'RC_001_PREFIX', 'GEN_002_PREFIX', 'EST_004_PREFIX',
     'NO_HARDCODED_DB_PASSWORD', 'AULA_ACTIVE_SQL_REFERENCES_ZERO', 'NORMATIVE_MODEL_GHOST_FIELDS_ZERO',
     'PUBLIC_SP_INVENTORY', 'PUBLIC_VIEW_INVENTORY',
+    'VIEW_ESTUDIANTE_PROGRAMA_SHAPE', 'VIEW_ESTUDIANTE_PROGRAMA_IDENTITY', 'VIEW_ESTUDIANTE_PROGRAMA_CARDINALITY', 'VIEW_ESTUDIANTE_PROGRAMA_DEPENDENCY',
     'USER_SYNC_SUCCESS', 'USER_SYNC_INVALID', 'DEAN_SUCCESS',
     'SESSION_CLOSE_NOT_SUPPORTED',
     'REVIEW_FILE_INVALID', 'REVIEW_FILE_SUCCESS', 'REVIEW_RESOLVE_NON_OWNER', 'REVIEW_RESOLVE_SUCCESS',
@@ -330,11 +347,26 @@ $criticalIds = @(
 )
 $sqlPasses = @([regex]::Matches($outputStr, '(?m)^TEST_PASS:([A-Z0-9_]+)\s*$') | ForEach-Object { $_.Groups[1].Value })
 $passed = @($sqlPasses) + @($clientPassed)
+# Contrato de matricula, revisiones, asistencia autonoma, cierre masivo y providers publicos (fase de alineacion DB).
+$criticalIds += @(
+    'ENROLL_ADMIN_DENIED', 'ENROLL_EXECUTOR_NULL_DBCODE', 'ENROLL_TYPE_NULL_DBCODE', 'ENROLL_TYPE_INVALID_ZERO_WRITES',
+    'ENROLL_DOCENTE_TITULAR_SUCCESS', 'ENROLL_DOCENTE_NO_TITULAR_DENIED', 'ENROLL_COORDINADOR_PROGRAM_SUCCESS',
+    'ENROLL_COORDINADOR_OTHER_PROGRAM_DENIED', 'ENROLL_DUAL_ROLE_OR_SUCCESS', 'ENROLL_IDENTITY_CONFLICT_IDN_001',
+    'ENROLL_EXISTING_USER_PASSWORD_UNCHANGED', 'ENROLL_ATOMIC_SAVEPOINT_ROLLBACK', 'ENROLL_ATOMIC_OWNER_ROLLBACK', 'ENROLL_DOOMED_TX_PROPAGATED',
+    'REVIEW_STATE_RADICAR_P', 'REVIEW_STATE_APROBAR_A', 'REVIEW_STATE_RECHAZAR_R',
+    'REVIEW_MISSING_P_CONTROLLED', 'REVIEW_MISSING_A_CONTROLLED', 'REVIEW_MISSING_R_CONTROLLED',
+    'AUTONOMOUS_ATOMIC_SAVEPOINT', 'AUTONOMOUS_ATOMIC_OWNER',
+    'MASS_CLOSE_UNKNOWN_PERIOD_ZERO_WRITES',
+    'PUBLIC_SP_NAMES_CORRECT', 'PUBLIC_NO_OUTPUT_PARAMS', 'SESSION_CLOSE_SIGNATURE', 'STUDENT_ENROLLMENT_INTERNAL_CALLS',
+    'USER_SYNC_PUBLIC_INVALID', 'USER_SYNC_PUBLIC_PROVIDER',
+    'SP_FILENAME_OBJECT_MISMATCH',
+    'PLAN_ESTUDIO_CREATE', 'PLAN_ESTUDIO_UPDATE', 'PLAN_ESTUDIO_PROGRAM_NOT_FOUND', 'PLAN_ESTUDIO_INP_INVALID', 'PLAN_ESTUDIO_INP_NULL', 'PLAN_ESTUDIO_CANONICAL_RESULT'
+)
 $missing = @($criticalIds | Where-Object { $_ -notin $passed })
 $duplicates = @($passed | Group-Object | Where-Object { $_.Count -ne 1 } | ForEach-Object { $_.Name })
 $skipped = @([regex]::Matches($outputStr, '(?m)^TEST_SKIP:([A-Z0-9_]+)\s*$') | ForEach-Object { $_.Groups[1].Value })
-$allowed = @($skipped | Where-Object { $_ -eq 'XACT_STATE_MINUS_ONE_RUNTIME' })
-$unauthorized = @($skipped | Where-Object { $_ -ne 'XACT_STATE_MINUS_ONE_RUNTIME' })
+$allowed = @()
+$unauthorized = @($skipped)
 $sqlErrors = @([regex]::Matches($outputStr, 'Msg \d+, Level \d+'))
 $explicitFailures = @([regex]::Matches($outputStr, 'TEST FAILED:'))
 $failed = $resultFailures.Count + $explicitFailures.Count + $duplicates.Count

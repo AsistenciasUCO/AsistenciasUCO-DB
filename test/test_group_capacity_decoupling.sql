@@ -11,7 +11,7 @@ PRINT 'TEST START: test_group_capacity_decoupling';
 --   Grupo existente, habilitado y LLENO -> crear/programar sesion: PERMITIDO.
 --   Grupo existente, habilitado y LLENO -> matricular un estudiante: RECHAZADO con ERR_CUPO_SUPERADO.
 -- El rechazo de la matricula por el SP publico (sin Usuario/Estudiante parciales) lo cubre STUDENT_CAPACITY_EXCEEDED
--- en test_usp_registrar_estudiante_en_grupo_usuario_no_existente.sql.
+-- en test_usp_registrar_estudiante_en_grupo.sql.
 DECLARE @baseGroup UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_grupo WHERE grupoEstaHablitado = 1 AND cuposDisponibles > 0 ORDER BY cuposDisponibles DESC);
 DECLARE @assignment UNIQUEIDENTIFIER = (SELECT idAsignatura FROM dbo.uv_grupo WHERE id = @baseGroup);
 DECLARE @period UNIQUEIDENTIFIER = (SELECT idPeriodoAcademico FROM dbo.uv_grupo WHERE id = @baseGroup);
