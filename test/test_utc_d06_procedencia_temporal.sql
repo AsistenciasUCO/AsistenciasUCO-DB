@@ -28,22 +28,32 @@ IF (SELECT TOP 1 column_id FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Ses
     THROW 53003, 'TEST FAILED: UTC_D06_SCHEMA_COLUMN procedenciaTemporal debe ser la ultima columna (DB nueva = DB migrada).', 1;
 PRINT 'TEST_PASS:UTC_D06_SCHEMA_COLUMN';
 
--- D06-01: filas sembradas (historicas) quedan INDETERMINADAS con sus DATETIME2 exactos.
+-- MAINT-003K: el seed 14 ya no crea sesiones con fechas locales ambiguas. Las filas sembradas (si existen) son instantes
+-- UTC exactos DATETIME2(7) con procedencia UTC_V2. (La conservacion de filas historicas NULL se prueba mas abajo, con
+-- filas historicas creadas dentro de la transaccion de prueba.)
 IF EXISTS (
     SELECT 1 FROM dbo.Sesion
     WHERE id IN ('B2C3D4E5-F6A7-8B9C-0D1E-2F3A4B5C6D7E', 'C3D4E5F6-A7B8-9C0D-1E2F-3A4B5C6D7E8F')
-      AND procedenciaTemporal IS NOT NULL
+      AND ISNULL(procedenciaTemporal, N'') <> N'UTC_V2'
 )
-    THROW 53004, 'TEST FAILED: UTC_D06_LEGACY_ROWS_NULL una sesion sembrada recibio procedencia.', 1;
+    THROW 53004, 'TEST FAILED: UTC_D06_SEED_UTC una sesion sembrada no esta marcada UTC_V2 (seed 14 debe insertar UTC confirmado).', 1;
 IF EXISTS (SELECT 1 FROM dbo.Sesion WHERE id = 'B2C3D4E5-F6A7-8B9C-0D1E-2F3A4B5C6D7E')
    AND NOT EXISTS (
     SELECT 1 FROM dbo.Sesion
     WHERE id = 'B2C3D4E5-F6A7-8B9C-0D1E-2F3A4B5C6D7E'
-      AND fechaHoraInicio = CAST('2026-08-17T08:00:00.0000000' AS DATETIME2(7))
-      AND fechaHoraFin = CAST('2026-08-17T10:00:00.0000000' AS DATETIME2(7))
+      AND fechaHoraInicio = CAST('2026-08-17T13:00:00.0000000' AS DATETIME2(7))
+      AND fechaHoraFin = CAST('2026-08-17T15:00:00.0000000' AS DATETIME2(7))
 )
-    THROW 53005, 'TEST FAILED: UTC_D06_LEGACY_ROWS_NULL la migracion altero las horas sembradas.', 1;
-PRINT 'TEST_PASS:UTC_D06_LEGACY_ROWS_NULL';
+    THROW 53005, 'TEST FAILED: UTC_D06_SEED_UTC el seed no almacena el instante UTC exacto (08:00 Bogota = 13:00Z).', 1;
+IF EXISTS (SELECT 1 FROM dbo.Sesion WHERE id = 'C3D4E5F6-A7B8-9C0D-1E2F-3A4B5C6D7E8F')
+   AND NOT EXISTS (
+    SELECT 1 FROM dbo.Sesion
+    WHERE id = 'C3D4E5F6-A7B8-9C0D-1E2F-3A4B5C6D7E8F'
+      AND fechaHoraInicio = CAST('2026-08-24T13:00:00.0000000' AS DATETIME2(7))
+      AND fechaHoraFin = CAST('2026-08-24T15:00:00.0000000' AS DATETIME2(7))
+)
+    THROW 53005, 'TEST FAILED: UTC_D06_SEED_UTC el seed SES-02 no almacena el instante UTC exacto.', 1;
+PRINT 'TEST_PASS:UTC_D06_SEED_UTC';
 
 -- D06-08/D06-09: v2 conserva las 10 columnas legacy (nombre/orden/tipo/nulabilidad) + procedencia.
 DECLARE @v1Shape NVARCHAR(MAX) = (
