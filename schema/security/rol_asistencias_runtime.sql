@@ -25,7 +25,52 @@ IF DATABASE_PRINCIPAL_ID(N'rol_asistencias_clasificador_temporal') IS NULL
     CREATE ROLE [rol_asistencias_clasificador_temporal] AUTHORIZATION [dbo];
 GO
 
-GRANT EXECUTE ON SCHEMA::[dbo] TO [rol_asistencias_runtime];
+-- No usar GRANT EXECUTE ON SCHEMA::dbo: incluiria procedimientos administrativos,
+-- internos y futuras capacidades sin revision de minimo privilegio. Este inventario
+-- se deriva del codigo runtime Java en MAINT-003G. Los dos providers ausentes
+-- (`usp_sincronizar_usuario` y `usp_registrar_o_actualizar_plan_estudio`) se
+-- mantienen fuera hasta que CC-003G-01 tenga contrato DB aprobado.
+REVOKE EXECUTE ON SCHEMA::[dbo] FROM [rol_asistencias_runtime];
+GO
+
+DECLARE @procedimiento SYSNAME, @sql NVARCHAR(MAX);
+DECLARE procedimientos CURSOR LOCAL FAST_FORWARD FOR
+    SELECT nombre
+    FROM (VALUES
+        (N'usp_actualizar_asignatura'),
+        (N'usp_actualizar_grupo'),
+        (N'usp_actualizar_sesion'),
+        (N'usp_actualizar_sesion_v2'),
+        (N'usp_cerrar_sesion'),
+        (N'usp_crear_asignatura'),
+        (N'usp_crear_coordinador'),
+        (N'usp_crear_decano'),
+        (N'usp_crear_grupo'),
+        (N'usp_crear_sesion'),
+        (N'usp_crear_sesion_v2'),
+        (N'usp_ejecutar_cierre_masivo_periodo'),
+        (N'usp_generar_sesiones_grupo'),
+        (N'usp_radicar_solicitud_revision_asistencia'),
+        (N'usp_registrar_asistencia_estudiante_autonomo'),
+        (N'usp_registrar_asistencias_sesion'),
+        (N'usp_registrar_estudiante_en_grupo'),
+        (N'usp_resolver_solicitud_revision_asistencia'),
+        (N'usp_toggle_estado_asignatura')
+    ) AS requeridos(nombre)
+    ORDER BY nombre;
+OPEN procedimientos;
+FETCH NEXT FROM procedimientos INTO @procedimiento;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    IF OBJECT_ID(N'dbo.' + @procedimiento, N'P') IS NULL
+        THROW 52120, 'UTC_D06_RUNTIME_GRANT: procedimiento runtime requerido ausente.', 1;
+    SET @sql = N'GRANT EXECUTE ON [dbo].' + QUOTENAME(@procedimiento)
+        + N' TO [rol_asistencias_runtime];';
+    EXEC sys.sp_executesql @sql;
+    FETCH NEXT FROM procedimientos INTO @procedimiento;
+END
+CLOSE procedimientos;
+DEALLOCATE procedimientos;
 GO
 
 -- Lectura solo de vistas uv_*: se concede vista por vista (no SELECT ON SCHEMA, que incluiria tablas).

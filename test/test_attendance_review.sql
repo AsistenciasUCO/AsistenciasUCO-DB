@@ -64,6 +64,11 @@ BEGIN TRY
     IF @request IS NULL
         THROW 51954, 'TEST FAILED: REVIEW_FILE_SUCCESS not visible in public view.', 1;
 
+    IF NOT EXISTS (SELECT 1 FROM dbo.uv_solicitud_revision_asistencia r
+        INNER JOIN dbo.Estado e ON e.id = r.idEstado
+        WHERE r.id = @request AND e.codigo = 'P')
+        THROW 51959, 'TEST FAILED: REVIEW_FILE_SUCCESS must create a pending (P) request.', 1;
+
     TRUNCATE TABLE #reviewResult;
     SET @corr = NEWID();
     DECLARE @otherTeacher UNIQUEIDENTIFIER = NEWID();
@@ -95,6 +100,10 @@ BEGIN TRY
     IF NOT EXISTS (SELECT 1 FROM dbo.uv_solicitud_revision_asistencia
         WHERE id = @request AND justificacionRespuesta = N'Aprobada por QA')
         THROW 51958, 'TEST FAILED: REVIEW_RESOLVE_SUCCESS response not visible.', 1;
+    IF NOT EXISTS (SELECT 1 FROM dbo.uv_solicitud_revision_asistencia r
+        INNER JOIN dbo.Estado e ON e.id = r.idEstado
+        WHERE r.id = @request AND e.codigo = 'A')
+        THROW 51960, 'TEST FAILED: REVIEW_RESOLVE_SUCCESS must set approved (A) state.', 1;
     IF NOT EXISTS (SELECT 1 FROM dbo.uv_detalle_asistencia
         WHERE id = @detail AND idAsistencia = @attendance AND asistio = 1)
         THROW 51959, 'TEST FAILED: REVIEW_RESOLVE_SUCCESS did not approve attendance.', 1;
