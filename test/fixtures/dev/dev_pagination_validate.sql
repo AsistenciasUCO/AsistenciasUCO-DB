@@ -81,18 +81,19 @@ BEGIN
         THROW 56023, 'VALIDATE FAILED: expected same-name pairs to exercise the id tie-break.', 1;
 
     -- V5: sesiones UTC DATETIME2(7) con procedencia; la sesion 1 conserva 100 ns
-    SELECT @n = COUNT(*) FROM dbo.Sesion WHERE grupo = @g AND procedenciaTemporal = N'UTC_V2';
+    SELECT @n = COUNT(*) FROM dbo.Sesion WHERE grupo = @g AND procedenciaTemporal = N'UTC_V2' AND LEFT(CONVERT(CHAR(36), id), 6) = 'DE0000';
     IF @n <> 4 THROW 56024, 'VALIDATE FAILED: expected 4 UTC_V2 sessions.', 1;
     IF NOT EXISTS (SELECT 1 FROM dbo.Sesion WHERE grupo = @g AND numero = 1
         AND fechaHoraInicio = CAST('2026-09-14T13:00:00.1234567' AS DATETIME2(7)) AND fechaHoraFin = CAST('2026-09-14T15:00:00.7654321' AS DATETIME2(7)))
         THROW 56025, 'VALIDATE FAILED: session 1 lost 100 ns precision.', 1;
     IF NOT EXISTS (SELECT 1 FROM dbo.uv_sesion_v2 WHERE idGrupo = @g AND procedenciaTemporal = N'UTC_V2') THROW 56026, 'VALIDATE FAILED: uv_sesion_v2 does not expose the sessions.', 1;
 
+    -- (Solo se cuentan filas del fixture, prefijo DE0000: otros tests pueden agregar sesiones propias al grupo, p. ej. el fixture Java IT-MAINT003G.)
     -- V6: asistencia (solo matriculas A): sesion 1 siempre; el grupo 300 ademas sesiones 2 y 3
     SELECT @expected = COUNT(*) * (CASE WHEN @size = 300 THEN 3 ELSE 1 END) FROM GENERATE_SERIES(1, @size) s WHERE s.value % 50 NOT IN (0, 1, 2, 3);
-    SELECT @n = COUNT(*) FROM dbo.Asistencia a JOIN dbo.Sesion ses ON ses.id = a.sesion WHERE ses.grupo = @g;
+    SELECT @n = COUNT(*) FROM dbo.Asistencia a JOIN dbo.Sesion ses ON ses.id = a.sesion WHERE ses.grupo = @g AND LEFT(CONVERT(CHAR(36), ses.id), 6) = 'DE0000';
     IF @n <> @expected THROW 56027, 'VALIDATE FAILED: attendance rows.', 1;
-    SELECT @n = COUNT(*) FROM dbo.DetalleAsistencia d JOIN dbo.Asistencia a ON a.id = d.asistencia JOIN dbo.Sesion ses ON ses.id = a.sesion WHERE ses.grupo = @g
+    SELECT @n = COUNT(*) FROM dbo.DetalleAsistencia d JOIN dbo.Asistencia a ON a.id = d.asistencia JOIN dbo.Sesion ses ON ses.id = a.sesion WHERE ses.grupo = @g AND LEFT(CONVERT(CHAR(36), ses.id), 6) = 'DE0000'
         AND d.fechaHoraInicio = ses.fechaHoraInicio AND d.fechaHoraFin = ses.fechaHoraFin;
     IF @n <> @expected THROW 56028, 'VALIDATE FAILED: attendance detail snapshot differs from the session.', 1;
 
