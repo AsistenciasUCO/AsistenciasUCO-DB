@@ -201,3 +201,19 @@ Esta documentación especifica la arquitectura, reglas de negocio, contrato de f
 ## Verificación de Integridad y Despliegue
 
 Todos los procedimientos listados en esta documentación han sido compilados y probados exitosamente en la base de datos `gestionasistenciadb` mediante la ejecución del script `deploy_schema.ps1`.
+
+---
+
+## Addendum CC-003G-01 — proveedores consumidos por el backend
+
+Contrato completo, decisiones y limitaciones: `docs/work-items/CC-003G-01-public-user-plan-providers/CONTRACT.md`.
+
+### 7. `dbo.usp_sincronizar_usuario`
+- **Caso de uso**: alta idempotente de usuario base para `POST /api/v1/usuarios` (el backend crea luego la cuenta de identidad). Nunca actualiza un usuario existente ni toca su password.
+- **Parametros**: `@idTipoIdIdentificacion`, `@numeroIdentificacion`, `@primerApellido`, `@segundoApellido`, `@primerNombre`, `@segundoNombre`, `@correo`, `@password` (hash), `@idCorrelacion`. Sin `@idUsuarioEjecutor` (el endpoint es AUTENTICADO).
+- **Flujo**: correlacion, limites de longitud, transaccion propia/savepoint, barrido serializable de unicidad, reintento exacto => exito sin escribir, si no => `usp_sincronizar_usuario_interno`.
+
+### 8. `dbo.usp_registrar_o_actualizar_plan_estudio`
+- **Caso de uso**: alta/actualizacion del `inp` de un plan por el COORDINADOR titular del programa (`/api/v1/coordinador/planes-estudio`).
+- **Parametros**: `@idPlanEstudio`, `@idPrograma`, `@inp`, `@idCorrelacion`, `@idUsuarioEjecutor` (obligatorio, fail-closed).
+- **Flujo**: correlacion, RBAC `COORDINADOR`, titularidad `PROGRAMA`, validaciones de entrada, transaccion propia/savepoint con bloqueo de la fila del programa, upsert por id con unicidad (programa, inp).

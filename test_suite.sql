@@ -18,6 +18,8 @@ PRINT '======================================================================';
 :r /tmp/test/test_usp_registrar_docente_en_grupo_usuario_no_existente.sql
 :r /tmp/test/test_usp_registrar_docente_en_grupo_autonomo.sql
 :r /tmp/test/test_transaction_ownership.sql
+:r /tmp/test/test_usp_sincronizar_usuario.sql
+:r /tmp/test/test_usp_registrar_o_actualizar_plan_estudio.sql
 :r /tmp/test/test_usp_crear_actualizar_grupo.sql
 :r /tmp/test/test_usp_crear_actualizar_sesion.sql
 :r /tmp/test/test_usp_generar_sesiones_grupo.sql
