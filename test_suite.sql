@@ -34,6 +34,7 @@ PRINT '======================================================================';
 :r /tmp/test/test_utc_d06_procedencia_temporal.sql
 :r /tmp/test/test_authorized_views_rbac.sql
 :r /tmp/test/test_usp_consultar_grupos_paginado.sql
+:r /tmp/test/test_uv_estudiante_programa_no_duplicates.sql
 
 IF @@TRANCOUNT <> 0
 BEGIN
