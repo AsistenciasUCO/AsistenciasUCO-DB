@@ -1,0 +1,59 @@
+---
+status: VALIDATED_LOCAL_DEV
+type: work-item
+scope: db
+work_item: MAINT-003K-DB-DEV-CONSOLIDATION
+date: 2026-10-10
+---
+
+# MAINT-003K-DB-DEV-CONSOLIDATION — rama SQL consolidada y DB de desarrollo reconstruida desde Git
+
+## Identidad y objetivo
+
+- Rama: `feat/maint-003k-db-dev-consolidation`, creada desde `origin/feat/cc-003g-01-public-user-plan-providers` (`3f6afec`),
+  que ya incorpora UTC-D06 (`6946a73`), el endurecimiento de permisos (`3842f70`) y CC-003G-01 (`f64abb6`..`3f6afec`).
+- Objetivo: una sola DB principal de desarrollo, `gestionasistenciadb` en el contenedor `sql_server_asistencias`, desplegada **solo
+  desde scripts versionados**, con datos sinteticos reproducibles, y los contenedores/BD temporales retirados.
+- Pareja backend: `alejovh12/AsistenciasUCO`, rama `jose-valencia/maint-003k-backend-only-release-gate` (work item
+  `docs/work-items/MAINT-003K-backend-only-release-gate`).
+- **No** hay merge a `develop`, despliegue a produccion ni cambio del proveedor de identidad.
+
+## Clase de cambio y alcance
+
+- Clase: `INFRASTRUCTURE` + correccion de dos defectos hallados por validacion real (seed 14 y `uv_estudiante_programa`).
+- Rutas modificadas: `schema/seed/14_grupos_sesiones.sql`, `schema/views/uv_estudiante_programa.sql`,
+  `test/test_utc_d06_procedencia_temporal.sql`, `test/test_uv_estudiante_programa_no_duplicates.sql`, `test_suite.sql`,
+  `test_summary.ps1`, `test/fixtures/dev/**`, `docs/work-items/MAINT-003K-DB-DEV-CONSOLIDATION/**`.
+- Rutas **no** modificadas: vistas/SP congelados del contrato v1, SP/tablas/trigger/roles de UTC-D06 y CC-003G-01, manifiestos
+  (`FREEZE_MANIFEST_OK` se verifica en el gate y sigue PASS).
+
+## Contratos incorporados (todos presentes en la rama base y verificados en el despliegue)
+
+UTC-D06 (`procedenciaTemporal`, `uv_sesion_v2`, `usp_crear/actualizar_sesion_v2`, `usp_clasificar_procedencia_sesion`, trigger
+`tr_Sesion_procedencia_temporal`, bitacora `SesionProcedenciaClasificacion`), SP v1 de sesiones (compatibilidad intacta),
+generacion de sesiones en UTC (`usp_generar_sesiones_grupo`, marca `UTC_GENERADOR`), `usp_sincronizar_usuario`,
+`usp_registrar_o_actualizar_plan_estudio`, roles de minimo privilegio (`rol_asistencias_runtime`, `rol_asistencias_clasificador_temporal`),
+auditoria, catalogos de mensajes y parametros. Ver `UTC-D06-POST-FREEZE` y `CC-003G-01-public-user-plan-providers`.
+
+## Decisiones
+
+| # | Decision | Motivo |
+|---|---|---|
+| 1 | La DB de desarrollo se **reconstruye** (DROP + `deploy_schema.ps1`) en lugar de limpiar selectivamente. | Es la opcion mas simple y verificable: el estado final sale solo de Git, sin dependencias de FK ni residuos; los datos previos eran sinteticos (47 `*.invalid` + 6 del seed + 1 cuenta dev), con respaldo verificado. |
+| 2 | Seed 14 inserta sesiones **UTC exactas** `DATETIME2(7)` con `procedenciaTemporal = 'UTC_V2'`. | `UTC_OWNER` esta reservada a `usp_clasificar_procedencia_sesion` (bitacora append-only); un seed no es una reclasificacion. Las filas historicas existentes **no** se reescriben desde el seed. |
+| 3 | `uv_estudiante_programa` une `SELECT DISTINCT id, nombreCompleto FROM uv_estudiante`. | La vista multiplicaba cada `EstudiantePrograma` por el numero de grupos del estudiante (hallado por `EstudianteProgramaJpaParityIT` con fixtures multigrupo). Mismas 5 columnas y misma semantica de presencia. |
+| 4 | Fixtures de desarrollo fuera de `schema/seed` (`test/fixtures/dev`) con prefijo de id reservado `DE0000`. | No forman parte de ningun despliegue; el limpiador solo toca ese prefijo; guardas: Developer Edition + nombre de DB + `OPERACION/AMBIENTE` no productivo. |
+| 5 | El addendum adjunto `DB_DEV_ADDENDUM.md` **no estaba disponible en disco** al ejecutar. | Se siguieron las instrucciones del prompt de la fase; se deja constancia en `docs/work-items/MAINT-003K-backend-only-release-gate/DB_DEV_ADDENDUM.md` (backend). |
+
+## Variable principal, riesgos, rollback
+
+- `PRIMARY_VARIABLE`: `DEV_DB_REBUILT_FROM_GIT`.
+- Riesgos: (a) los ITs Java `EstudianteAcademicFilterJpaParityIT` y `CoreViewQueriesJpaParityIT` asumian <=500/<=100 estudiantes; se hicieron
+  independientes del volumen en el backend; (b) `prepare_java_integration_fixture.ps1` elige el grupo con `ORDER BY g.id` y puede sembrar su
+  sesion `IT-MAINT003G-ATTENDANCE` en un grupo fixture (la validacion de fixtures cuenta solo filas `DE0000`).
+- Rollback: ver `VALIDATION.md` (respaldos `.bak` verificados con `CHECKSUM`, restauracion de prueba y `DBCC CHECKDB`). El rollback de Git es
+  `git revert` de los commits de esta rama; produccion no se toca.
+
+## Definition of Ready
+
+READY: fuentes, entorno (contenedor Developer local), rollback y pruebas identificados. Despliegue en staging/produccion: `NOT_READY` (decision del owner DB).
