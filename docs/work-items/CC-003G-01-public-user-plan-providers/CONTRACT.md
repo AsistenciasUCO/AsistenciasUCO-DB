@@ -25,7 +25,7 @@ sin alias a `usp_sincronizar_usuario_interno` y sin conceder `EXECUTE` sobre el 
 | Aspecto | Decision | Motivo |
 |---|---|---|
 | Firma | La exigida por el backend, sin cambios: `@idTipoIdIdentificacion, @numeroIdentificacion, @primerApellido, @segundoApellido, @primerNombre, @segundoNombre, @correo, @password, @idCorrelacion` | `SqlStoredProcedureContractIT` y `UsuarioJpaRepository` |
-| Semantica | Identidad nueva => alta (`GEN_004`). Reintento **exacto** (tipo, numero, correo, nombres y apellidos iguales) => exito sin escribir. Documento o correo en uso con datos distintos => rechazo (`ERR_UNICIDAD_DOCUMENTO` / `VAL_006`) sin modificar nada | `POST /api/v1/usuarios` es `authenticated()`; un UPSERT permitiria a cualquier autenticado reescribir nombre, correo o password de otro usuario |
+| Semantica | Identidad nueva => alta (`GEN_004`). Reintento **exacto de un usuario ACTIVO** (tipo, numero, correo, nombres y apellidos iguales) => exito sin escribir; un usuario inactivo no se reconfirma ni se reactiva (se rechaza como documento en uso). Documento o correo en uso con datos distintos => rechazo (`ERR_UNICIDAD_DOCUMENTO` / `VAL_006`) sin modificar nada | `POST /api/v1/usuarios` es `authenticated()`; un UPSERT permitiria a cualquier autenticado reescribir nombre, correo o password de otro usuario |
 | Password | Se persiste solo en el alta; en un reintento **no se compara ni se sobreescribe**; nunca se devuelve ni entra en mensajes. `uv_usuario.password` ya es `'*****'` | Evita toma de cuenta y fuga del hash |
 | Id del usuario | No va en el resultset canonico (4 columnas); el backend lo resuelve por `uv_usuario` (tipo + numero) | Contrato canonico del owner |
 | Autorizacion | Sin `@idUsuarioEjecutor` (el contrato HTTP es AUTENTICADO). Defensa DB = minimo privilegio: `EXECUTE` solo al rol runtime, `DENY` del nucleo interno y del DML directo sobre `dbo.Usuario` | No inventar un actor que el endpoint no tiene |
@@ -72,6 +72,7 @@ Script aditivo, idempotente, independiente del orden de despliegue y que **no mo
 
 ## Limitaciones declaradas
 
+- La unicidad se serializa con un barrido completo de `dbo.Usuario` (no hay indices sobre documento ni correo): correcto y simple a la escala actual; si el volumen crece, el owner debe crear indices no unicos y revisar el costo del bloqueo de rango. `usp_registrar_o_actualizar_plan_estudio` no valida que el programa este activo (no hay regla documentada).
 - `dbo.Usuario`/`dbo.PlanEstudio` siguen sin indices unicos: otros creadores de usuario (`usp_crear_coordinador`,
   `usp_crear_decano`, matricula) no usan este barrido; la serializacion cubre solo las altas via `usp_sincronizar_usuario`.
 - En un reintento exacto el password enviado se ignora: si Keycloak se creo con otro password tras un fallo parcial del

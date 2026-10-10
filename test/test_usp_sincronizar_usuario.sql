@@ -273,6 +273,28 @@ BEGIN TRY
         FROM dbo.Usuario WHERE id = @userId)
         THROW 53142, 'TEST FAILED: USER_SYNC_PUBLIC_ROLLBACK_SAVEPOINT revirtio trabajo previo de la transaccion externa.', 1;
     PRINT 'TEST_STATE_PASS:USER_SYNC_PUBLIC_ROLLBACK_SAVEPOINT';
+
+    -- ===== Reintento exacto de un usuario INACTIVO: no se reconfirma ni se reactiva =====
+    UPDATE dbo.Usuario SET estado = 0 WHERE id = @userId;
+    SELECT @firmaAntes = CHECKSUM(id, correo, primerNombre, segundoNombre, primerApellido, segundoApellido, estado, password)
+    FROM dbo.Usuario WHERE id = @userId;
+    SET @corr = NEWID();
+    EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = 'ERR_UNICIDAD_DOCUMENTO', @p_param1 = @numero,
+        @mensajeUsuarioResultado = @expU OUTPUT, @mensajeTecnicoResultado = @expT OUTPUT;
+    PRINT CONCAT('TEST_EXPECTED_USER:USER_SYNC_PUBLIC_INACTIVE_REPLAY|', @expU);
+    PRINT CONCAT('TEST_EXPECTED_TECH:USER_SYNC_PUBLIC_INACTIVE_REPLAY|', @expT, ' Correlacion: ', @corr);
+    PRINT 'TEST_RESULT_BEGIN:USER_SYNC_PUBLIC_INACTIVE_REPLAY';
+    EXEC dbo.usp_sincronizar_usuario
+        @idTipoIdIdentificacion = @tipo, @numeroIdentificacion = @numero,
+        @primerApellido = N'Perez', @segundoApellido = N'Gomez', @primerNombre = N'Ana', @segundoNombre = N'Maria',
+        @correo = @correo, @password = @secretReplay, @idCorrelacion = @corr;
+    PRINT 'TEST_RESULT_END:USER_SYNC_PUBLIC_INACTIVE_REPLAY';
+    IF NOT EXISTS (SELECT 1 FROM dbo.Usuario WHERE id = @userId AND estado = 0)
+       OR @firmaAntes <> (SELECT CHECKSUM(id, correo, primerNombre, segundoNombre, primerApellido, segundoApellido, estado, password)
+            FROM dbo.Usuario WHERE id = @userId)
+        THROW 53145, 'TEST FAILED: USER_SYNC_PUBLIC_INACTIVE_REPLAY reconfirmo o reactivo a un usuario inactivo.', 1;
+    IF @@TRANCOUNT <> @tranAntes THROW 53146, 'TEST FAILED: USER_SYNC_PUBLIC_INACTIVE_REPLAY altero la transaccion externa.', 1;
+    PRINT 'TEST_STATE_PASS:USER_SYNC_PUBLIC_INACTIVE_REPLAY';
 END TRY
 BEGIN CATCH
     IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;

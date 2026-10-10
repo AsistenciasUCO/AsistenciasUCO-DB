@@ -9,7 +9,8 @@ GO
 --
 -- Semantica: ALTA IDEMPOTENTE (find-or-create), nunca actualizacion de un usuario existente.
 --   * Identidad nueva (tipo + numero + correo libres)            -> alta atomica (GEN_004).
---   * Reintento EXACTO (mismo tipo, numero, correo y nombres)    -> exito sin escribir (GEN_004).
+--   * Reintento EXACTO de un usuario ACTIVO (mismo tipo, numero, correo y nombres) -> exito sin escribir (GEN_004).
+--     Un usuario inactivo no se reconfirma ni se reactiva: el reintento se rechaza como documento en uso.
 --   * Cualquier otra coincidencia (documento o correo en uso)    -> rechazo sin escribir
 --     (ERR_UNICIDAD_DOCUMENTO / VAL_006). El SP no modifica nombres, correo ni password de un usuario
 --     existente: /api/v1/usuarios es accesible a cualquier usuario autenticado y un UPSERT permitiria
@@ -146,6 +147,7 @@ BEGIN
             FROM dbo.uv_usuario u
             WHERE u.idTipoIdentificacion = @idTipoIdIdentificacionDefecto
               AND u.numeroIdentificacion = @numeroIdentificacionDefecto
+              AND u.estaActivoUsuario = 1
               AND LOWER(TRIM(u.correo)) = @correoDefecto
               AND UPPER(TRIM(u.primerNombre)) = @primerNombreDefecto
               AND UPPER(TRIM(u.segundoNombre)) = @segundoNombreDefecto
