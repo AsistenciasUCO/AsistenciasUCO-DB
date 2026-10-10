@@ -69,6 +69,8 @@ USING (VALUES
     ('SES_002', 'BUSINESS_ERROR', 'MEDIO', 'El código de verificación de asistencia es incorrecto o ha expirado.'),
     ('SES_003', 'BUSINESS_ERROR', 'MEDIO', 'El cierre de sesión no está soportado por el contrato vigente de base de datos.'),
     ('SES_004', 'BUSINESS_ERROR', 'MEDIO', 'La fecha y hora de fin de sesión debe ser posterior a la fecha y hora de inicio.'),
+    ('SES_005', 'BUSINESS_ERROR', 'MEDIO', 'El horario institucional incluye una hora local inexistente por cambio de horario; no se generaron sesiones.'),
+    ('SES_006', 'BUSINESS_ERROR', 'ALTO', 'La sesión no coincide con el manifiesto de clasificación aprobado; no se modificó.'),
     ('ERR_TOKEN_VERIFICACION_INVALIDO', 'BUSINESS_ERROR', 'MEDIO', 'El codigo de verificacion de asistencia es incorrecto o ha expirado.'),
 
     ('INST_001', 'BUSINESS_ERROR', 'CRITICO', 'El estudiante, programa y facultad deben pertenecer a la misma institución.'),
@@ -173,6 +175,8 @@ USING (VALUES
     ('SES_002', 'BUSINESS_ERROR', 'MEDIO', 'Validación fallida: Token QR o código de verificación no coincide o venció para Sesión: {}.'),
     ('SES_003', 'BUSINESS_ERROR', 'MEDIO', 'LEGACY_NOT_SUPPORTED: dbo.Sesion no posee columna de cierre/estado; usp_cerrar_sesion no persiste cierre real.'),
     ('SES_004', 'BUSINESS_ERROR', 'MEDIO', 'Validación temporal fallida: fechaHoraFin [{}] debe ser posterior a fechaHoraInicio [{}].'),
+    ('SES_005', 'BUSINESS_ERROR', 'MEDIO', 'Validación temporal fallida: la zona [{}] no contiene la hora local [{}] (salto DST); generación abortada sin escrituras.'),
+    ('SES_006', 'BUSINESS_ERROR', 'ALTO', 'Clasificación UTC_OWNER rechazada: la sesión [{}] no coincide con el manifiesto [{}] (procedencia no NULL u horas distintas).'),
     ('ERR_TOKEN_VERIFICACION_INVALIDO', 'BUSINESS_ERROR', 'MEDIO', 'Fallo: Codigo de verificacion incorrecto o expirado para Sesion: {}.'),
 
     ('INST_001', 'BUSINESS_ERROR', 'CRITICO', 'Inconsistencia institucional: Los identificadores de institución no coinciden entre la facultad, programa y estudiante: {}.'),

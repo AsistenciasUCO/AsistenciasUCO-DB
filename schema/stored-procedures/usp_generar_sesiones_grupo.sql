@@ -164,6 +164,65 @@ BEGIN
             END
         END
 
+        -- PASO 4.6 (UTC-D06-POST-FREEZE): la marca UTC_GENERADOR solo se emite si cada hora local del
+        -- horario existe en la zona institucional para la fecha concreta. Una hora local inexistente
+        -- (salto DST, p. ej. Europe/Berlin 2026-03-29 02:30) es desplazada en silencio por AT TIME ZONE,
+        -- por lo que se detecta comparando el reloj local resuelto con el pedido y se aborta la
+        -- generacion completa ANTES de abrir la transaccion: cero filas escritas.
+        -- Horas ambiguas (solape DST) se resuelven de forma determinista por AT TIME ZONE (primer offset).
+        IF @estadoResultado = 1
+        BEGIN
+            DECLARE @fechaHoraLocalInexistente DATETIME2;
+
+            SELECT TOP 1 @idPeriodo = periodoAcademico FROM dbo.Grupo WHERE id = @idGrupoDefecto;
+            SELECT TOP 1 @fechaInicio = fechaInicio, @fechaFin = fechaFin FROM dbo.PeriodoAcademico WHERE id = @idPeriodo;
+
+            WITH fechas AS (
+                SELECT fecha = @fechaInicio
+                UNION ALL
+                SELECT DATEADD(DAY, 1, fecha) FROM fechas WHERE fecha < @fechaFin
+            ),
+            franjas AS (
+                SELECT f.fecha, h.horaInicio, h.horaFin
+                FROM fechas f
+                INNER JOIN dbo.Horario h ON h.grupo = @idGrupoDefecto
+                INNER JOIN dbo.Dia d ON d.id = h.dia
+                WHERE d.codigo =
+                    CASE LTRIM(RTRIM(LOWER(DATENAME(dw, f.fecha))))
+                        WHEN 'monday' THEN 'LU' WHEN 'lunes' THEN 'LU'
+                        WHEN 'tuesday' THEN 'MA' WHEN 'martes' THEN 'MA'
+                        WHEN 'wednesday' THEN 'MI' WHEN 'miércoles' THEN 'MI' WHEN 'miercoles' THEN 'MI'
+                        WHEN 'thursday' THEN 'JU' WHEN 'jueves' THEN 'JU'
+                        WHEN 'friday' THEN 'VI' WHEN 'viernes' THEN 'VI'
+                        WHEN 'saturday' THEN 'SA' WHEN 'sábado' THEN 'SA' WHEN 'sabado' THEN 'SA'
+                        WHEN 'sunday' THEN 'DO' WHEN 'domingo' THEN 'DO'
+                    END
+            ),
+            relojes AS (
+                SELECT horaLocal = CAST(CONCAT(CONVERT(CHAR(10), fecha, 23), 'T', CONVERT(CHAR(8), horaInicio, 108)) AS DATETIME2) FROM franjas
+                UNION ALL
+                SELECT CAST(CONCAT(CONVERT(CHAR(10), fecha, 23), 'T', CONVERT(CHAR(8), horaFin, 108)) AS DATETIME2) FROM franjas
+            )
+            SELECT TOP 1 @fechaHoraLocalInexistente = horaLocal
+            FROM relojes
+            WHERE CAST(horaLocal AT TIME ZONE @zonaHorariaSqlServer AS DATETIME2) <> horaLocal
+            ORDER BY horaLocal
+            OPTION (MAXRECURSION 0);
+
+            IF @fechaHoraLocalInexistente IS NOT NULL
+            BEGIN
+                EXEC dbo.usp_obtener_mensaje_catalogo
+                    @p_codigo = 'SES_005',
+                    @p_param1 = @zonaHorariaSqlServer,
+                    @p_param2 = @fechaHoraLocalInexistente,
+                    @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                    @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
+
+                SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+                SET @estadoResultado = 0;
+            END
+        END
+
         -- PASO 5: Generación recurrente de sesiones de clase según el periodo académico y franjas horarias
         IF @estadoResultado = 1
         BEGIN
@@ -245,8 +304,10 @@ BEGIN
                             SET @codigoVerif = UPPER(LEFT(REPLACE(CAST(NEWID() AS NVARCHAR(50)), '-', ''), 6));
                             SET @nombreSesion = CONCAT('Sesión ', @numeroSesion);
 
-                            INSERT INTO dbo.Sesion (id, nombre, numero, codigo, numeroSemana, grupo, fechaHoraInicio, fechaHoraFin)
-                            VALUES (NEWID(), @nombreSesion, @numeroSesion, @codigoVerif, @numSemana, @idGrupoDefecto, @fechaHoraInicio, @fechaHoraFin);
+                            -- UTC-D06: horas convertidas desde la zona institucional validada (PASO 4.5/4.6)
+                            -- y marca UTC_GENERADOR en la MISMA sentencia.
+                            INSERT INTO dbo.Sesion (id, nombre, numero, codigo, numeroSemana, grupo, fechaHoraInicio, fechaHoraFin, procedenciaTemporal)
+                            VALUES (NEWID(), @nombreSesion, @numeroSesion, @codigoVerif, @numSemana, @idGrupoDefecto, @fechaHoraInicio, @fechaHoraFin, N'UTC_GENERADOR');
 
                             SET @sesionesCreadas = @sesionesCreadas + 1;
                             SET @numeroSesion = @numeroSesion + 1;
