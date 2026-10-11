@@ -35,8 +35,9 @@ Backend certificado contra esta DB: Surefire 1502, Failsafe 196 (0 fallos/0 skip
 
 En `af37ccc8...`, SonarCloud y DB Quality Gate fueron aprobados: 0,0 % de duplicación, 0 issues nuevos y
 225 ejecutadas / 224 PASS / 0 FAILED / 1 skip permitido. En el nuevo HEAD, el gate local sobre el contenedor principal
-pasó con 227 ejecutadas / 226 PASS / 0 FAILED / 1 skip permitido. Los checks remotos deben ejecutarse nuevamente
-después del commit/push; no se reutilizan checks de un SHA anterior.
+pasó con 227 ejecutadas / 226 PASS / 0 FAILED / 1 skip permitido. El run remoto 23 (`38125366104`) sobre
+`d9741b12b68f3737726e3d1ecd7f05c211a8b543` también terminó **success**: despliegue, gate SQL, SonarCloud y
+post-checkout exitosos.
 
 El contenedor local temporal `maint003k_cert_20261011` fue retirado sin volumen y no se creó ningún contenedor SQL nuevo.
 

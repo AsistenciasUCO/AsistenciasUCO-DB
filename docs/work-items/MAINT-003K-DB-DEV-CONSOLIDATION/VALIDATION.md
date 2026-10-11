@@ -1,5 +1,5 @@
 ---
-status: LOCAL_PRIMARY_DB_CERTIFIED_REMOTE_CI_PENDING
+status: LOCAL_PRIMARY_DB_CERTIFIED_REMOTE_CI_PASS
 work_item: MAINT-003K-DB-DEV-CONSOLIDATION
 date: 2026-10-10
 ---
@@ -11,7 +11,7 @@ Estados independientes (no se declara ninguno sin evidencia):
 | Estado | Valor | Evidencia |
 |---|---|---|
 | `DEV_DB_CONSOLIDATED` | **PASS** | Secciones históricas 3-6 más la certificación final sobre `sql_server_asistencias` en sección 12. |
-| `DB_PR_READY` | **PASS local / CI remoto pendiente** | Gate real del nuevo HEAD aprobado localmente; faltan checks remotos posteriores al push. |
+| `DB_PR_READY` | **PASS local + CI remoto** | Gate real del nuevo HEAD aprobado en la DB principal y por GitHub Actions/SonarCloud. |
 | `BACKEND_LOCAL_GREEN` / `BACKEND_CI_GREEN` | ver el work item backend | `docs/work-items/MAINT-003K-backend-only-release-gate/VALIDATION.md` |
 
 ## 1. Inventario previo (solo lectura)
@@ -105,7 +105,7 @@ MinIO, ClamAV, Keycloak y su PostgreSQL, y la pila de observabilidad. Se restaur
 
 ## 8. NOT_RUN / limitaciones
 
-- CI remoto del nuevo HEAD (`DB Quality Gate CI/CD`), SonarCloud y CodeQL: **PENDIENTES** hasta publicar el commit final; no se reutilizan checks de `af37ccc8`.
+- CI remoto del nuevo HEAD (`DB Quality Gate CI/CD`) y SonarCloud: **PASS** en el run 23 (`38125366104`); CodeQL no está configurado en este workflow.
 - Despliegue en staging/institucional y aprobacion del owner DB: **NOT_RUN** (decision humana).
 - `XACT_STATE_MINUS_ONE_RUNTIME` sigue siendo skip permitido.
 
@@ -121,7 +121,7 @@ MinIO, ClamAV, Keycloak y su PostgreSQL, y la pila de observabilidad. Se restaur
 | SQL Server 2022 limpio + redeploy + suite del SHA auditado | **PASS histórico** | `TOTAL_EXECUTED=225`, `PASSED=224`, `FAILED=0`, `SKIPPED=1`; único skip `XACT_STATE_MINUS_ONE_RUNTIME` |
 | Manifiesto post-freeze del SHA auditado | **PASS histórico** | `FREEZE_MANIFEST_OK`; 11 objetos post-freeze |
 | SQL Server principal + suite del nuevo HEAD | **PASS** | `sql_server_asistencias/gestionasistenciadb`, gate final registrado en sección 12 |
-| SonarCloud, DB CI y GitHub Actions del nuevo HEAD | **PENDIENTE** | Requieren commit/push de esta corrección; no se reutilizan checks del SHA anterior |
+| SonarCloud, DB CI y GitHub Actions del nuevo HEAD | **PASS** | Run 23 (`38125366104`) sobre `d9741b12b68f3737726e3d1ecd7f05c211a8b543`: despliegue, `test_summary.ps1`, SonarCloud y post-checkout exitosos |
 
 ## 10. Regresión de prioridad de errores
 
