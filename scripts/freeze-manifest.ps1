@@ -48,6 +48,7 @@ $postFreezeNew = @( # added or extended (Sesion.sql gains the provenance column 
     'schema/triggers/tr_Sesion_procedencia_temporal.sql',
     'schema/views/uv_sesion_v2.sql',
     'schema/stored-procedures/usp_crear_sesion_interno.sql',
+    'schema/stored-procedures/usp_validar_sesion_operacion_interno.sql',
     'schema/stored-procedures/usp_crear_sesion_v2.sql',
     'schema/stored-procedures/usp_actualizar_sesion_interno.sql',
     'schema/stored-procedures/usp_actualizar_sesion_v2.sql',

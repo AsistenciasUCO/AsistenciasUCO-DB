@@ -57,3 +57,20 @@ auditoria, catalogos de mensajes y parametros. Ver `UTC-D06-POST-FREEZE` y `CC-0
 ## Definition of Ready
 
 READY: fuentes, entorno (contenedor Developer local), rollback y pruebas identificados. Despliegue en staging/produccion: `NOT_READY` (decision del owner DB).
+
+## MAINT-003K-Sonar follow-up (PR #36)
+
+El comentario oficial de SonarCloud en PR #36 reporto `6.2% Duplication on New Code` (umbral `<= 3%`). La vista de
+SonarCloud confirmo dos componentes afectados: `usp_crear_sesion_interno.sql` (61 lineas duplicadas) y
+`usp_actualizar_sesion_interno.sql` (61 lineas duplicadas). El desglose de rangos no fue expuesto por la interfaz,
+por lo que la matriz de rangos locales se conserva como evidencia complementaria y no como hallazgo independiente.
+
+| Evidencia | Antes | Despues | Decision |
+|---|---|---|---|
+| Bloque Sonar confirmado | 61 lineas en cada nucleo de sesion; contraparte entre crear/actualizar | Extraido a `usp_validar_sesion_operacion_interno.sql` | Refactor seguro: procedencia `NULL/UTC_V2`, correlacion, ejecutor/RBAC DOCENTE y fechas son reglas comunes |
+| Candidato local adicional | 37 lineas de fechas dentro del bloque comun | Incluido en el mismo helper | Candidato local, no presentado como bloque Sonar separado |
+| Contratos explicitos de wrappers v1/v2 | Sin cambios | Sin cambios | Se mantienen las cuatro columnas y las marcas `NULL`/`UTC_V2` |
+| Limpieza de temporales | `catch {}` silencioso en dos limpiezas | Errores observables; SQL cleanup se intenta aunque falle el archivo | El gate acumula fallo sin imprimir credenciales |
+
+La rama de trabajo sigue siendo `feat/maint-003k-db-dev-consolidation`; no se cambia `develop`, esquema fisico ni
+contratos publicos. La validacion SQL y el nuevo analisis remoto deben ejecutarse sobre el commit final.

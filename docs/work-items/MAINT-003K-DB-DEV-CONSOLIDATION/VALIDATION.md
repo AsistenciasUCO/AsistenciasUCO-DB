@@ -1,5 +1,5 @@
 ---
-status: VALIDATED_LOCAL_DEV
+status: PENDING_POST_REFACTOR_GATE
 work_item: MAINT-003K-DB-DEV-CONSOLIDATION
 date: 2026-10-10
 ---
@@ -107,3 +107,17 @@ MinIO, ClamAV, Keycloak y su PostgreSQL, y la pila de observabilidad. Se restaur
 - CI remoto del repo DB (`DB Quality Gate CI/CD`), SonarCloud y CodeQL del PR: se ejecutan al abrir el PR; se registran en la descripcion del PR, no se presumen.
 - Despliegue en staging/institucional y aprobacion del owner DB: **NOT_RUN** (decision humana).
 - `XACT_STATE_MINUS_ONE_RUNTIME` sigue siendo skip permitido.
+
+## 9. MAINT-003K-Sonar follow-up (commit posterior)
+
+| Comprobacion | Resultado | Evidencia |
+|---|---|---|
+| SonarCloud inicial de PR #36 | **CONFIRMED FAIL**: 6.2% duplicacion en codigo nuevo, maximo 3% | Comentario oficial de SonarCloud `issuecomment-6103273978` y panel de medidas; dos archivos, 61 lineas cada uno |
+| Matriz local de candidatos | **COMPLETADA** | El bloque comun de procedencia/correlacion/RBAC/fechas fue extraido; los wrappers y proveedores quedaron sin cambios |
+| Issue `catch {}` vacio | **CORREGIDO EN FUENTE** | `test_summary.ps1`: ambas limpiezas registran errores y siempre intentan la limpieza SQL |
+| Manifiesto post-freeze | **PASS local** | `scripts/freeze-manifest.ps1 -Mode Verify` => `FREEZE_MANIFEST_OK`, 11 objetos work-item |
+| Parseo PowerShell | **PASS local** | `test_summary.ps1` => `POWERSHELL_PARSE_OK` |
+| SQL Server 2022 limpio + redeploy + suite | **NOT RUN** | Docker Engine no estaba disponible en esta sesion (`dockerDesktopLinuxEngine` ausente) |
+| SonarCloud final, DB CI y GitHub Actions | **NOT RUN** | Requieren commit/push del cambio y ejecucion remota posterior |
+
+El estado no se declara GREEN hasta ejecutar el gate sobre el ultimo commit y comprobar el nuevo Quality Gate remoto.

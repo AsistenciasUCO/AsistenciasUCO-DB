@@ -24,3 +24,16 @@ Todas las pruebas SQL viven en el gate `test_summary.ps1` (ids criticos obligato
 
 Comando del gate: `.\test_summary.ps1 -ContainerName <contenedor> -Password <sa>` (precheck: DB `gestionasistenciadb` y Developer Edition).
 Fixtures: `.\test\fixtures\dev\deploy_dev_fixtures.ps1 -ContainerName <contenedor> -Password <sa> [-Scenarios 300,1000,5000] [-CleanupOnly|-ValidateOnly]`.
+
+## MAINT-003K-Sonar follow-up
+
+| Requisito | Prueba (id) | Archivo | Resultado esperado |
+|---|---|---|---|
+| Validacion comun exitosa para docente activo y v1 | `SESSION_COMMON_VALIDATION_HAPPY_PATH` | `test/test_usp_validar_sesion_operacion_interno.sql` | `estadoResultado = 1`, sin transaccion abierta |
+| Procedencia reservada rechazada | `SESSION_COMMON_VALIDATION_RESERVED_PROVENANCE` | idem | `estadoResultado = 0`, sin escritura |
+| Ejecutor obligatorio | `SESSION_COMMON_VALIDATION_EXECUTOR_REQUIRED` | idem | `estadoResultado = 0` |
+| Fechas obligatorias y orden temporal | `SESSION_COMMON_VALIDATION_START_REQUIRED`, `SESSION_COMMON_VALIDATION_DATE_ORDER` | idem | `estadoResultado = 0`, catalogo preservado |
+| Contratos v1/v2 y flujo completo | ids existentes `SESSION_*`, `UTC_D06_*` | `test/test_usp_crear_actualizar_sesion.sql`, `test/test_utc_d06_procedencia_temporal.sql` | Sin regresiones de correlacion, RBAC, procedencia o cuatro columnas |
+
+La suite aumenta en cinco identificadores obligatorios respecto de la evidencia anterior; por eso el resultado esperado
+del gate pasa de `220/219/0/1` a `225/224/0/1` (ejecutadas/PASS/FAILED/SKIPPED), sujeto a la ejecucion real.

@@ -41,61 +41,11 @@ AS
 
 BEGIN
     SET NOCOUNT ON;
-
-    SELECT
-        @idCorrelacionResultado  = @idCorrelacionDefecto,
-        @mensajeUsuarioResultado = dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA'),
-        @mensajeTecnicoResultado = dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA'),
-        @estadoResultado         = 1;
+    SET @idCorrelacionResultado = @idCorrelacionDefecto;
 
     BEGIN TRY
-        -- PASO 0: Solo NULL (v1) o UTC_V2 (v2) son procedencias admitidas por esta via.
-        IF @procedenciaTemporal IS NOT NULL AND @procedenciaTemporal <> N'UTC_V2'
-        BEGIN
-            EXEC dbo.usp_obtener_mensaje_catalogo
-                @p_codigo = 'GEN_002',
-                @p_param1 = 'procedenciaTemporal',
-                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
-                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
-
-            SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
-            SET @estadoResultado = 0;
-        END
-
-        -- PASO 1: Validación de correlación
-        IF @estadoResultado = 1
-        BEGIN
-            EXEC dbo.usp_validar_id_correlacion_esta_presente_interno
-                @idCorrelacion = @idCorrelacionDefecto,
-                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
-                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
-                @estadoResultado = @estadoResultado OUTPUT;
-        END
-
-        -- PASO 1.5: El ejecutor (Usuario.id) es obligatorio y nunca puede saltar seguridad.
-        IF @estadoResultado = 1 AND @idUsuarioEjecutor IS NULL
-        BEGIN
-            EXEC dbo.usp_obtener_mensaje_catalogo
-                @p_codigo = 'GEN_002',
-                @p_param1 = 'idUsuarioEjecutor',
-                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
-                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
-
-            SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
-            SET @estadoResultado = 0;
-        END
-
-        -- PASO 1.6: Validación de perfil RBAC del ejecutor
-        IF @estadoResultado = 1
-        BEGIN
-            EXEC dbo.usp_validar_permiso_rbac_usuario_interno
-                @idUsuario = @idUsuarioEjecutorDefecto,
-                @codigoPerfilRequerido = 'DOCENTE',
-                @idCorrelacion = @idCorrelacionDefecto,
-                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
-                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
-                @estadoResultado = @estadoResultado OUTPUT;
-        END
+        -- PASOS 0-2: validacion comun de procedencia, correlacion, seguridad y fechas.
+        EXEC dbo.usp_validar_sesion_operacion_interno @idCorrelacion, @idUsuarioEjecutor, @procedenciaTemporal, @fechaHoraInicio, @fechaHoraFin, @mensajeUsuarioResultado OUTPUT, @mensajeTecnicoResultado OUTPUT, @estadoResultado OUTPUT;
 
         -- PASO 2: Validación de existencia del grupo académico
         IF @estadoResultado = 1
@@ -119,44 +69,6 @@ BEGIN
                 @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                 @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
                 @estadoResultado = @estadoResultado OUTPUT;
-        END
-
-        -- PASO 2.5: Las fechas de sesión son obligatorias y representan instantes UTC.
-        IF @estadoResultado = 1 AND @fechaHoraInicio IS NULL
-        BEGIN
-            EXEC dbo.usp_obtener_mensaje_catalogo
-                @p_codigo = 'GEN_002',
-                @p_param1 = 'fechaHoraInicio',
-                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
-                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
-
-            SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
-            SET @estadoResultado = 0;
-        END
-
-        IF @estadoResultado = 1 AND @fechaHoraFin IS NULL
-        BEGIN
-            EXEC dbo.usp_obtener_mensaje_catalogo
-                @p_codigo = 'GEN_002',
-                @p_param1 = 'fechaHoraFin',
-                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
-                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
-
-            SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
-            SET @estadoResultado = 0;
-        END
-
-        IF @estadoResultado = 1 AND @fechaHoraFin <= @fechaHoraInicio
-        BEGIN
-            EXEC dbo.usp_obtener_mensaje_catalogo
-                @p_codigo = 'SES_004',
-                @p_param1 = 'fechaHoraFin',
-                @p_param2 = 'fechaHoraInicio',
-                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
-                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
-
-            SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
-            SET @estadoResultado = 0;
         END
 
         -- PASO 3: Cálculo transaccional del correlativo de sesión e inserción
@@ -208,12 +120,7 @@ BEGIN
                     ROLLBACK TRANSACTION;
             END
 
-            EXEC dbo.usp_obtener_mensaje_catalogo
-                @p_codigo = 'GEN_004',
-                @p_param1 = 'Sesion',
-                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
-                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
-
+            EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = 'GEN_004', @p_param1 = 'Sesion', @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT, @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
             SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
         END
 
@@ -238,11 +145,7 @@ BEGIN
             THROW;
         END
 
-        EXEC dbo.usp_obtener_mensaje_catalogo
-            @p_codigo = 'SYS_001',
-            @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
-            @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
-
+        EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = 'SYS_001', @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT, @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
         SET @mensajeTecnicoResultado = dbo.ufn_obtener_detalle_error(@idCorrelacionDefecto);
         SET @estadoResultado = 0;
     END CATCH

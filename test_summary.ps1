@@ -209,10 +209,26 @@ catch {
     $resultFailures += "ATTENDANCE_CONCURRENT_UPSERT $($_.Exception.Message)"
 }
 finally {
-    try { docker exec -u 0 $ContainerName rm -f /tmp/attendance_concurrent_worker.sql 2>$null | Out-Null } catch {}
+    $cleanupErrors = @()
+    try {
+        docker exec -u 0 $ContainerName rm -f /tmp/attendance_concurrent_worker.sql 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) { $cleanupErrors += 'attendance worker file cleanup returned a non-zero exit code' }
+    }
+    catch {
+        $cleanupErrors += 'attendance worker file cleanup raised an exception'
+    }
     if ($concurrencySession) {
         $cleanupSql = "SET NOCOUNT ON; DELETE d FROM dbo.DetalleAsistencia d JOIN dbo.Asistencia a ON a.id = d.asistencia WHERE a.sesion = '$concurrencySession'; DELETE FROM dbo.Asistencia WHERE sesion = '$concurrencySession'; DELETE FROM dbo.Sesion WHERE id = '$concurrencySession';"
-        docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $Password -C -Q $cleanupSql | Out-Null
+        try {
+            docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $Password -C -Q $cleanupSql | Out-Null
+            if ($LASTEXITCODE -ne 0) { $cleanupErrors += 'attendance SQL cleanup returned a non-zero exit code' }
+        }
+        catch {
+            $cleanupErrors += 'attendance SQL cleanup raised an exception'
+        }
+    }
+    if ($cleanupErrors.Count -gt 0) {
+        $resultFailures += "ATTENDANCE_CONCURRENT_UPSERT cleanup failed: $($cleanupErrors -join '; ')"
     }
 }
 
@@ -264,9 +280,25 @@ catch {
     $resultFailures += "UTC_D06_CONCURRENT_V2_CREATE $($_.Exception.Message)"
 }
 finally {
-    try { docker exec -u 0 $ContainerName rm -f /tmp/utc_d06_concurrent_worker.sql 2>$null | Out-Null } catch {}
+    $cleanupErrors = @()
+    try {
+        docker exec -u 0 $ContainerName rm -f /tmp/utc_d06_concurrent_worker.sql 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) { $cleanupErrors += 'D06 worker file cleanup returned a non-zero exit code' }
+    }
+    catch {
+        $cleanupErrors += 'D06 worker file cleanup raised an exception'
+    }
     if ($d06Group) {
-        docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $Password -C -Q "SET NOCOUNT ON; DELETE FROM dbo.Sesion WHERE grupo = '$d06Group' AND nombre = N'$d06Tag';" | Out-Null
+        try {
+            docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $Password -C -Q "SET NOCOUNT ON; DELETE FROM dbo.Sesion WHERE grupo = '$d06Group' AND nombre = N'$d06Tag';" | Out-Null
+            if ($LASTEXITCODE -ne 0) { $cleanupErrors += 'D06 SQL cleanup returned a non-zero exit code' }
+        }
+        catch {
+            $cleanupErrors += 'D06 SQL cleanup raised an exception'
+        }
+    }
+    if ($cleanupErrors.Count -gt 0) {
+        $resultFailures += "UTC_D06_CONCURRENT_V2_CREATE cleanup failed: $($cleanupErrors -join '; ')"
     }
 }
 
@@ -481,6 +513,9 @@ $criticalIds = @(
     'GROUP_CREATE', 'GROUP_UPDATE', 'GROUP_CAPACITY_REJECT',
     'SESSION_CREATE', 'SESSION_UPDATE', 'SESSION_NON_OWNER', 'SESSION_REQUIRED_START',
     'SESSION_REQUIRED_END', 'SESSION_END_AFTER_START', 'SESSION_EXECUTOR_REQUIRED', 'SESSION_NOT_FOUND_CODE',
+    'SESSION_COMMON_VALIDATION_HAPPY_PATH', 'SESSION_COMMON_VALIDATION_RESERVED_PROVENANCE',
+    'SESSION_COMMON_VALIDATION_EXECUTOR_REQUIRED', 'SESSION_COMMON_VALIDATION_START_REQUIRED',
+    'SESSION_COMMON_VALIDATION_DATE_ORDER',
     'SESSION_GENERATION_SUCCESS', 'SESSION_GENERATION_IDEMPOTENT', 'SESSION_GENERATION_INVALID', 'UTC_SESSION_GENERATION',
     'SESSION_SEQUENCE_USES_MAX_NOT_COUNT', 'SESSION_CODE_OVER_99', 'SESSION_CREATE_NO_DUPLICATE_NUMBER_CODE',
     'CAPACITY_GROUP_VALIDATOR_ALLOWS_FULL_GROUP', 'CAPACITY_VALIDATOR_REJECTS_FULL_GROUP', 'SESSION_CREATE_ALLOWED_ON_FULL_GROUP',

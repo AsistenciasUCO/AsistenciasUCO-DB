@@ -95,6 +95,7 @@ DENY INSERT, UPDATE, DELETE ON [dbo].[Sesion] TO [rol_asistencias_runtime];
 DENY INSERT, UPDATE, DELETE ON [dbo].[SesionProcedenciaClasificacion] TO [rol_asistencias_runtime];
 DENY EXECUTE ON [dbo].[usp_crear_sesion_interno] TO [rol_asistencias_runtime];
 DENY EXECUTE ON [dbo].[usp_actualizar_sesion_interno] TO [rol_asistencias_runtime];
+DENY EXECUTE ON [dbo].[usp_validar_sesion_operacion_interno] TO [rol_asistencias_runtime];
 DENY EXECUTE ON [dbo].[usp_clasificar_procedencia_sesion] TO [rol_asistencias_runtime];
 GO
 

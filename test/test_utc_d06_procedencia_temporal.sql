@@ -258,7 +258,7 @@ BEGIN TRY
     -- D06-06 (permisos EFECTIVOS): principal del rol runtime, sin login, via EXECUTE AS USER.
     CREATE USER [utc_d06_runtime_probe] WITHOUT LOGIN;
     ALTER ROLE [rol_asistencias_runtime] ADD MEMBER [utc_d06_runtime_probe];
-    DECLARE @dmlDenegado BIT = 0, @selectTablaDenegado BIT = 0, @internoDenegado BIT = 0, @clasificarDenegado BIT = 0;
+    DECLARE @dmlDenegado BIT = 0, @selectTablaDenegado BIT = 0, @internoDenegado BIT = 0, @commonValidatorDenegado BIT = 0, @clasificarDenegado BIT = 0;
     DECLARE @lecturaV2 INT = NULL;
     DECLARE @rProbe TABLE (idCorrelacion UNIQUEIDENTIFIER, mensajeUsuarioResultado NVARCHAR(4000), mensajeTecnicoResultado NVARCHAR(4000), estadoResultado BIT);
     EXECUTE AS USER = 'utc_d06_runtime_probe';
@@ -285,6 +285,12 @@ BEGIN TRY
             IF ERROR_NUMBER() = 229 SET @internoDenegado = 1;
         END CATCH
         BEGIN TRY
+            EXEC dbo.usp_validar_sesion_operacion_interno;
+        END TRY
+        BEGIN CATCH
+            IF ERROR_NUMBER() = 229 SET @commonValidatorDenegado = 1;
+        END CATCH
+        BEGIN TRY
             EXEC dbo.usp_clasificar_procedencia_sesion
                 @idSesion = @sesionV1, @ambiente = N'QA', @idManifiesto = N'X', @hashEvidencia = '0000000000000000000000000000000000000000000000000000000000000000',
                 @fechaHoraInicioVerificada = '2026-07-21T00:30:00', @fechaHoraFinVerificada = '2026-07-21T02:00:00',
@@ -302,7 +308,7 @@ BEGIN TRY
             @fechaHoraInicio = @inicioV2, @fechaHoraFin = @finV2,
             @idCorrelacion = @corr, @idUsuarioEjecutor = @usuarioDocente;
     REVERT;
-    IF @dmlDenegado = 0 OR @selectTablaDenegado = 0 OR @internoDenegado = 0 OR @clasificarDenegado = 0 OR @lecturaV2 <> 1
+    IF @dmlDenegado = 0 OR @selectTablaDenegado = 0 OR @internoDenegado = 0 OR @commonValidatorDenegado = 0 OR @clasificarDenegado = 0 OR @lecturaV2 <> 1
         THROW 53031, 'TEST FAILED: UTC_D06_RUNTIME_PERMISSIONS el rol runtime tiene DML/SELECT de tabla o EXEC reservado.', 1;
     IF NOT EXISTS (SELECT 1 FROM @rProbe WHERE estadoResultado = 1)
        OR NOT EXISTS (SELECT 1 FROM dbo.Sesion WHERE id = @sesionV2 AND nombre = N'D06 Via Runtime' AND procedenciaTemporal = N'UTC_V2'
