@@ -55,7 +55,13 @@ foreach ($line in ($outputStr -split '\r?\n')) {
 # ROLLBACK inside INSERT ... EXEC is prohibited by SQL Server. SQLCMD owns
 # the result set and compares the actual row with catalog and state checks.
 $resultIds = @('STUDENT_DUPLICATE', 'STUDENT_GROUP_NOT_FOUND', 'STUDENT_GROUP_DISABLED', 'STUDENT_CAPACITY_EXCEEDED', 'TEACHER_GROUP_NOT_FOUND', 'MASS_CLOSE_SUCCESS',
-    'ATTENDANCE_BULK_STUDENT_NOT_IN_GROUP', 'ATTENDANCE_BULK_ATOMIC')
+    'ATTENDANCE_BULK_STUDENT_NOT_IN_GROUP', 'ATTENDANCE_BULK_ATOMIC',
+    # CC-003G-01: rechazos y fallos forzados de los proveedores publicos (el SP ejecuta ROLLBACK internamente)
+    'USER_SYNC_PUBLIC_DUPLICATE_DOCUMENT', 'USER_SYNC_PUBLIC_DUPLICATE_EMAIL', 'USER_SYNC_PUBLIC_CONFLICTING_PROFILE',
+    'USER_SYNC_PUBLIC_INVALID_EMAIL', 'USER_SYNC_PUBLIC_EMPTY_PASSWORD', 'USER_SYNC_PUBLIC_UNKNOWN_ID_TYPE',
+    'USER_SYNC_PUBLIC_ROLLBACK_SAVEPOINT', 'USER_SYNC_PUBLIC_ROLLBACK_OWN_TRANSACTION', 'USER_SYNC_PUBLIC_INACTIVE_REPLAY',
+    'PLAN_PUBLIC_DUPLICATE_BUSINESS_KEY', 'PLAN_PUBLIC_UPDATE_TO_TAKEN_INP', 'PLAN_PUBLIC_FOREIGN_PLAN',
+    'PLAN_PUBLIC_ROLLBACK_SAVEPOINT', 'PLAN_PUBLIC_ROLLBACK_OWN_TRANSACTION')
 $resultFailures = @()
 $clientPassed = @()
 foreach ($id in $resultIds) {
@@ -63,8 +69,10 @@ foreach ($id in $resultIds) {
     $block = [regex]::Match($outputStr, "(?ms)^TEST_RESULT_BEGIN:$escaped\r?\n(.*?)^TEST_RESULT_END:$escaped\s*$")
     $user = [regex]::Match($outputStr, "(?m)^TEST_EXPECTED_USER:$escaped\|(.*)$")
     $tech = [regex]::Match($outputStr, "(?m)^TEST_EXPECTED_TECH:$escaped\|(.*)$")
+    # Mensajes tecnicos con detalle de error de SQL Server no son deterministas: se verifican por expresion regular.
+    $techRegex = [regex]::Match($outputStr, "(?m)^TEST_EXPECTED_TECH_REGEX:$escaped\|(.*)$")
     $statePassed = $outputStr -match "(?m)^TEST_STATE_PASS:$escaped\s*$"
-    if (-not $block.Success -or -not $user.Success -or -not $tech.Success -or -not $statePassed) {
+    if (-not $block.Success -or -not $user.Success -or (-not $tech.Success -and -not $techRegex.Success) -or -not $statePassed) {
         $resultFailures += "$id missing result, catalog expectation, or state assertion"
         continue
     }
@@ -74,10 +82,17 @@ foreach ($id in $resultIds) {
         continue
     }
     $row = $rows[0]
+    # Ningun proveedor publico puede devolver el hash del password en un resultado canonico (CC-003G-01).
+    if ($block.Groups[1].Value -match 'SECRET_MARKER') {
+        $resultFailures += "$id leaked the password marker in the canonical result"
+        continue
+    }
+    $techMatches = if ($techRegex.Success) { $row.Groups[3].Value -match $techRegex.Groups[1].Value.Trim() }
+                   else { $row.Groups[3].Value.Trim() -ceq $tech.Groups[1].Value.Trim() }
     $expectedState = if ($id -eq 'MASS_CLOSE_SUCCESS') { '1' } else { '0' }
     if ($row.Groups[4].Value -ne $expectedState -or
         $row.Groups[2].Value.Trim() -cne $user.Groups[1].Value.Trim() -or
-        $row.Groups[3].Value.Trim() -cne $tech.Groups[1].Value.Trim()) {
+        -not $techMatches) {
         $resultFailures += "$id actual result differs from state=$expectedState/catalog message"
         continue
     }
@@ -194,15 +209,219 @@ catch {
     $resultFailures += "ATTENDANCE_CONCURRENT_UPSERT $($_.Exception.Message)"
 }
 finally {
-    try { docker exec -u 0 $ContainerName rm -f /tmp/attendance_concurrent_worker.sql 2>$null | Out-Null } catch {}
+    $cleanupErrors = @()
+    try {
+        docker exec -u 0 $ContainerName rm -f /tmp/attendance_concurrent_worker.sql 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) { $cleanupErrors += 'attendance worker file cleanup returned a non-zero exit code' }
+    }
+    catch {
+        $cleanupErrors += 'attendance worker file cleanup raised an exception'
+    }
     if ($concurrencySession) {
         $cleanupSql = "SET NOCOUNT ON; DELETE d FROM dbo.DetalleAsistencia d JOIN dbo.Asistencia a ON a.id = d.asistencia WHERE a.sesion = '$concurrencySession'; DELETE FROM dbo.Asistencia WHERE sesion = '$concurrencySession'; DELETE FROM dbo.Sesion WHERE id = '$concurrencySession';"
-        docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $Password -C -Q $cleanupSql | Out-Null
+        try {
+            docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $Password -C -Q $cleanupSql | Out-Null
+            if ($LASTEXITCODE -ne 0) { $cleanupErrors += 'attendance SQL cleanup returned a non-zero exit code' }
+        }
+        catch {
+            $cleanupErrors += 'attendance SQL cleanup raised an exception'
+        }
+    }
+    if ($cleanupErrors.Count -gt 0) {
+        $resultFailures += "ATTENDANCE_CONCURRENT_UPSERT cleanup failed: $($cleanupErrors -join '; ')"
     }
 }
 
 # Secret hygiene (DB-GP-001C): scans scripts, workflows, env templates and versioned config.
 # Findings are reported as file:line:type only; the secret value is never printed.
+# UTC-D06-POST-FREEZE: dos conexiones crean sesiones v2 en paralelo sobre el mismo grupo. El correlativo
+# (UPDLOCK, HOLDLOCK) no se duplica y TODAS las filas quedan UTC_V2 (horas y marca en el mismo INSERT).
+$d06Group = $null
+$d06Tag = "D06C-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
+try {
+    $d06SetupSql = @"
+SET NOCOUNT ON;
+SELECT TOP 1 CONCAT(CONVERT(VARCHAR(36), g.id), '|', CONVERT(VARCHAR(36), di.idUsuario))
+FROM dbo.uv_grupo g JOIN dbo.uv_docente_identidad di ON di.id = g.idDocente
+WHERE g.grupoEstaHablitado = 1 AND di.estaActivoUsuario = 1
+ORDER BY g.cuposDisponibles DESC;
+"@
+    $d06Setup = @(docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $Password -C -b -h -1 -W -Q $d06SetupSql 2>&1 |
+        ForEach-Object { "$_".Trim() } | Where-Object { $_ -match '^[0-9a-fA-F-]{36}\|' })
+    if ($LASTEXITCODE -ne 0 -or $d06Setup.Count -ne 1) { throw "setup failed: $($d06Setup -join '; ')" }
+    $d06Group = $d06Setup[0].Split('|')[0]
+    $d06Owner = $d06Setup[0].Split('|')[1]
+    $d06WorkerSql = "SET NOCOUNT ON; DECLARE @i INT = 0; WHILE @i < 5 BEGIN DECLARE @corr UNIQUEIDENTIFIER = NEWID(); EXEC dbo.usp_crear_sesion_v2 @idGrupo = '$d06Group', @nombre = N'$d06Tag', @fechaHoraInicio = '2027-01-10T13:00:00', @fechaHoraFin = '2027-01-10T14:00:00', @idCorrelacion = @corr, @idUsuarioEjecutor = '$d06Owner'; SET @i += 1; END"
+    $d06Local = Join-Path ([System.IO.Path]::GetTempPath()) "utc_d06_concurrent_worker_$([guid]::NewGuid().ToString('N')).sql"
+    Set-Content -Path $d06Local -Value $d06WorkerSql -Encoding utf8 -NoNewline
+    docker cp $d06Local "${ContainerName}:/tmp/utc_d06_concurrent_worker.sql" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'could not copy D06 worker sql into container.' }
+    docker exec -u 0 $ContainerName chmod a+r /tmp/utc_d06_concurrent_worker.sql | Out-Null
+    Remove-Item -Path $d06Local -Force -ErrorAction SilentlyContinue
+    $d06Job = {
+        param($cn, $pw)
+        $output = @(& docker exec $cn /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $pw -C -b -h -1 -W -i /tmp/utc_d06_concurrent_worker.sql 2>&1)
+        if ($LASTEXITCODE -ne 0) { throw "sqlcmd failed: $($output -join '; ')" }
+    }
+    $d06Jobs = @(
+        (Start-Job -ScriptBlock $d06Job -ArgumentList $ContainerName, $Password),
+        (Start-Job -ScriptBlock $d06Job -ArgumentList $ContainerName, $Password)
+    )
+    $d06Out = @(Receive-Job -Job $d06Jobs -Wait -AutoRemoveJob 2>&1)
+    if ($d06Out | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] }) { throw "worker failed: $($d06Out -join '; ')" }
+    $d06ValidateSql = "SET NOCOUNT ON; SELECT CONCAT(COUNT(1), '|', COUNT(DISTINCT numero), '|', COUNT(DISTINCT codigo), '|', SUM(CASE WHEN procedenciaTemporal = N'UTC_V2' THEN 1 ELSE 0 END)) FROM dbo.Sesion WHERE grupo = '$d06Group' AND nombre = N'$d06Tag';"
+    $d06Counts = @(docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $Password -C -b -h -1 -W -Q $d06ValidateSql 2>&1 |
+        ForEach-Object { "$_".Trim() } | Where-Object { $_ -match '^\d+\|\d+\|\d+\|\d+$' })
+    if ($LASTEXITCODE -ne 0 -or $d06Counts.Count -ne 1 -or $d06Counts[0] -ne '10|10|10|10') { throw "unexpected counts: $($d06Counts -join '; ')" }
+    $clientPassed += 'UTC_D06_CONCURRENT_V2_CREATE'
+    Write-Host 'TEST_PASS:UTC_D06_CONCURRENT_V2_CREATE'
+}
+catch {
+    $resultFailures += "UTC_D06_CONCURRENT_V2_CREATE $($_.Exception.Message)"
+}
+finally {
+    $cleanupErrors = @()
+    try {
+        docker exec -u 0 $ContainerName rm -f /tmp/utc_d06_concurrent_worker.sql 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) { $cleanupErrors += 'D06 worker file cleanup returned a non-zero exit code' }
+    }
+    catch {
+        $cleanupErrors += 'D06 worker file cleanup raised an exception'
+    }
+    if ($d06Group) {
+        try {
+            docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $Password -C -Q "SET NOCOUNT ON; DELETE FROM dbo.Sesion WHERE grupo = '$d06Group' AND nombre = N'$d06Tag';" | Out-Null
+            if ($LASTEXITCODE -ne 0) { $cleanupErrors += 'D06 SQL cleanup returned a non-zero exit code' }
+        }
+        catch {
+            $cleanupErrors += 'D06 SQL cleanup raised an exception'
+        }
+    }
+    if ($cleanupErrors.Count -gt 0) {
+        $resultFailures += "UTC_D06_CONCURRENT_V2_CREATE cleanup failed: $($cleanupErrors -join '; ')"
+    }
+}
+
+# CC-003G-01: carreras REALES entre dos sesiones sqlcmd sobre los proveedores publicos (dbo.Usuario y dbo.PlanEstudio
+# no tienen indices unicos de negocio: la unicidad la garantiza la serializacion dentro del SP).
+function Invoke-Cc003g01WorkerPair {
+    param([string]$SqlA, [string]$SqlB, [string]$Label)
+    $remotes = @()
+    foreach ($pair in @(@('a', $SqlA), @('b', $SqlB))) {
+        $local = Join-Path ([System.IO.Path]::GetTempPath()) "cc003g01_$($Label)_$($pair[0])_$([guid]::NewGuid().ToString('N')).sql"
+        Set-Content -Path $local -Value $pair[1] -Encoding utf8
+        $remote = "/tmp/cc003g01_$($Label)_$($pair[0]).sql"
+        docker cp $local "${ContainerName}:$remote" | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "could not copy CC-003G-01 worker $($pair[0])." }
+        docker exec -u 0 $ContainerName chmod a+r $remote | Out-Null
+        Remove-Item -Path $local -Force -ErrorAction SilentlyContinue
+        $remotes += $remote
+    }
+    $job = {
+        param($cn, $pw, $file)
+        $output = @(& docker exec $cn /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $pw -C -b -h -1 -W -s '|' -w 65535 -i $file 2>&1)
+        if ($LASTEXITCODE -ne 0) { throw "sqlcmd failed: $($output -join '; ')" }
+        $output
+    }
+    $jobs = @((Start-Job -ScriptBlock $job -ArgumentList $ContainerName, $Password, $remotes[0]),
+              (Start-Job -ScriptBlock $job -ArgumentList $ContainerName, $Password, $remotes[1]))
+    $out = @(Receive-Job -Job $jobs -Wait -AutoRemoveJob 2>&1)
+    foreach ($r in $remotes) { docker exec -u 0 $ContainerName rm -f $r 2>$null | Out-Null }
+    if ($out | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] }) { throw "worker failed: $($out -join '; ')" }
+    return @($out | ForEach-Object { "$_" })
+}
+function Get-Cc003g01States { param([string[]]$Lines)
+    return @($Lines | Where-Object { $_ -match '^[0-9A-Fa-f-]{36}\|.*\|\s*[01]\s*$' } | ForEach-Object { ($_ -replace '^.*\|\s*([01])\s*$', '$1') })
+}
+$ccTag = "cc3g$([guid]::NewGuid().ToString('N').Substring(0, 10))"
+$ccCount = 5
+try {
+    $ccFx = @(docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $Password -C -b -h -1 -W -Q @"
+SET NOCOUNT ON;
+SELECT TOP 1 CONCAT(CONVERT(VARCHAR(36), (SELECT TOP 1 id FROM dbo.uv_tipo_identificacion WHERE tipoIdentificacion = 'CC')), '|',
+       CONVERT(VARCHAR(36), p.id), '|', CONVERT(VARCHAR(36), ci.idUsuario))
+FROM dbo.uv_programa p JOIN dbo.uv_coordinador_identidad ci ON ci.id = p.idCoordinador
+WHERE ci.estaActivoUsuario = 1 ORDER BY p.id;
+"@ 2>&1 | ForEach-Object { "$_".Trim() } | Where-Object { $_ -match '^[0-9A-Fa-f-]{36}\|[0-9A-Fa-f-]{36}\|[0-9A-Fa-f-]{36}$' })
+    if ($LASTEXITCODE -ne 0 -or $ccFx.Count -ne 1) { throw "CC-003G-01 concurrency fixtures missing: $($ccFx -join '; ')" }
+    $ccTipo, $ccPrograma, $ccCoord = $ccFx[0].Split('|')
+    $ccBase = 1700000000 + (Get-Random -Minimum 1 -Maximum 90000000)
+
+    # (1) Usuario: mismas solicitudes exactas desde dos sesiones => una fila por identidad y todo exito (alta o reintento)
+    $userCalls = { param($offset) (1..$ccCount | ForEach-Object {
+        "EXEC dbo.usp_sincronizar_usuario @idTipoIdIdentificacion = '$ccTipo', @numeroIdentificacion = $($ccBase + $_ + $offset), @primerApellido = N'Race', @segundoApellido = N'Gate', @primerNombre = N'Same', @segundoNombre = N'Request', @correo = N'$ccTag.same.$_@test.local', @password = N'HashBackend_CC003G01_SECRET_MARKER_RACE', @idCorrelacion = '$([guid]::NewGuid())';" }) -join "`n" }
+    $outSame = Invoke-Cc003g01WorkerPair -SqlA ("SET NOCOUNT ON;`n" + (& $userCalls 0)) -SqlB ("SET NOCOUNT ON;`n" + (& $userCalls 0)) -Label 'usersame'
+    $sameStates = Get-Cc003g01States $outSame
+    $sameCounts = @(docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $Password -C -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CONCAT(COUNT(*), '|', COUNT(DISTINCT numeroIdentificacion), '|', COUNT(DISTINCT correo)) FROM dbo.Usuario WHERE correo LIKE N'$ccTag.same.%';" 2>&1 | ForEach-Object { "$_".Trim() } | Where-Object { $_ -match '^\d+\|\d+\|\d+$' })
+    if ($sameStates.Count -ne (2 * $ccCount) -or ($sameStates | Where-Object { $_ -ne '1' }) -or $sameCounts.Count -ne 1 -or $sameCounts[0] -ne "$ccCount|$ccCount|$ccCount") {
+        throw "same-request race: states=$($sameStates -join ',') counts=$($sameCounts -join ';')"
+    }
+    $clientPassed += 'CC003G01_CONCURRENT_USER_IDENTICAL'
+    Write-Host 'TEST_PASS:CC003G01_CONCURRENT_USER_IDENTICAL'
+
+    # (2) Usuario: mismo correo con documentos distintos => exactamente un ganador por correo
+    $conflictCalls = { param($offset) (1..$ccCount | ForEach-Object {
+        "EXEC dbo.usp_sincronizar_usuario @idTipoIdIdentificacion = '$ccTipo', @numeroIdentificacion = $($ccBase + 100 + $_ + $offset), @primerApellido = N'Race', @segundoApellido = N'Gate', @primerNombre = N'Same', @segundoNombre = N'Email', @correo = N'$ccTag.conflict.$_@test.local', @password = N'HashBackend_CC003G01_SECRET_MARKER_RACE', @idCorrelacion = '$([guid]::NewGuid())';" }) -join "`n" }
+    $outConflict = Invoke-Cc003g01WorkerPair -SqlA ("SET NOCOUNT ON;`n" + (& $conflictCalls 0)) -SqlB ("SET NOCOUNT ON;`n" + (& $conflictCalls 1000)) -Label 'userconflict'
+    $conflictStates = Get-Cc003g01States $outConflict
+    $conflictCounts = @(docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $Password -C -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CONCAT(COUNT(*), '|', COUNT(DISTINCT correo)) FROM dbo.Usuario WHERE correo LIKE N'$ccTag.conflict.%';" 2>&1 | ForEach-Object { "$_".Trim() } | Where-Object { $_ -match '^\d+\|\d+$' })
+    $conflictWins = @($conflictStates | Where-Object { $_ -eq '1' }).Count
+    if ($conflictStates.Count -ne (2 * $ccCount) -or $conflictWins -ne $ccCount -or $conflictCounts.Count -ne 1 -or $conflictCounts[0] -ne "$ccCount|$ccCount") {
+        throw "same-email race: wins=$conflictWins of $($conflictStates.Count) counts=$($conflictCounts -join ';')"
+    }
+    $clientPassed += 'CC003G01_CONCURRENT_USER_CONFLICT_EMAIL'
+    Write-Host 'TEST_PASS:CC003G01_CONCURRENT_USER_CONFLICT_EMAIL'
+
+    # (3) Plan: mismo (programa, inp) con ids distintos desde dos sesiones => un solo plan por inp
+    $ccInpBase = 40000 + (Get-Random -Minimum 1 -Maximum 5000) * 10
+    $planCalls = { (1..$ccCount | ForEach-Object {
+        "EXEC dbo.usp_registrar_o_actualizar_plan_estudio @idPlanEstudio = '$([guid]::NewGuid())', @idPrograma = '$ccPrograma', @inp = $($ccInpBase + $_), @idCorrelacion = '$([guid]::NewGuid())', @idUsuarioEjecutor = '$ccCoord';" }) -join "`n" }
+    $outPlan = Invoke-Cc003g01WorkerPair -SqlA ("SET NOCOUNT ON;`n" + (& $planCalls)) -SqlB ("SET NOCOUNT ON;`n" + (& $planCalls)) -Label 'plandup'
+    $planStates = Get-Cc003g01States $outPlan
+    $planCounts = @(docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $Password -C -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CONCAT(COUNT(*), '|', COUNT(DISTINCT inp)) FROM dbo.PlanEstudio WHERE programa = '$ccPrograma' AND inp BETWEEN $($ccInpBase + 1) AND $($ccInpBase + $ccCount);" 2>&1 | ForEach-Object { "$_".Trim() } | Where-Object { $_ -match '^\d+\|\d+$' })
+    $planWins = @($planStates | Where-Object { $_ -eq '1' }).Count
+    if ($planStates.Count -ne (2 * $ccCount) -or $planWins -ne $ccCount -or $planCounts.Count -ne 1 -or $planCounts[0] -ne "$ccCount|$ccCount") {
+        throw "plan business-key race: wins=$planWins of $($planStates.Count) counts=$($planCounts -join ';')"
+    }
+    $clientPassed += 'CC003G01_CONCURRENT_PLAN_DUPLICATE_KEY'
+    Write-Host 'TEST_PASS:CC003G01_CONCURRENT_PLAN_DUPLICATE_KEY'
+
+    # (4) Plan: mismo id + inp desde dos sesiones (reintento simultaneo) => idempotente, una fila, todo exito
+    $ccPlanIds = 1..$ccCount | ForEach-Object { [guid]::NewGuid().ToString() }
+    $sameIdCalls = { (1..$ccCount | ForEach-Object {
+        "EXEC dbo.usp_registrar_o_actualizar_plan_estudio @idPlanEstudio = '$($ccPlanIds[$_ - 1])', @idPrograma = '$ccPrograma', @inp = $($ccInpBase + 100 + $_), @idCorrelacion = '$([guid]::NewGuid())', @idUsuarioEjecutor = '$ccCoord';" }) -join "`n" }
+    $outPlanSame = Invoke-Cc003g01WorkerPair -SqlA ("SET NOCOUNT ON;`n" + (& $sameIdCalls)) -SqlB ("SET NOCOUNT ON;`n" + (& $sameIdCalls)) -Label 'planidem'
+    $planSameStates = Get-Cc003g01States $outPlanSame
+    $idList = ($ccPlanIds | ForEach-Object { "'$_'" }) -join ','
+    $planSameCounts = @(docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $Password -C -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CONCAT(COUNT(*), '|', COUNT(DISTINCT id)) FROM dbo.PlanEstudio WHERE id IN ($idList);" 2>&1 | ForEach-Object { "$_".Trim() } | Where-Object { $_ -match '^\d+\|\d+$' })
+    if ($planSameStates.Count -ne (2 * $ccCount) -or ($planSameStates | Where-Object { $_ -ne '1' }) -or $planSameCounts.Count -ne 1 -or $planSameCounts[0] -ne "$ccCount|$ccCount") {
+        throw "plan idempotent race: states=$($planSameStates -join ',') counts=$($planSameCounts -join ';')"
+    }
+    $clientPassed += 'CC003G01_CONCURRENT_PLAN_IDEMPOTENT'
+    Write-Host 'TEST_PASS:CC003G01_CONCURRENT_PLAN_IDEMPOTENT'
+}
+catch {
+    $resultFailures += "CC003G01_CONCURRENCY $($_.Exception.Message)"
+}
+finally {
+    $ccCleanup = "SET NOCOUNT ON; DELETE FROM dbo.Usuario WHERE correo LIKE N'$ccTag.%'; DELETE FROM dbo.PlanEstudio WHERE programa = '$ccPrograma' AND (inp BETWEEN $($ccInpBase + 1) AND $($ccInpBase + $ccCount) OR inp BETWEEN $($ccInpBase + 101) AND $($ccInpBase + 100 + $ccCount));"
+    if ($ccPrograma) { docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $Password -C -Q $ccCleanup | Out-Null }
+}
+
+# CC-003G-01: login real de minimo privilegio (no sa) para los dos proveedores.
+try {
+    $rtOutput = @(& (Join-Path $PSScriptRoot 'test/verify_runtime_role_cc003g01.ps1') -ContainerName $ContainerName -AdminPassword $Password 2>&1 | ForEach-Object { "$_" })
+    foreach ($line in $rtOutput) { Write-Host $line }
+    foreach ($id in @('CC003G01_RUNTIME_EXECUTE_GRANTS', 'CC003G01_RUNTIME_INTERNAL_EXEC_DENIED', 'CC003G01_RUNTIME_DIRECT_DML_DENIED',
+            'CC003G01_RUNTIME_BASE_TABLE_READ_DENIED', 'CC003G01_RUNTIME_PROVIDERS_FUNCTIONAL')) {
+        if ($rtOutput -contains "TEST_PASS:$id") { $clientPassed += $id }
+        else { $resultFailures += "$id not reported by verify_runtime_role_cc003g01.ps1" }
+    }
+}
+catch {
+    $resultFailures += "CC003G01_RUNTIME_LOGIN $($_.Exception.Message)"
+}
+
 . (Join-Path $PSScriptRoot 'scripts/secret-hygiene.ps1')
 $secretScanList = @(Get-SecretScanFiles -Root $PSScriptRoot)
 $secretFindings = @(Invoke-SecretHygieneScan -Root $PSScriptRoot)
@@ -294,6 +513,10 @@ $criticalIds = @(
     'GROUP_CREATE', 'GROUP_UPDATE', 'GROUP_CAPACITY_REJECT',
     'SESSION_CREATE', 'SESSION_UPDATE', 'SESSION_NON_OWNER', 'SESSION_REQUIRED_START',
     'SESSION_REQUIRED_END', 'SESSION_END_AFTER_START', 'SESSION_EXECUTOR_REQUIRED', 'SESSION_NOT_FOUND_CODE',
+    'SESSION_COMMON_VALIDATION_HAPPY_PATH', 'SESSION_COMMON_VALIDATION_RESERVED_PROVENANCE',
+    'SESSION_COMMON_VALIDATION_EXECUTOR_REQUIRED', 'SESSION_COMMON_VALIDATION_START_REQUIRED',
+    'SESSION_COMMON_VALIDATION_DATE_ORDER',
+    'SESSION_ERROR_PRIORITY_CREATE_GROUP_BEFORE_DATES', 'SESSION_ERROR_PRIORITY_UPDATE_SESSION_BEFORE_DATES',
     'SESSION_GENERATION_SUCCESS', 'SESSION_GENERATION_IDEMPOTENT', 'SESSION_GENERATION_INVALID', 'UTC_SESSION_GENERATION',
     'SESSION_SEQUENCE_USES_MAX_NOT_COUNT', 'SESSION_CODE_OVER_99', 'SESSION_CREATE_NO_DUPLICATE_NUMBER_CODE',
     'CAPACITY_GROUP_VALIDATOR_ALLOWS_FULL_GROUP', 'CAPACITY_VALIDATOR_REJECTS_FULL_GROUP', 'SESSION_CREATE_ALLOWED_ON_FULL_GROUP',
@@ -326,7 +549,28 @@ $criticalIds = @(
     'RBAC_RESET_CONTEXT',
     'GOLDEN_PATH_VIEW_SHAPES_FROZEN', 'GOLDEN_PATH_SP_SIGNATURES_FROZEN', 'GOLDEN_PATH_MUTATION_RESULTSET_FROZEN',
     'GOLDEN_PATH_FREEZE_MANIFEST_VERIFIED',
-    'SECRET_GATE_COVERS_ENV_TEMPLATES', 'SECRET_GATE_DETECTS_UNSAFE_TEMPLATE', 'SECRET_GATE_ACCEPTS_PLACEHOLDER'
+    'UTC_D06_READONLY_CONTRACT', 'UTC_D06_SCHEMA_COLUMN', 'UTC_D06_SEED_UTC', 'UTC_D06_V2_VIEW_SHAPE',
+    'UTC_D06_V2_SIGNATURES', 'UTC_D06_V2_CREATE_MARK', 'UTC_D06_V1_CREATE_NULL', 'UTC_D06_V2_UPDATE_MARK',
+    'UTC_D06_V2_SES_004_NO_WRITE', 'UTC_D06_V2_NON_OWNER', 'UTC_D06_V1_UPDATE_INVALIDATES',
+    'UTC_D06_INTERNAL_REJECTS_RESERVED_MARK', 'UTC_D06_CHECK_REJECTS_UNKNOWN', 'UTC_D06_V2_VIEW_PARITY',
+    'UTC_D06_RUNTIME_PERMISSIONS', 'UTC_D06_CLASSIFICATION_REJECTS', 'UTC_D06_CLASSIFICATION_BY_ID',
+    'UTC_D06_DETALLE_SNAPSHOT', 'UTC_D06_GENERATOR_DST_GAP', 'UTC_D06_GENERATOR_MARK',
+    'UTC_D06_DIRECT_UPDATE_REJECTED', 'UTC_D06_CONCURRENT_V2_CREATE', 'UV_ESTUDIANTE_PROGRAMA_NO_DUPLICATES',
+    'SECRET_GATE_COVERS_ENV_TEMPLATES', 'SECRET_GATE_DETECTS_UNSAFE_TEMPLATE', 'SECRET_GATE_ACCEPTS_PLACEHOLDER',
+    # CC-003G-01: proveedores publicos usp_sincronizar_usuario y usp_registrar_o_actualizar_plan_estudio
+    'USER_SYNC_PUBLIC_METADATA', 'USER_SYNC_PUBLIC_SUCCESS', 'USER_SYNC_PUBLIC_NO_SECRET_LEAK', 'USER_SYNC_PUBLIC_IDEMPOTENT',
+    'USER_SYNC_PUBLIC_REJECTIONS_PRE_TRANSACTION', 'USER_SYNC_PUBLIC_DUPLICATE_DOCUMENT', 'USER_SYNC_PUBLIC_DUPLICATE_EMAIL',
+    'USER_SYNC_PUBLIC_CONFLICTING_PROFILE', 'USER_SYNC_PUBLIC_INVALID_EMAIL', 'USER_SYNC_PUBLIC_EMPTY_PASSWORD',
+    'USER_SYNC_PUBLIC_UNKNOWN_ID_TYPE', 'USER_SYNC_PUBLIC_ROLLBACK_SAVEPOINT', 'USER_SYNC_PUBLIC_COMMIT_OWN_TRANSACTION',
+    'USER_SYNC_PUBLIC_ROLLBACK_OWN_TRANSACTION', 'USER_SYNC_PUBLIC_INACTIVE_REPLAY',
+    'PLAN_PUBLIC_METADATA', 'PLAN_PUBLIC_CREATE', 'PLAN_PUBLIC_VIEW_CONSISTENT', 'PLAN_PUBLIC_IDEMPOTENT', 'PLAN_PUBLIC_UPDATE',
+    'PLAN_PUBLIC_TWO_ACTORS', 'PLAN_PUBLIC_EXECUTOR_REQUIRED', 'PLAN_PUBLIC_RBAC', 'PLAN_PUBLIC_FOREIGN_PROGRAM_SCOPE',
+    'PLAN_PUBLIC_INVALID_INPUT', 'PLAN_PUBLIC_DUPLICATE_BUSINESS_KEY', 'PLAN_PUBLIC_UPDATE_TO_TAKEN_INP', 'PLAN_PUBLIC_FOREIGN_PLAN',
+    'PLAN_PUBLIC_ROLLBACK_SAVEPOINT', 'PLAN_PUBLIC_COMMIT_OWN_TRANSACTION', 'PLAN_PUBLIC_ROLLBACK_OWN_TRANSACTION',
+    'CC003G01_CONCURRENT_USER_IDENTICAL', 'CC003G01_CONCURRENT_USER_CONFLICT_EMAIL',
+    'CC003G01_CONCURRENT_PLAN_DUPLICATE_KEY', 'CC003G01_CONCURRENT_PLAN_IDEMPOTENT',
+    'CC003G01_RUNTIME_EXECUTE_GRANTS', 'CC003G01_RUNTIME_INTERNAL_EXEC_DENIED', 'CC003G01_RUNTIME_DIRECT_DML_DENIED',
+    'CC003G01_RUNTIME_BASE_TABLE_READ_DENIED', 'CC003G01_RUNTIME_PROVIDERS_FUNCTIONAL'
 )
 $sqlPasses = @([regex]::Matches($outputStr, '(?m)^TEST_PASS:([A-Z0-9_]+)\s*$') | ForEach-Object { $_.Groups[1].Value })
 $passed = @($sqlPasses) + @($clientPassed)
