@@ -74,3 +74,25 @@ por lo que la matriz de rangos locales se conserva como evidencia complementaria
 
 La rama de trabajo sigue siendo `feat/maint-003k-db-dev-consolidation`; no se cambia `develop`, esquema fisico ni
 contratos publicos. La validacion SQL y el nuevo analisis remoto deben ejecutarse sobre el commit final.
+
+## MAINT-003K error-priority follow-up
+
+La comparacion entre `af37ccc8` y su padre confirmó un cambio funcional observable:
+
+| Flujo | Prioridad histórica | Prioridad tras la refactorización | Decisión |
+|---|---|---|---|
+| Crear con grupo inexistente y fechas invertidas | `ERR_GRUPO_NO_EXISTE` | `SES_004` | Restaurada la prioridad histórica |
+| Actualizar sesión inexistente y fechas invertidas | `SES_001` | `SES_004` | Restaurada la prioridad histórica |
+
+La prioridad se considera parte del contrato porque el código de catálogo viaja en `mensajeTecnicoResultado` del
+resultset público. La corrección mantiene correlación, procedencia, RBAC y titularidad como validaciones tempranas;
+solo separa la fase de fechas del helper común para ejecutarla después de validar la entidad. No se modifican tablas,
+firmas públicas, marcas v1/v2, transacciones ni el acceso directo del runtime a los procedimientos internos.
+
+## Entorno local definitivo
+
+Desde el 2026-10-11 el único entorno SQL local autorizado para despliegue y validación es
+`sql_server_asistencias/gestionasistenciadb`. El contenedor efímero `maint003k_cert_20261011` fue inspeccionado y
+retirado sin volumen; no se creó otra base, no se reconstruyó la principal y los conteos de las vistas antes y después
+del gate permanecieron idénticos. El backup `maint003k_pre_priority_20261011.bak` quedó fuera de Git y fue verificado
+con `RESTORE VERIFYONLY ... WITH CHECKSUM` antes de aplicar los tres procedimientos corregidos.

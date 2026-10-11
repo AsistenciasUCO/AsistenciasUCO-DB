@@ -23,6 +23,7 @@ PRINT '======================================================================';
 :r /tmp/test/test_usp_crear_actualizar_grupo.sql
 :r /tmp/test/test_usp_crear_actualizar_sesion.sql
 :r /tmp/test/test_usp_validar_sesion_operacion_interno.sql
+:r /tmp/test/test_maint_003k_error_priority.sql
 :r /tmp/test/test_usp_generar_sesiones_grupo.sql
 :r /tmp/test/test_group_capacity_decoupling.sql
 :r /tmp/test/test_titularidad_jerarquica.sql

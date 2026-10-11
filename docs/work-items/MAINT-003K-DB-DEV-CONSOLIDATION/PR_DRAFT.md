@@ -1,6 +1,6 @@
 # PR (Draft) — MAINT-003K: consolidacion SQL (UTC-D06 + CC-003G-01), seed UTC y fixtures de desarrollo
 
-**Base:** `develop`. **Head:** `feat/maint-003k-db-dev-consolidation`. **Draft — NO hacer merge** hasta aprobacion del owner DB y de seguridad. Sin despliegue a produccion.
+**Base:** `develop`. **Head:** `feat/maint-003k-db-dev-consolidation`. **Draft — no hacer merge en esta tarea**; el merge será manual del usuario. Sin despliegue a produccion.
 
 ## Contenido (acumulado)
 
@@ -10,6 +10,7 @@
    - `schema/seed/14_grupos_sesiones.sql`: las sesiones sembradas son instantes UTC exactos `DATETIME2(7)` con `procedenciaTemporal='UTC_V2'` (antes: relojes locales sin procedencia); un redeploy ya no crea fechas ambiguas ni reescribe historicos.
    - `schema/views/uv_estudiante_programa.sql`: una fila por `EstudiantePrograma` (antes se multiplicaba por grupo).
    - Tests: `UTC_D06_SEED_UTC` (reemplaza `UTC_D06_LEGACY_ROWS_NULL`) y `UV_ESTUDIANTE_PROGRAMA_NO_DUPLICATES` (RED -> GREEN).
+   - Regresión de prioridad: `SESSION_ERROR_PRIORITY_CREATE_GROUP_BEFORE_DATES` y `SESSION_ERROR_PRIORITY_UPDATE_SESSION_BEFORE_DATES`; grupo/sesión conserva prioridad sobre fechas inválidas y no hay escrituras parciales.
    - `test/fixtures/dev`: fixtures sinteticos reproducibles 300/1000/5000 estudiantes (limpieza, carga, validacion, guardas de entorno). **No** forman parte de ningun despliegue.
    - Documentacion: `docs/work-items/MAINT-003K-DB-DEV-CONSOLIDATION/{PLAN,TEST_PLAN,VALIDATION}.md`.
 
@@ -17,7 +18,7 @@
 
 ```powershell
 .\deploy_schema.ps1 -ContainerName sql_server_asistencias -Password <sa>      # idempotente; ejecutar 2 veces no cambia nada
-.\test_summary.ps1  -ContainerName sql_server_asistencias -Password <sa>      # gate: 220 ejecutadas / 219 PASS / 0 FAILED / 1 skip permitido
+.\test_summary.ps1  -ContainerName sql_server_asistencias -Password <sa>      # gate del nuevo HEAD; no presupone conteos
 .\test\fixtures\dev\deploy_dev_fixtures.ps1 -ContainerName sql_server_asistencias -Password <sa>   # opcional: datos de paginacion
 ```
 
@@ -26,12 +27,18 @@ o, solo en desarrollo, reconstruir la DB desde Git. Orden de despliegue: DB prim
 
 ## Evidencia
 
-`VALIDATION.md` de este work item: respaldo verificado + restauracion de prueba, reconstruccion, 3 despliegues con huellas identicas, gate SQL 220/219/0/1, fixtures validados.
+`VALIDATION.md` de este work item: respaldo verificado, datos principales preservados, procedimientos corregidos aplicados
+selectivamente y gate SQL final sobre `sql_server_asistencias`: 227 ejecutadas / 226 PASS / 0 FAILED / 1 skip permitido.
 Backend certificado contra esta DB: Surefire 1502, Failsafe 196 (0 fallos/0 skips), JaCoCo 91,31 % lineas / 78,83 % ramas, E2E con JWT reales 28/28 en JVM UTC, Bogota y Berlin.
 
 ## Checks CI
 
-Los checks reales de GitHub Actions (`DB Quality Gate CI/CD`) se anotan como comentario del PR cuando terminan; los no ejecutados figuran como `NOT_RUN`. SonarCloud/CodeQL: `NOT_RUN` hasta que corran en el PR.
+En `af37ccc8...`, SonarCloud y DB Quality Gate fueron aprobados: 0,0 % de duplicación, 0 issues nuevos y
+225 ejecutadas / 224 PASS / 0 FAILED / 1 skip permitido. En el nuevo HEAD, el gate local sobre el contenedor principal
+pasó con 227 ejecutadas / 226 PASS / 0 FAILED / 1 skip permitido. Los checks remotos deben ejecutarse nuevamente
+después del commit/push; no se reutilizan checks de un SHA anterior.
+
+El contenedor local temporal `maint003k_cert_20261011` fue retirado sin volumen y no se creó ningún contenedor SQL nuevo.
 
 ## Riesgos / decisiones para el owner
 

@@ -1,5 +1,5 @@
 ---
-status: PENDING_POST_REFACTOR_GATE
+status: LOCAL_PRIMARY_DB_CERTIFIED_REMOTE_CI_PENDING
 work_item: MAINT-003K-DB-DEV-CONSOLIDATION
 date: 2026-10-10
 ---
@@ -10,8 +10,8 @@ Estados independientes (no se declara ninguno sin evidencia):
 
 | Estado | Valor | Evidencia |
 |---|---|---|
-| `DEV_DB_CONSOLIDATED` | **PASS (local)** | Seccion 3-6. |
-| `DB_PR_READY` | **PASS (local) / CI remoto NOT_RUN al redactar** | Gate SQL local verde; los checks de GitHub Actions se registran en el PR. |
+| `DEV_DB_CONSOLIDATED` | **PASS** | Secciones históricas 3-6 más la certificación final sobre `sql_server_asistencias` en sección 12. |
+| `DB_PR_READY` | **PASS local / CI remoto pendiente** | Gate real del nuevo HEAD aprobado localmente; faltan checks remotos posteriores al push. |
 | `BACKEND_LOCAL_GREEN` / `BACKEND_CI_GREEN` | ver el work item backend | `docs/work-items/MAINT-003K-backend-only-release-gate/VALIDATION.md` |
 
 ## 1. Inventario previo (solo lectura)
@@ -19,6 +19,7 @@ Estados independientes (no se declara ninguno sin evidencia):
 | Contenedor | Imagen | Puerto | Volumen | Uso |
 |---|---|---|---|---|
 | `sql_server_asistencias` | mssql/server:2022 (Developer) | 1433 | `sql_server_asistencias_data` | **principal**: el backend lee `jdbc:sqlserver://localhost:1433;databaseName=gestionasistenciadb` (`.env`) |
+| `maint003k_cert_20261011` | mssql/server:2022 | ninguno | ninguno | **retirado** tras inspección; no fue usado para certificar el nuevo HEAD |
 | `utc_d06_sqltest` | mssql/server:2022 | 127.0.0.1:14333 | ninguno (efimero) | temporal D06; unico consumidor: un backend huerfano de una sesion previa (PID 23100, puerto 18080, 10 conexiones) |
 | (segundo temporal) | — | — | — | **no existia como contenedor**: el segundo artefacto temporal era la base `gestionasistenciadb_fase1` dentro del contenedor principal (restaurada de `fase1_backend_2026-10-09.bak`) |
 
@@ -104,20 +105,50 @@ MinIO, ClamAV, Keycloak y su PostgreSQL, y la pila de observabilidad. Se restaur
 
 ## 8. NOT_RUN / limitaciones
 
-- CI remoto del repo DB (`DB Quality Gate CI/CD`), SonarCloud y CodeQL del PR: se ejecutan al abrir el PR; se registran en la descripcion del PR, no se presumen.
+- CI remoto del nuevo HEAD (`DB Quality Gate CI/CD`), SonarCloud y CodeQL: **PENDIENTES** hasta publicar el commit final; no se reutilizan checks de `af37ccc8`.
 - Despliegue en staging/institucional y aprobacion del owner DB: **NOT_RUN** (decision humana).
 - `XACT_STATE_MINUS_ONE_RUNTIME` sigue siendo skip permitido.
 
-## 9. MAINT-003K-Sonar follow-up (commit posterior)
+## 9. MAINT-003K-Sonar follow-up (SHA auditado `af37ccc8d30100fbffda7ab3a4034734153374b3`)
 
 | Comprobacion | Resultado | Evidencia |
 |---|---|---|
-| SonarCloud inicial de PR #36 | **CONFIRMED FAIL**: 6.2% duplicacion en codigo nuevo, maximo 3% | Comentario oficial de SonarCloud `issuecomment-6103273978` y panel de medidas; dos archivos, 61 lineas cada uno |
+| SonarCloud final del SHA auditado | **PASS**: 0,0 % de duplicación en código nuevo; 0 issues nuevos | Evidencia aportada para PR #36 y asociada a `af37ccc8...` |
 | Matriz local de candidatos | **COMPLETADA** | El bloque comun de procedencia/correlacion/RBAC/fechas fue extraido; los wrappers y proveedores quedaron sin cambios |
 | Issue `catch {}` vacio | **CORREGIDO EN FUENTE** | `test_summary.ps1`: ambas limpiezas registran errores y siempre intentan la limpieza SQL |
 | Manifiesto post-freeze | **PASS local** | `scripts/freeze-manifest.ps1 -Mode Verify` => `FREEZE_MANIFEST_OK`, 11 objetos work-item |
 | Parseo PowerShell | **PASS local** | `test_summary.ps1` => `POWERSHELL_PARSE_OK` |
-| SQL Server 2022 limpio + redeploy + suite | **NOT RUN** | Docker Engine no estaba disponible en esta sesion (`dockerDesktopLinuxEngine` ausente) |
-| SonarCloud final, DB CI y GitHub Actions | **NOT RUN** | Requieren commit/push del cambio y ejecucion remota posterior |
+| SQL Server 2022 limpio + redeploy + suite del SHA auditado | **PASS histórico** | `TOTAL_EXECUTED=225`, `PASSED=224`, `FAILED=0`, `SKIPPED=1`; único skip `XACT_STATE_MINUS_ONE_RUNTIME` |
+| Manifiesto post-freeze del SHA auditado | **PASS histórico** | `FREEZE_MANIFEST_OK`; 11 objetos post-freeze |
+| SQL Server principal + suite del nuevo HEAD | **PASS** | `sql_server_asistencias/gestionasistenciadb`, gate final registrado en sección 12 |
+| SonarCloud, DB CI y GitHub Actions del nuevo HEAD | **PENDIENTE** | Requieren commit/push de esta corrección; no se reutilizan checks del SHA anterior |
 
-El estado no se declara GREEN hasta ejecutar el gate sobre el ultimo commit y comprobar el nuevo Quality Gate remoto.
+## 10. Regresión de prioridad de errores
+
+La revisión de `af37ccc8^` contra `af37ccc8` mostró que la extracción de fechas al helper común adelantó `SES_004`
+respecto de `ERR_GRUPO_NO_EXISTE` y `SES_001`. Se restauró el orden mediante `@faseValidacion`: fase 0 para
+procedencia/correlación/RBAC, validación de grupo o sesión y titularidad, y fase 2 para fechas. Las pruebas
+`SESSION_ERROR_PRIORITY_CREATE_GROUP_BEFORE_DATES` y `SESSION_ERROR_PRIORITY_UPDATE_SESSION_BEFORE_DATES` verifican
+las cuatro columnas contractuales y que no cambie el conteo de `uv_sesion`. Ambos pasaron en la ejecución final sobre
+la DB principal.
+
+## 11. Estado de integración
+
+La aprobación humana específica del responsable DB y de seguridad no está registrada en este checkout. El merge a
+`develop`, la eliminación de la rama remota y cualquier despliegue siguen deliberadamente sin ejecutarse por instrucción
+del usuario.
+
+## 12. Certificación final sobre la DB principal
+
+El 2026-10-11 se verificó `sql_server_asistencias` como SQL Server 2022 Developer y se aplicaron solo los tres
+procedimientos modificados. El backup previo fue `C:\Users\josev\AsistenciasUCO\db-backups\maint003k_pre_priority_20261011.bak`
+(17.952.768 bytes, SHA-256 `e344ef3d644b860666d4686d263e878b0a3cdfd11ca23f026b9ad302a9f432e1`).
+
+Resultado real del gate: `TOTAL_EXPECTED=224`, `TOTAL_EXECUTED=227`, `PASSED=226`, `FAILED=0`, `SKIPPED=1`,
+`ALLOWED_SKIPPED=1`, `CRITICAL_MISSING=0`, `SQLCMD_EXIT_CODE=0`, `SQL_ERROR_COUNT=0`,
+`UNAUTHORIZED_SKIPS=0`, `@@TRANCOUNT=0`, `DB GATE PASS`.
+
+Conteos de vistas antes y después: `uv_usuario=5011`, `uv_estudiante=6302`, `uv_docente=5`, `uv_grupo=5`,
+`uv_sesion=15`, `uv_estudiante_grupo=6302`, `uv_asistencia=6350`, `uv_detalle_asistencia=6350`.
+Residuos propios detectados: 0; restricciones QA temporales: 0. El contenedor temporal fue eliminado y el principal,
+Keycloak, PostgreSQL, MinIO, ClamAV y observabilidad permanecieron operativos.

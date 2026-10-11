@@ -44,8 +44,17 @@ BEGIN
     SET @idCorrelacionResultado = @idCorrelacionDefecto;
 
     BEGIN TRY
-        -- PASOS 0-2: validacion comun de procedencia, correlacion, seguridad y fechas.
-        EXEC dbo.usp_validar_sesion_operacion_interno @idCorrelacion, @idUsuarioEjecutor, @procedenciaTemporal, @fechaHoraInicio, @fechaHoraFin, @mensajeUsuarioResultado OUTPUT, @mensajeTecnicoResultado OUTPUT, @estadoResultado OUTPUT;
+        -- PASOS 0-1.6: procedencia, correlacion y seguridad antes de consultar el grupo.
+        EXEC dbo.usp_validar_sesion_operacion_interno
+            @idCorrelacion = @idCorrelacion,
+            @idUsuarioEjecutor = @idUsuarioEjecutor,
+            @procedenciaTemporal = @procedenciaTemporal,
+            @fechaHoraInicio = @fechaHoraInicio,
+            @fechaHoraFin = @fechaHoraFin,
+            @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+            @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+            @estadoResultado = @estadoResultado OUTPUT,
+            @faseValidacion = 0;
 
         -- PASO 2: Validación de existencia del grupo académico
         IF @estadoResultado = 1
@@ -69,6 +78,21 @@ BEGIN
                 @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                 @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
                 @estadoResultado = @estadoResultado OUTPUT;
+        END
+
+        -- PASO 2.5: conservar la prioridad contractual de entidad antes de fechas.
+        IF @estadoResultado = 1
+        BEGIN
+            EXEC dbo.usp_validar_sesion_operacion_interno
+                @idCorrelacion = @idCorrelacion,
+                @idUsuarioEjecutor = @idUsuarioEjecutor,
+                @procedenciaTemporal = @procedenciaTemporal,
+                @fechaHoraInicio = @fechaHoraInicio,
+                @fechaHoraFin = @fechaHoraFin,
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+                @estadoResultado = @estadoResultado OUTPUT,
+                @faseValidacion = 2;
         END
 
         -- PASO 3: Cálculo transaccional del correlativo de sesión e inserción

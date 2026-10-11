@@ -22,7 +22,7 @@ Todas las pruebas SQL viven en el gate `test_summary.ps1` (ids criticos obligato
 | Integridad referencial de toda la DB | `DEV_FIXTURE_REFERENTIAL_INTEGRITY` (`DBCC CHECKCONSTRAINTS WITH ALL_CONSTRAINTS`) | idem | PASS |
 | Idempotencia de fixtures | `deploy_dev_fixtures.ps1` ejecutado dos veces (limpieza -> carga -> validacion) | `deploy_dev_fixtures.ps1` | PASS |
 
-Comando del gate: `.\test_summary.ps1 -ContainerName <contenedor> -Password <sa>` (precheck: DB `gestionasistenciadb` y Developer Edition).
+Comando del gate: `.\test_summary.ps1 -ContainerName sql_server_asistencias` (precheck: DB `gestionasistenciadb` y Developer Edition; credencial desde `.env` local).
 Fixtures: `.\test\fixtures\dev\deploy_dev_fixtures.ps1 -ContainerName <contenedor> -Password <sa> [-Scenarios 300,1000,5000] [-CleanupOnly|-ValidateOnly]`.
 
 ## MAINT-003K-Sonar follow-up
@@ -34,6 +34,22 @@ Fixtures: `.\test\fixtures\dev\deploy_dev_fixtures.ps1 -ContainerName <contenedo
 | Ejecutor obligatorio | `SESSION_COMMON_VALIDATION_EXECUTOR_REQUIRED` | idem | `estadoResultado = 0` |
 | Fechas obligatorias y orden temporal | `SESSION_COMMON_VALIDATION_START_REQUIRED`, `SESSION_COMMON_VALIDATION_DATE_ORDER` | idem | `estadoResultado = 0`, catalogo preservado |
 | Contratos v1/v2 y flujo completo | ids existentes `SESSION_*`, `UTC_D06_*` | `test/test_usp_crear_actualizar_sesion.sql`, `test/test_utc_d06_procedencia_temporal.sql` | Sin regresiones de correlacion, RBAC, procedencia o cuatro columnas |
+| Prioridad de error al crear | `SESSION_ERROR_PRIORITY_CREATE_GROUP_BEFORE_DATES` | `test/test_maint_003k_error_priority.sql` | Grupo inexistente gana a `SES_004`; cuatro columnas y cero escrituras parciales |
+| Prioridad de error al actualizar | `SESSION_ERROR_PRIORITY_UPDATE_SESSION_BEFORE_DATES` | `test/test_maint_003k_error_priority.sql` | Sesión inexistente gana a `SES_004`; cuatro columnas y cero escrituras parciales |
 
-La suite aumenta en cinco identificadores obligatorios respecto de la evidencia anterior; por eso el resultado esperado
-del gate pasa de `220/219/0/1` a `225/224/0/1` (ejecutadas/PASS/FAILED/SKIPPED), sujeto a la ejecucion real.
+La suite aumentó en cinco identificadores obligatorios en el SHA auditado, por eso su evidencia histórica fue
+`225/224/0/1` (ejecutadas/PASS/FAILED/SKIPPED). Esta corrección agrega dos IDs más.
+
+## Ejecución final sobre el entorno principal
+
+El 2026-10-11 se ejecutó el gate oficial sobre `sql_server_asistencias/gestionasistenciadb`, después de aplicar solo
+los tres procedimientos corregidos y verificar el manifiesto:
+
+`TOTAL_EXPECTED=224`, `TOTAL_EXECUTED=227`, `PASSED=226`, `FAILED=0`, `SKIPPED=1`,
+`ALLOWED_SKIPPED=1`, `CRITICAL_MISSING=0`, `SQLCMD_EXIT_CODE=0`, `SQL_ERROR_COUNT=0`,
+`UNAUTHORIZED_SKIPS=0`, `@@TRANCOUNT=0`, `DB GATE PASS`.
+
+El único skip fue `XACT_STATE_MINUS_ONE_RUNTIME`. Los dos IDs de prioridad pasaron. Los conteos de vistas antes y
+después fueron idénticos: Usuario 5.011, Estudiante 6.302, Docente 5, Grupo 5, Sesión 15,
+EstudianteGrupo 6.302, Asistencia 6.350 y DetalleAsistencia 6.350. No quedaron residuos `maint003k`, `cc003g01` ni
+restricciones `CK_qa_*`.
