@@ -105,7 +105,7 @@ MinIO, ClamAV, Keycloak y su PostgreSQL, y la pila de observabilidad. Se restaur
 
 ## 8. NOT_RUN / limitaciones
 
-- CI remoto del nuevo HEAD (`DB Quality Gate CI/CD`) y SonarCloud: **PASS** en el run 23 (`38125366104`); CodeQL no está configurado en este workflow.
+- CI remoto del nuevo HEAD (`DB Quality Gate CI/CD`) y SonarCloud: **PASS** en el run 24 (`38125569939`); CodeQL no está configurado en este workflow.
 - Despliegue en staging/institucional y aprobacion del owner DB: **NOT_RUN** (decision humana).
 - `XACT_STATE_MINUS_ONE_RUNTIME` sigue siendo skip permitido.
 
