@@ -8,14 +8,36 @@ Guía operativa del repositorio de base de datos para Claude Code y asistentes d
 
 ## ⚡ Comandos Clave (PowerShell)
 
+### Entorno Docker Automatizado (Recomendado)
 ```powershell
-# 1. Despliegue completo del esquema en contenedor SQL Server
+# Levantar SQL Server, esperar estado healthy, desplegar esquema y correr pruebas
+.\run_local_env.ps1 -All
+
+# Solo iniciar contenedor y esperar healthcheck
+.\run_local_env.ps1 -Up
+
+# Desplegar esquema sobre el contenedor activo
+.\run_local_env.ps1 -Deploy
+
+# Correr suite de pruebas sobre el contenedor activo
+.\run_local_env.ps1 -Test
+
+# Detener el contenedor
+.\run_local_env.ps1 -Down
+
+# Detener y limpiar volúmenes de datos (reinicio limpio desde cero)
+.\run_local_env.ps1 -Clean
+```
+
+### Ejecución Manual de Scripts
+```powershell
+# 1. Despliegue directo del esquema en contenedor SQL Server
 .\deploy_schema.ps1
 
 # Despliegue con parámetros explícitos
 .\deploy_schema.ps1 -ContainerName "sqlserver" -Password "TuPasswordSeguro123!"
 
-# 2. Ejecución y resumen de la suite de pruebas unitarias
+# 2. Ejecución directa y resumen de la suite de pruebas unitarias
 .\test_summary.ps1
 
 # Ejecutar pruebas apuntando a un contenedor específico

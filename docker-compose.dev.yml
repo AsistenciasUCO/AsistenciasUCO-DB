@@ -1,0 +1,25 @@
+﻿services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: ${SQL_CONTAINER_NAME:-sqlserver}
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${SQL_CONTAINER_PASSWORD:-PasswordSeguro123!}"
+      MSSQL_PID: "Developer"
+    ports:
+      - "${SQL_PORT:-1433}:1433"
+    healthcheck:
+      test: >
+        /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "${SQL_CONTAINER_PASSWORD:-PasswordSeguro123!}" -C -Q "SELECT 1"
+        || /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "${SQL_CONTAINER_PASSWORD:-PasswordSeguro123!}" -Q "SELECT 1"
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 10s
+    volumes:
+      - mssql_dev_data:/var/opt/mssql
+
+volumes:
+  mssql_dev_data:
+    driver: local
