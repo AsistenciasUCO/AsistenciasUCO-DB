@@ -65,6 +65,14 @@ Get-ChildItem -Path "$schemaDir\tables" -Filter "*.sql" -Recurse | Sort-Object N
     Execute-Sql-File -LocalFilePath $_.FullName
 }
 
+# 1.5 Aplicar Triggers (UTC-D06-POST-FREEZE: dependen solo de tablas)
+if (Test-Path "$schemaDir\triggers") {
+    Write-Host "`nAplicando Triggers..." -ForegroundColor Yellow
+    Get-ChildItem -Path "$schemaDir\triggers" -Filter "*.sql" -Recurse | Sort-Object Name | ForEach-Object {
+        Execute-Sql-File -LocalFilePath $_.FullName
+    }
+}
+
 # 2. Aplicar Funciones
 Write-Host "`nAplicando Funciones..." -ForegroundColor Yellow
 Get-ChildItem -Path "$schemaDir\functions" -Filter "*.sql" -Recurse | Sort-Object Name | ForEach-Object {
@@ -115,6 +123,14 @@ Write-Host "`nAplicando Procedimientos Almacenados..." -ForegroundColor Yellow
 Get-ChildItem -Path "$schemaDir\stored-procedures" -Filter "*.sql" -Recurse | Sort-Object Name | ForEach-Object {
     Write-Host "Ejecutando: $($_.Name)" -ForegroundColor Gray
     Execute-Sql-File -LocalFilePath $_.FullName
+}
+
+# 4.5 Aplicar Seguridad (UTC-D06-POST-FREEZE: roles y permisos; referencian tablas, vistas y SP)
+if (Test-Path "$schemaDir\security") {
+    Write-Host "`nAplicando Seguridad (roles y permisos)..." -ForegroundColor Yellow
+    Get-ChildItem -Path "$schemaDir\security" -Filter "*.sql" -Recurse | Sort-Object Name | ForEach-Object {
+        Execute-Sql-File -LocalFilePath $_.FullName
+    }
 }
 
 # 5. Aplicar Datos Semilla / Maestros (Seed)

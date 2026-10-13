@@ -105,7 +105,9 @@ BEGIN
         -- PASO 3: Resolución atómica transaccional
         IF @estadoResultado = 1
         BEGIN
-            SET @codigoEstadoNuevo = CASE WHEN @accionDefecto = 'APROBADA' THEN 'APRO' ELSE 'RECH' END;
+            -- Public review contract stores the canonical Estado codes seeded by
+            -- 06_estado.sql: P (pending), A (approved), and R (rejected).
+            SET @codigoEstadoNuevo = CASE WHEN @accionDefecto = 'APROBADA' THEN 'A' ELSE 'R' END;
 
             SELECT TOP 1 @idEstadoNuevo = id
             FROM dbo.Estado

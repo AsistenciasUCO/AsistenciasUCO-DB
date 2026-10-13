@@ -88,3 +88,31 @@ IF NOT EXISTS (
     CREATE UNIQUE INDEX UX_Sesion_Grupo_Codigo
     ON dbo.Sesion(grupo, codigo);
 GO
+
+-- UTC-D06-POST-FREEZE: procedencia temporal de las horas de la sesion.
+-- NULL = INDETERMINADA (historico/v1: el DATETIME2 no prueba que el valor sea UTC).
+-- Sin DEFAULT: las filas existentes conservan byte a byte sus dos DATETIME2(7) y quedan NULL.
+-- Se agrega con ALTER (no en el CREATE) para que DB nueva y DB existente tengan el mismo orden de columnas.
+IF COL_LENGTH('dbo.Sesion', 'procedenciaTemporal') IS NULL
+    ALTER TABLE [dbo].[Sesion] ADD [procedenciaTemporal] NVARCHAR(24) NULL;
+GO
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.check_constraints
+    WHERE parent_object_id = OBJECT_ID('dbo.Sesion')
+      AND name = 'CK_Sesion_ProcedenciaTemporal'
+)
+    ALTER TABLE [dbo].[Sesion] WITH CHECK ADD CONSTRAINT [CK_Sesion_ProcedenciaTemporal]
+    CHECK ([procedenciaTemporal] IS NULL OR [procedenciaTemporal] IN (N'UTC_V2', N'UTC_GENERADOR', N'UTC_OWNER'));
+GO
+
+IF EXISTS (
+    SELECT 1
+    FROM sys.check_constraints
+    WHERE parent_object_id = OBJECT_ID('dbo.Sesion')
+      AND name = 'CK_Sesion_ProcedenciaTemporal'
+      AND (is_disabled = 1 OR is_not_trusted = 1)
+)
+    ALTER TABLE [dbo].[Sesion] WITH CHECK CHECK CONSTRAINT [CK_Sesion_ProcedenciaTemporal];
+GO
