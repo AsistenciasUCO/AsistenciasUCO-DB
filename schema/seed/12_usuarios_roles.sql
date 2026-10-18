@@ -16,7 +16,8 @@ USING (VALUES
     ('E1F2A3B4-0000-0000-0000-000000000003', @TipoCC, 1017112233, 'Rostagno', 'Valencia', 'Maria', 'Elena', 'maria.rostagno@uco.edu.co', 1, 1, 'HashBackend_AbCdEf1234567890'),
     ('E1F2A3B4-0000-0000-0000-000000000004', @TipoCC, 1017223344, 'Zapata', 'Gomez', 'Carlos', 'Andres', 'carlos.zapata@uco.edu.co', 1, 1, 'HashBackend_AbCdEf1234567890'),
     ('E1F2A3B4-0000-0000-0000-000000000005', @TipoCC, 1017334455, 'Gomez', 'Rios', 'Ana', 'Sofia', 'ana.gomez@uco.edu.co', 1, 1, 'HashBackend_AbCdEf1234567890'),
-    ('E1F2A3B4-0000-0000-0000-000000000006', @TipoCC, 1017445566, 'Admin', 'UCO', 'Sistema', 'QA', 'admin.sistema@uco.edu.co', 1, 1, 'HashBackend_AbCdEf1234567890')
+    ('E1F2A3B4-0000-0000-0000-000000000006', @TipoCC, 1017445566, 'Admin', 'UCO', 'Sistema', 'QA', 'admin.sistema@uco.edu.co', 1, 1, 'HashBackend_AbCdEf1234567890'),
+    ('E1F2A3B4-0000-0000-0000-000000000000', @TipoCC, 1017445500, 'Admin', 'Institucional', 'Sistema', 'UCO', 'admin.institucional@uco.edu.co', 1, 1, 'HashBackend_AbCdEf1234567890')
 ) AS Source (id, tipoIdIdentificacion, numeroIdentificacion, primerApellido, segundoApellido, primerNombre, segundoNombre, correo, correoConfirmado, estado, password)
 ON (Target.id = TRY_CAST(Source.id AS UNIQUEIDENTIFIER) OR Target.correo = Source.correo)
 WHEN MATCHED THEN
@@ -39,7 +40,8 @@ GO
 -- 1.1 Sembrado Idempotente: Administrador
 MERGE INTO [dbo].[Administrador] AS Target
 USING (VALUES
-    ('F1A2B3C4-0000-0000-0000-000000000006', 'E1F2A3B4-0000-0000-0000-000000000006', 'B1C2D3E4-0000-0000-0000-000000000001')
+    ('F1A2B3C4-0000-0000-0000-000000000006', 'E1F2A3B4-0000-0000-0000-000000000006', 'B1C2D3E4-0000-0000-0000-000000000001'),
+    ('F1A2B3C4-0000-0000-0000-000000000000', 'E1F2A3B4-0000-0000-0000-000000000000', 'B1C2D3E4-0000-0000-0000-000000000001')
 ) AS Source (id, usuario, institucion)
 ON (Target.id = TRY_CAST(Source.id AS UNIQUEIDENTIFIER) OR Target.usuario = TRY_CAST(Source.usuario AS UNIQUEIDENTIFIER))
 WHEN MATCHED THEN
