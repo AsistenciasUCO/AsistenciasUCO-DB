@@ -28,7 +28,7 @@ sequenceDiagram
     C-->>B: CLEAN (INFECTED → 400; error/timeout → 500, fail closed)
     B->>B: compresión (si ahorra ≥ 10 %), SHA-256 de los bytes originales, fileId = UUID v4
     B->>M: put soportes/<fileId> + metadata técnica
-    B->>S: W1 usp_registrar_archivo_soporte_borrador(fileId, metadata, idCorrelacion, idUsuarioEjecutor)
+    B->>S: W1 usp_registrar_archivo_soporte(fileId, nombre, tipo, tamanio, sha256, idCorrelacion, idUsuarioEjecutor)
     S-->>B: 4 campos canónicos (DRAFT)
     B-->>E: 201 { fileId, nombre, url relativa, tamanio }
 ```
@@ -52,7 +52,7 @@ sequenceDiagram
     E->>B: POST /api/v1/asistencias/revisiones { sesionId, categoria, justificacion, soporteArchivoId? }
     B->>B: JWT → idUsuario → idEstudiante (InstitutionalScopePort)
     B->>S: W2 usp_radicar_solicitud_revision_asistencia_v2(..., @idArchivoSoporte, idCorrelacion, idUsuarioEjecutor)
-    Note over S: BEGIN TRAN · INSERT Solicitud (P) · UPDATE ArchivoSoporte DRAFT→ATTACHED (WHERE estado='DRAFT' AND propietario=ejecutor) · INSERT Transición · COMMIT
+    Note over S: BEGIN TRAN · INSERT Solicitud (P) · UPDATE ArchivoSoporte DRAFT→ATTACHED (WHERE estado='DRAFT' AND propietario=ejecutor) · COMMIT
     S-->>B: 4 campos canónicos
     B-->>E: 202 (éxito) · 404 (soporte no disponible) · 400 (validación)
 ```
@@ -94,7 +94,7 @@ sequenceDiagram
   cambiando su estado.
 - `owner-subject` de MinIO queda como control técnico adicional, no como autoridad.
 
-## 4. Reconciliación (proceso durable, no `@Scheduled` local)
+## 4. Reconciliación (DIFERIDA — Q6; no implementada en D1)
 
 ```mermaid
 sequenceDiagram
