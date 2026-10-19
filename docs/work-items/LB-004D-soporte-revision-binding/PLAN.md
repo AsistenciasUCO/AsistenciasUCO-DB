@@ -25,22 +25,26 @@ last-reviewed: 2026-10-19
 | [INTERACTIONS](INTERACTIONS.md) | Secuencias de subida, radicación, descarga y reconciliación, con fallas y compensación |
 | [TEST_MATRIX](TEST_MATRIX.md) | Pruebas SQL, backend, frontend y E2E |
 
-## Alcance D1 (solo tras aprobación)
+## Alcance D1 (ONE_TABLE) — implementado en rama, pendiente de aprobacion del owner DB
 
-- Rutas permitidas: `schema/tables/ArchivoSoporte*.sql`, `schema/tables/zz_foreign_keys.sql`
-  (aditivo), SP nuevos de la propuesta, `schema/seed/03_parametro.sql` y `04_mensaje.sql`
-  (aditivo), `schema/security/rol_asistencias_runtime.sql` (grants aditivos), `deploy_schema.ps1`
-  (orden), `test/test_lb004d_support_binding.sql`, `test_suite.sql`, manifest LB-004D, este work item.
-- Rutas prohibidas: fuentes del manifest Golden Path, `usp_radicar_solicitud_revision_asistencia.sql`
-  (v1), `usp_resolver_…`, `uv_*` existentes, `DB_BASELINE_CONTRACT.md`.
+- Nuevos: `schema/tables/ArchivoSoporte.sql`, `schema/seed/15_lb004d_archivo_soporte.sql`,
+  `schema/security/rol_asistencias_runtime_lb004d.sql`, cuatro SP (`usp_registrar_archivo_soporte`,
+  `usp_radicar_solicitud_revision_asistencia_v2`, `usp_consultar_archivo_soporte_autorizado`,
+  `usp_consultar_solicitudes_revision_docente`), `test/test_lb004d_support_binding.sql`,
+  `test/test_lb004d_concurrency.ps1`, manifest `DB_LB004D_SUPPORT_BINDING_MANIFEST.sha256`.
+- Extendidos (aditivo): `schema/tables/zz_foreign_keys.sql` (2 FK), `test/test_contract_closure.sql`
+  (R1/R2 como `READ_QUERY_RESULTSET`), `test_suite.sql`, `test_summary.ps1` (ids criticos).
+- No tocados: manifest Golden Path, `usp_radicar_solicitud_revision_asistencia.sql` (v1),
+  `usp_resolver_...`, `uv_*`, `rol_asistencias_runtime.sql`, `03_parametro.sql`, `04_mensaje.sql`.
 - Variable principal: `SUPPORT_BINDING_DURABLE`.
-- Rollback: los objetos son nuevos; retirar grants, SP y tablas (en ese orden) devuelve el AS-IS.
+- Rollback: los objetos son nuevos; retirar grants, SP y tabla (en ese orden) devuelve el AS-IS.
   La v1 nunca deja de funcionar.
 
 ## Definition of Ready
 
 ```text
-DOR: NOT_READY
-BLOQUEO: aprobación del owner DB (ADR §7) y respuestas Q1–Q10
-INDEPENDIENTE DEL BLOQUEO: nada en schema/test hasta la aprobación
+DOR: READY_FOR_OWNER_REVIEW (arquitectura ONE_TABLE decidida por el solicitante)
+LB004D_CONTRACT_APPROVED: NO — falta la revision de John (firmas, grants, Q5, Q6, Q9)
+INDEPENDIENTE DEL BLOQUEO: backend B1 y frontend F1 pueden construirse contra este contrato en ramas;
+  no se fusiona nada sin la aprobacion del owner DB
 ```

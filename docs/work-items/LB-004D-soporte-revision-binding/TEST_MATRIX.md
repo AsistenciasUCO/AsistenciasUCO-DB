@@ -16,37 +16,42 @@ con `ROLLBACK` y verifica `@@TRANCOUNT = 0` y que no queden filas.
 
 ## 1. SQL (D1) — repo DB
 
-| ID | Requisito del encargo | Escenario | Esperado |
-|---|---|---|---|
-| DB-01 | Archivo propio y válido | W1 de un estudiante; v2 con ese `fileId` sobre su sesión | `DRAFT` → `ATTACHED`, solicitud `P`, 2 transiciones, 4 campos `estadoResultado = 1` |
-| DB-02 | Archivo ajeno | Estudiante B radica con `fileId` de A | `estadoResultado = 0`, `ARC_001`, sin solicitud, A sigue `DRAFT` |
-| DB-03 | Doble asociación | Segunda v2 con un `fileId` ya `ATTACHED` (otra correlación) | `ARC_001`, sin segunda solicitud |
-| DB-04 | Docente titular | R1 con el usuario del `Grupo.docente`; R2 lista el reclamo con soporte | 1 fila, `relacionAcceso = DOCENTE_TITULAR`; R2 incluye `idArchivoSoporte` |
-| DB-05 | Docente no titular | R1 y R2 con otro docente | 0 filas en ambos |
-| DB-06 | Otros actores | R1 con otro estudiante del **mismo** grupo, administrador, coordinador y decano | 0 filas en todos (no hereda `uv_auth_grupo`) |
-| DB-07 | Propietario | R1 del propietario en `DRAFT` y en `ATTACHED` | 1 fila, `PROPIETARIO`; en `ORPHAN` 0 filas |
-| DB-08 | Revisión/sesión inexistente | v2 con sesión inexistente y `fileId` válido | Rechazo; archivo sigue `DRAFT` |
-| DB-09 | Matrícula/grupo inválido | v2 de un estudiante no matriculado en el grupo de la sesión | Rechazo; sin solicitud; archivo `DRAFT` |
-| DB-10 | Estudiante ≠ ejecutor | v2 con `@idEstudiante` de otro y ejecutor propio | `ARC_005`; sin escritura |
-| DB-11 | Concurrencia attach | Dos sesiones SQL radican con el mismo `fileId` (script con dos conexiones / `sp_getapplock` de sincronización) | Exactamente 1 solicitud con soporte; la otra `ARC_001` |
-| DB-12 | Concurrencia attach vs orphan | W3 y v2 concurrentes sobre el mismo `DRAFT` | Estado final `ATTACHED` **u** `ORPHAN`, nunca ambos; si `ORPHAN`, sin solicitud con soporte |
-| DB-13 | Rollback | Forzar error tras el `INSERT` de la solicitud (fixture que invalida el `UPDATE`) | Sin solicitud, archivo `DRAFT`, sin transición `ADJUNCION`, `@@TRANCOUNT = 0` |
-| DB-14 | Idempotencia W1 | W1 repetido idéntico; W1 mismo `fileId` con otro checksum; W1 mismo `fileId` por otro estudiante | 1 fila; segundo y tercero `ARC_002` sin cambios |
-| DB-15 | Idempotencia W2 | v2 repetida con la misma correlación tras éxito | Éxito, sigue habiendo 1 solicitud |
-| DB-16 | Integridad referencial | `INSERT` directo con usuario/solicitud inexistente; `ATTACHED` sin solicitud; segundo `ATTACHED` en la misma solicitud | Violación de FK / `CK` / índice único filtrado |
-| DB-17 | Reclamo sin soporte | v2 sin `@idArchivoSoporte` | Solicitud `P`; R2 con columnas de soporte `NULL` |
-| DB-18 | Metadata inválida | Tipo no permitido, tamaño 0, > 5 MiB, almacenado > original, checksum no hex, comprimido sin algoritmo | `ARC_003`, sin escritura |
-| DB-19 | Perfil RBAC | W1/v2 con ejecutor docente | Rechazo de perfil |
-| DB-20 | Reconciliación | W3 con corte posterior sobre `DRAFT`; repetido; sobre `ATTACHED`; sin `@fechaCorteUtc` | `ORPHAN`; idempotente; rechazo sin cambio; rechazo |
-| DB-21 | Modo "registrado" | R3 con un JSON de ids conocidos y desconocidos | `registrado` 1/0 correcto |
-| DB-22 | UTC | Fechas de W1/W2/W3 | Dentro de `[SYSUTCDATETIME() antes, después]` |
-| DB-23 | v1 intacta | Suite actual completa (`test_attendance_review.sql`, `test_contract_closure.sql`, manifest Golden Path) | Igual que antes; manifest `GOLDEN_PATH_FREEZE_MANIFEST_VERIFIED` |
-| DB-24 | Contrato de resultset | `test_contract_closure.sql` | W1/W2/W3 con 4 columnas canónicas; R1/R2/R3 como `READ_QUERY_RESULTSET` |
-| DB-25 | Mínimo privilegio | Login temporal con `rol_asistencias_runtime` | `EXECUTE` en W1, v2, R1, R2; denegado `SELECT/INSERT/UPDATE` en tablas nuevas; W3/R3 según Q6 |
-| DB-26 | Manifest LB-004D | `freeze-manifest.ps1 -Mode Verify` del manifest nuevo | Verificado |
+Estado: **PASS** en la base local principal (`gestionasistenciadb`, contenedor `sql_server_asistencias`)
+el 2026-10-19; ver [VALIDATION](VALIDATION.md). Los casos viven en
+`test/test_lb004d_support_binding.sql` (una transaccion con `ROLLBACK`, sin datos persistentes; incluido
+en `test_suite.sql` y registrado como `LB004D_*` critico en `test_summary.ps1`) y
+`test/test_lb004d_concurrency.ps1` (dos conexiones, fixtures con marcador unico eliminados en `finally`).
 
-Gates D1: `test_summary.ps1` 100 % (más los skips permitidos actuales), Golden Path, SonarCloud y
-Trivy del PR en verde.
+| ID | Requisito del encargo | Prueba | Estado |
+|---|---|---|---|
+| DB-01 | Archivo propio y valido | `W1_VALID`, `W2_ATTACH` (DRAFT -> ATTACHED, solicitud `P`, correlaciones, fechas UTC) | PASS |
+| DB-02 | Archivo ajeno | `W2_FOREIGN_FILE_REJECTED` (ARC_001, sin solicitud, B sigue DRAFT) | PASS |
+| DB-03 | Doble asociacion | `W2_DOUBLE_ATTACH_REJECTED` | PASS |
+| DB-04 | Docente titular | `R1_TEACHER_TITULAR`, `R2_TEACHER_SCOPE_AND_SUPPORT` | PASS |
+| DB-05 | Docente no titular | `R1_DENIED_TEACHER_NOT_TITULAR`, `R2_OTHER_TEACHER_ZERO_ROWS` | PASS |
+| DB-06 | Otros actores | `R1_DENIED_*`: estudiante del mismo grupo, de otro grupo, administrador, coordinador, decano | PASS |
+| DB-07 | Propietario | `R1_OWNER_DRAFT`, `R1_OWNER_ATTACHED`, `R1_ORPHAN_NOT_ACCESSIBLE` | PASS |
+| DB-08 | Sesion inexistente | `W2_MISSING_SESSION` (archivo sigue DRAFT) | PASS |
+| DB-09 | Matricula invalida | `W2_NOT_ENROLLED` | PASS |
+| DB-10 | Estudiante != ejecutor | `W2_STUDENT_NOT_EXECUTOR` (ARC_005) | PASS |
+| DB-11 | Concurrencia attach | `test_lb004d_concurrency.ps1`: una ganadora, otra ARC_001 | PASS |
+| DB-12 | Attach vs orphan | N/A en D1: el marcado `ORPHAN` por SP esta diferido (Q6) | NOT_APPLICABLE |
+| DB-13 | Rollback | `W2_ATOMIC_ROLLBACK` (la solicitud se revierte si el vinculo no queda verificado) | PASS |
+| DB-14 | Idempotencia W1 | `W1_IDEMPOTENT_RETRY`, `W1_CONFLICT_*`, concurrencia W1 | PASS |
+| DB-15 | Idempotencia W2 | `W2_RETRY_SAME_CORRELATION_IDEMPOTENT` | PASS |
+| DB-16 | Integridad referencial | `INTEGRITY_FK_*`, `INTEGRITY_CK_*`, `INTEGRITY_ONE_SUPPORT_PER_REQUEST` | PASS |
+| DB-17 | Reclamo sin soporte | `W2_NO_SUPPORT_*`, `R2_WITHOUT_SUPPORT_AND_UTC_PRECISION` | PASS |
+| DB-18 | Metadata invalida | `W1_INVALID_METADATA` (tipo, 0, > 5 MiB, checksum, nombre) | PASS |
+| DB-19 | Perfil RBAC | `W1_NON_STUDENT_PROFILE`, `W2_NON_STUDENT_PROFILE` | PASS |
+| DB-20/21 | Reconciliacion | Diferida (Q6): sin SP W3/R3 en D1 | NOT_APPLICABLE |
+| DB-22 | UTC | `UTC_V2_DATETIME2_7`: `DATETIME2(7)`, fechas dentro de `[SYSUTCDATETIME() antes, despues]`, 7 decimales de `Sesion` intactos en R2 | PASS |
+| DB-23 | v1 intacta | `V1_UNCHANGED` + suite completa + manifest Golden Path | PASS |
+| DB-24 | Contrato de resultset | `test_contract_closure.sql`: W1/W2 con 4 columnas canonicas; R1/R2 excluidos por nombre | PASS |
+| DB-25 | Minimo privilegio | `RUNTIME_LEAST_PRIVILEGE` (usuario del rol: EXECUTE si, SELECT sobre la tabla denegado) | PASS |
+| DB-26 | Manifest LB-004D | `scripts/lb004d-manifest.ps1 -Mode Verify` | PASS |
+
+Gates D1: `test_summary.ps1` = `DB GATE PASS` (247 pruebas, 0 fallos, 1 skip permitido). SonarCloud y Trivy
+del PR: ver el PR (no se declaran PASS sin evidencia remota).
 
 ## 2. Backend (B1) — repo backend
 
