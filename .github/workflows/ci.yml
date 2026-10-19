@@ -1,4 +1,4 @@
-﻿name: DB Quality Gate CI/CD
+name: DB Quality Gate CI/CD
 
 on:
   push:
@@ -71,7 +71,7 @@ jobs:
           ./test_summary.ps1 -ContainerName "sqlserver" -Password $env:MSSQL_SA_PASSWORD
 
       - name: SonarCloud Analysis
-        if: env.SONAR_TOKEN != ''
+        if: ${{ secrets.SONAR_TOKEN != '' }}
         continue-on-error: true
         uses: SonarSource/sonarcloud-github-action@master
         env:
@@ -79,7 +79,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
       - name: SonarCloud Skipped Notice
-        if: env.SONAR_TOKEN == ''
+        if: ${{ secrets.SONAR_TOKEN == '' }}
         run: |
           echo "::notice::SONAR_TOKEN no está configurado en los secrets del repositorio. Análisis SonarCloud omitido."
 
