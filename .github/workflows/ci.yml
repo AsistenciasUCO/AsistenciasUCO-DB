@@ -39,9 +39,10 @@ jobs:
             mcr.microsoft.com/mssql/server:2022-latest
 
       - name: Wait for MSSQL Engine Readiness
+        id: mssql-ready
         shell: pwsh
         run: |
-          $maxAttempts = 35
+          $maxAttempts = 60
           $attempt = 0
           $ready = $false
           while (-not $ready -and $attempt -lt $maxAttempts) {
@@ -52,6 +53,8 @@ jobs:
               if ($LASTEXITCODE -eq 0) {
                   $ready = $true
                   Write-Host "MSSQL Server Engine is READY!" -ForegroundColor Green
+              } elseif ($attempt -eq 1 -or $attempt % 10 -eq 0) {
+                  Write-Host "MSSQL readiness probe still pending (exit code $LASTEXITCODE)."
               }
           }
           if (-not $ready) {
@@ -59,11 +62,13 @@ jobs:
           }
 
       - name: Verify Baseline Freeze Manifest Integrity
+        id: freeze-manifest
         shell: pwsh
         run: |
           ./scripts/freeze-manifest.ps1 -Mode Verify
 
       - name: Deploy Database Schema (deploy_schema.ps1)
+        id: deploy-schema
         shell: pwsh
         run: |
           ./deploy_schema.ps1 -ContainerName "sqlserver" -Password $env:MSSQL_SA_PASSWORD
@@ -111,8 +116,12 @@ jobs:
         run: |
           "### 🛡️ Resumen de Puerta de Calidad (DB Quality Gate)" >> $env:GITHUB_STEP_SUMMARY
           "- **Motor:** SQL Server 2022 (Linux Container)" >> $env:GITHUB_STEP_SUMMARY
-          "- **Manifiesto de Congelamiento:** ✅ Verificado contra SHA256" >> $env:GITHUB_STEP_SUMMARY
-          "- **Despliegue de Esquema:** ✅ Exitoso (deploy_schema.ps1)" >> $env:GITHUB_STEP_SUMMARY
+          $readyStatus = '${{ steps.mssql-ready.outcome }}'
+          $manifestStatus = '${{ steps.freeze-manifest.outcome }}'
+          $schemaStatus = '${{ steps.deploy-schema.outcome }}'
+          "- **Readiness SQL Server:** $readyStatus" >> $env:GITHUB_STEP_SUMMARY
+          "- **Manifiesto de Congelamiento:** $manifestStatus" >> $env:GITHUB_STEP_SUMMARY
+          "- **Despliegue de Esquema:** $schemaStatus" >> $env:GITHUB_STEP_SUMMARY
           $summaryPath = Join-Path $env:GITHUB_WORKSPACE 'db-quality-summary.log'
           if (Test-Path $summaryPath) {
               $summary = Get-Content $summaryPath -Raw
