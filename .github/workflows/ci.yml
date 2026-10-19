@@ -174,6 +174,17 @@ jobs:
               exit $LASTEXITCODE
           }
 
+      - name: Trivy Security Scan (Filesystem)
+        id: trivy-scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,misconfig,secret
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: 0
+
       - name: SonarCloud Analysis and Quality Gate
         id: sonar-analysis
         uses: SonarSource/sonarcloud-github-action@master
@@ -197,6 +208,7 @@ jobs:
           $manifestStatus = '${{ steps.freeze-manifest.outcome }}'
           $schemaStatus = '${{ steps.deploy-schema.outcome }}'
           $dbStatus = '${{ steps.db-quality.outcome }}'
+          $trivyStatus = '${{ steps.trivy-scan.outcome }}'
           $sonarStatus = '${{ steps.sonar-analysis.outcome }}'
           $summaryLines += "- **Readiness SQL Server:** $readyStatus"
           $summaryLines += "- **Manifiesto de Congelamiento:** $manifestStatus"
@@ -219,6 +231,7 @@ jobs:
               $summaryLines += "- **Suite de Pruebas T-SQL:** Expected=$expected; Executed=$executed; Passed=$passed; Failed=$failed; Skipped=$skipped; AllowedSkipped=$allowedSkipped"
               $summaryLines += "- **Integridad de ejecución SQL:** CriticalMissing=$criticalMissing; SQLCMD=$sqlExit; SQLErrors=$sqlErrors; UnauthorizedSkips=$unauthorizedSkips"
               $summaryLines += "- **Higiene de Secretos:** $secretStatus"
+              $summaryLines += "- **Escaneo Trivy:** $trivyStatus"
               if ($summary -notmatch '(?m)^TOTAL_EXPECTED=\d+$' -or $summary -notmatch '(?m)^TOTAL_EXECUTED=\d+$' -or $summary -notmatch '(?m)^PASSED=\d+$' -or $summary -notmatch '(?m)^FAILED=\d+$' -or $summary -notmatch '(?m)^SKIPPED=\d+$' -or $summary -notmatch '(?m)^CRITICAL_MISSING=\d+$') {
                   $verificationFailures += 'DB test summary is incomplete.'
               }
@@ -241,6 +254,7 @@ jobs:
           if ($manifestStatus -ne 'success') { $verificationFailures += "Manifest validation status=$manifestStatus." }
           if ($schemaStatus -ne 'success') { $verificationFailures += "Schema deployment status=$schemaStatus." }
           if ($dbStatus -ne 'success') { $verificationFailures += "SQL test gate status=$dbStatus." }
+          if ($trivyStatus -ne 'success') { $verificationFailures += "Trivy security scan status=$trivyStatus." }
           if ($sonarStatus -ne 'success') { $verificationFailures += "Sonar analysis/quality gate status=$sonarStatus." }
           if ($verificationFailures.Count -gt 0) {
               $summaryLines += "- **Critical verification result:** FAIL ($($verificationFailures -join ' | '))"
