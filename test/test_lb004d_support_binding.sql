@@ -87,10 +87,10 @@ CREATE TABLE #r1 (idArchivoSoporte UNIQUEIDENTIFIER, estado VARCHAR(10), nombreO
 CREATE TABLE #r2 (idSolicitudRevisionAsistencia UNIQUEIDENTIFIER, nombreSolicitud NVARCHAR(50), fechaSolicitud DATE,
     codigoEstado CHAR(1), nombreEstado NVARCHAR(100), justificacionSolicitud NVARCHAR(MAX), justificacionRespuesta NVARCHAR(MAX),
     idEstudiante UNIQUEIDENTIFIER, nombreEstudiante NVARCHAR(400), idSesion UNIQUEIDENTIFIER, numeroSesion INT,
-    fechaHoraInicioSesionUtc DATETIME2(7), procedenciaTemporalSesion NVARCHAR(24), idGrupo UNIQUEIDENTIFIER, codigoGrupo INT,
+    fechaHoraInicioSesion DATETIME2(7), procedenciaTemporalSesion NVARCHAR(24), idGrupo UNIQUEIDENTIFIER, codigoGrupo INT,
     nombreGrupo NVARCHAR(100), idAsignatura UNIQUEIDENTIFIER, codigoAsignatura NVARCHAR(100), nombreAsignatura NVARCHAR(100),
     idArchivoSoporte UNIQUEIDENTIFIER, nombreSoporte NVARCHAR(250), tipoContenidoSoporte VARCHAR(50),
-    tamanioSoporteBytes BIGINT, totalRegistros INT);
+    tamanioSoporteBytes BIGINT, fechaRegistroSoporteUtc DATETIME2(7), totalRegistros INT);
 
 BEGIN TRANSACTION;
 BEGIN TRY
@@ -260,7 +260,7 @@ BEGIN TRY
     SET @ok = IIF(EXISTS (SELECT 1 FROM #r2 WHERE idSolicitudRevisionAsistencia = @req AND idArchivoSoporte IS NULL
         AND nombreSoporte IS NULL AND tipoContenidoSoporte IS NULL AND tamanioSoporteBytes IS NULL
         AND idEstudiante = @studentA AND idSesion = @session AND idGrupo = @group AND codigoEstado = 'P'
-        AND fechaHoraInicioSesionUtc = @inicioSesion), 1, 0);
+        AND fechaHoraInicioSesion = @inicioSesion AND procedenciaTemporalSesion IS NULL), 1, 0);
     EXEC #lb4d_expect 'R2_WITHOUT_SUPPORT_AND_UTC_PRECISION', @ok;
 
     -- ---------------------------------------------------------------- W2 con soporte propio => ATTACHED
@@ -417,6 +417,7 @@ BEGIN TRY
         @codigoEstado = NULL, @numeroPagina = 1, @tamanoPagina = 100;
     SET @ok = IIF(EXISTS (SELECT 1 FROM #r2 WHERE idSolicitudRevisionAsistencia = @req2 AND idArchivoSoporte = @file1
         AND nombreSoporte = N'evidencia.pdf' AND tipoContenidoSoporte = 'application/pdf' AND tamanioSoporteBytes = 1234
+        AND fechaRegistroSoporteUtc IS NOT NULL
         AND nombreEstudiante IS NOT NULL AND nombreEstudiante <> N'')
         AND EXISTS (SELECT 1 FROM #r2 WHERE idSolicitudRevisionAsistencia = @req AND idArchivoSoporte IS NULL)
         AND NOT EXISTS (SELECT 1 FROM #r2 WHERE idGrupo <> @group)

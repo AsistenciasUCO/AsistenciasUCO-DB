@@ -19,9 +19,10 @@ GO
 -- SESSION_CONTEXT ni uv_auth_*.
 --
 -- Semantica temporal: fechaSolicitud es DATE de calendario (semantica v1, no es un instante).
--- fechaHoraInicioSesionUtc es el DATETIME2(7) de dbo.Sesion y procedenciaTemporalSesion indica si
--- es UTC verificable (UTC_V2/UTC_GENERADOR/UTC_OWNER) o INDETERMINADA (NULL, historica): el
--- consumidor decide segun esa procedencia (contrato UTC v2).
+-- fechaHoraInicioSesion es el DATETIME2(7) de dbo.Sesion TAL CUAL y procedenciaTemporalSesion indica
+-- si es UTC verificable (UTC_V2/UTC_GENERADOR/UTC_OWNER) o INDETERMINADA (NULL, historica): el
+-- consumidor decide segun esa procedencia (contrato UTC v2); la DB no afirma UTC cuando no lo sabe.
+-- fechaRegistroSoporteUtc es un instante UTC DATETIME2(7) generado con SYSUTCDATETIME().
 -- Datos personales minimos: nombre del estudiante, sin correo.
 -- ============================================================================
 CREATE OR ALTER PROCEDURE [dbo].[usp_consultar_solicitudes_revision_docente]
@@ -88,7 +89,7 @@ BEGIN
                                             NULLIF(TRIM(usu.segundoApellido), N'')) AS NVARCHAR(400)),
         idSesion                      = ses.id,
         numeroSesion                  = ses.numero,
-        fechaHoraInicioSesionUtc      = ses.fechaHoraInicio,
+        fechaHoraInicioSesion         = ses.fechaHoraInicio,
         procedenciaTemporalSesion     = ses.procedenciaTemporal,
         idGrupo                       = gru.id,
         codigoGrupo                   = gru.codigo,
@@ -100,6 +101,7 @@ BEGIN
         nombreSoporte                 = arc.nombreOriginal,
         tipoContenidoSoporte          = arc.tipoContenido,
         tamanioSoporteBytes           = arc.tamanioBytes,
+        fechaRegistroSoporteUtc       = arc.fechaRegistroUtc,
         totalRegistros                = COUNT(*) OVER()
     FROM dbo.SolicitudRevisionAsistencia sra
     INNER JOIN dbo.Estado est             ON est.id = sra.estado

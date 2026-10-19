@@ -145,17 +145,18 @@ RESULTSET (0..1 fila): idArchivoSoporte, estado, nombreOriginal, tipoContenido, 
 @tamanoPagina INT = 10 (1..100)
 RESULTSET: idSolicitudRevisionAsistencia, nombreSolicitud, fechaSolicitud, codigoEstado, nombreEstado,
   justificacionSolicitud, justificacionRespuesta, idEstudiante, nombreEstudiante, idSesion,
-  numeroSesion, fechaHoraInicioSesionUtc, procedenciaTemporalSesion, idGrupo, codigoGrupo, nombreGrupo,
+  numeroSesion, fechaHoraInicioSesion, procedenciaTemporalSesion, idGrupo, codigoGrupo, nombreGrupo,
   idAsignatura, codigoAsignatura, nombreAsignatura, idArchivoSoporte, nombreSoporte,
-  tipoContenidoSoporte, tamanioSoporteBytes, totalRegistros
+  tipoContenidoSoporte, tamanioSoporteBytes, fechaRegistroSoporteUtc, totalRegistros
 ```
 
 - Solo solicitudes cuyo `Grupo.docente` pertenece a `Docente.usuario = @idUsuarioEjecutor`
   (titularidad institucional, no solo el rol).
 - Soporte por `LEFT JOIN ArchivoSoporte` (`estado = 'ATTACHED'`); `NULL` si no hay.
-- `fechaHoraInicioSesionUtc` es el `DATETIME2(7)` de `Sesion` con `procedenciaTemporalSesion`
-  (`UTC_V2`/`UTC_GENERADOR`/`UTC_OWNER` o `NULL` = indeterminada, histórica): el consumidor decide
-  si la trata como UTC según esa procedencia (contrato UTC v2). `fechaSolicitud` es `DATE`.
+- `fechaHoraInicioSesion` es el `DATETIME2(7)` de `Sesion` tal cual, con `procedenciaTemporalSesion`
+  (`UTC_V2`/`UTC_GENERADOR`/`UTC_OWNER` o `NULL` = indeterminada, historica): la DB no afirma UTC
+  cuando no lo sabe; el consumidor decide segun esa procedencia (contrato UTC v2). `fechaSolicitud`
+  es `DATE`; `fechaRegistroSoporteUtc` es un instante UTC `DATETIME2(7)`.
 - Orden determinista: `fecha DESC, nombre ASC, id ASC`. Datos personales mínimos: nombre, sin correo.
 
 ### Diferido: reconciliación (Q6)
