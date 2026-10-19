@@ -22,19 +22,26 @@ jobs:
 
       - name: Set MSSQL Password Environment
         id: mssql-env
+        env:
+          MSSQL_SA_PASSWORD: ${{ secrets.MSSQL_SA_PASSWORD }}
+        shell: bash
         run: |
-          PASS="${{ secrets.MSSQL_SA_PASSWORD }}"
-          if [ -z "$PASS" ]; then
+          set -euo pipefail
+          if [ -z "${MSSQL_SA_PASSWORD:-}" ]; then
             echo "::error::MSSQL_SA_PASSWORD repository secret is required."
             exit 1
           fi
-          echo "MSSQL_SA_PASSWORD=$PASS" >> "$GITHUB_ENV"
+          printf 'MSSQL_SA_PASSWORD=%s\n' "$MSSQL_SA_PASSWORD" >> "$GITHUB_ENV"
 
       - name: Start MSSQL Docker Container
+        env:
+          MSSQL_SA_PASSWORD: ${{ secrets.MSSQL_SA_PASSWORD }}
+        shell: bash
         run: |
+          set -euo pipefail
           docker run -d --name sqlserver \
             -e "ACCEPT_EULA=Y" \
-            -e "MSSQL_SA_PASSWORD=${{ env.MSSQL_SA_PASSWORD }}" \
+            -e "MSSQL_SA_PASSWORD=$MSSQL_SA_PASSWORD" \
             -p 1433:1433 \
             mcr.microsoft.com/mssql/server:2022-latest
 
@@ -45,20 +52,104 @@ jobs:
           $maxAttempts = 60
           $attempt = 0
           $ready = $false
+          $sqlcmdPath = $null
+          $sqlcmdCandidates = @(
+              '/opt/mssql-tools18/bin/sqlcmd',
+              '/opt/mssql-tools/bin/sqlcmd'
+          )
+
           while (-not $ready -and $attempt -lt $maxAttempts) {
               $attempt++
               Write-Host "Waiting for MSSQL Server engine... (Attempt $attempt/$maxAttempts)"
-              Start-Sleep -Seconds 2
-              $check = docker exec sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P $env:MSSQL_SA_PASSWORD -C -Q "SELECT 1;" 2>&1
-              if ($LASTEXITCODE -eq 0) {
-                  $ready = $true
-                  Write-Host "MSSQL Server Engine is READY!" -ForegroundColor Green
-              } elseif ($attempt -eq 1 -or $attempt % 10 -eq 0) {
-                  Write-Host "MSSQL readiness probe still pending (exit code $LASTEXITCODE)."
+
+              $state = docker inspect sqlserver --format '{{.State.Status}}|{{.State.ExitCode}}' 2>&1
+              if ($LASTEXITCODE -ne 0) {
+                  Write-Host "MSSQL container state is not inspectable yet."
+                  Start-Sleep -Seconds 2
+                  continue
               }
+              $stateParts = ($state -join '') -split '\|'
+              if ($stateParts[0] -ne 'running') {
+                  throw "MSSQL container is not running (status=$($stateParts[0]); exit_code=$($stateParts[1]))."
+              }
+
+              if (-not $sqlcmdPath) {
+                  foreach ($candidate in $sqlcmdCandidates) {
+                      docker exec sqlserver sh -c "test -x '$candidate'" 2>$null
+                      if ($LASTEXITCODE -eq 0) {
+                          $sqlcmdPath = $candidate
+                          break
+                      }
+                  }
+              }
+
+              if (-not $sqlcmdPath) {
+                  if ($attempt -eq 1 -or $attempt % 10 -eq 0) {
+                      Write-Host 'sqlcmd was not found in the supported container paths yet.'
+                  }
+                  Start-Sleep -Seconds 2
+                  continue
+              }
+
+              $check = docker exec sqlserver $sqlcmdPath -S localhost -U sa -P $env:MSSQL_SA_PASSWORD -C -b -Q "SELECT 1;" 2>&1
+              $probeExitCode = $LASTEXITCODE
+              if ($probeExitCode -eq 0) {
+                  $ready = $true
+                  Write-Host "MSSQL Server Engine is READY! sqlcmd_path=$sqlcmdPath" -ForegroundColor Green
+              } elseif ($attempt -eq 1 -or $attempt % 10 -eq 0) {
+                  $safeCheck = (($check -join ' ') -replace '(?i)(password|secret|token)(\s*[:=]\s*)\S+', '$1$2[REDACTED]')
+                  Write-Host "MSSQL readiness probe still pending (sqlcmd_path=$sqlcmdPath; exit_code=$probeExitCode; output=$safeCheck)"
+              }
+              Start-Sleep -Seconds 2
           }
           if (-not $ready) {
               throw "MSSQL Server failed to start within time limit."
+          }
+
+      - name: Diagnose MSSQL readiness failure
+        if: always() && steps.mssql-ready.outcome != 'success'
+        continue-on-error: true
+        env:
+          MSSQL_SA_PASSWORD: ${{ secrets.MSSQL_SA_PASSWORD }}
+        shell: pwsh
+        run: |
+          Write-Host '--- docker ps -a ---'
+          docker ps -a --no-trunc --filter "name=sqlserver"
+
+          Write-Host '--- docker inspect (sanitized state only) ---'
+          $inspect = docker inspect sqlserver --format '{{json .State}}' 2>&1
+          $safeInspect = (($inspect -join [Environment]::NewLine) -replace '(?i)(password|secret|token)(\s*[:=]\s*)\S+', '$1$2[REDACTED]')
+          Write-Host $safeInspect
+
+          Write-Host '--- container logs (sanitized, last 200 lines) ---'
+          $logs = docker logs --tail 200 sqlserver 2>&1
+          $safeLogs = (($logs -join [Environment]::NewLine) -replace '(?i)(password|secret|token)(\s*[:=]\s*)\S+', '$1$2[REDACTED]')
+          Write-Host $safeLogs
+
+          Write-Host '--- sqlcmd availability ---'
+          $sqlcmdCandidates = @(
+              '/opt/mssql-tools18/bin/sqlcmd',
+              '/opt/mssql-tools/bin/sqlcmd'
+          )
+          $availablePaths = @()
+          foreach ($candidate in $sqlcmdCandidates) {
+              docker exec sqlserver sh -c "test -x '$candidate'" 2>$null
+              $available = ($LASTEXITCODE -eq 0)
+              Write-Host "$candidate available=$available"
+              if ($available) {
+                  $availablePaths += $candidate
+              }
+          }
+
+          Write-Host '--- authentication validation ---'
+          $status = docker inspect sqlserver --format '{{.State.Status}}' 2>$null
+          if ($status -eq 'running' -and $availablePaths.Count -gt 0) {
+              $auth = docker exec sqlserver $availablePaths[0] -S localhost -U sa -P $env:MSSQL_SA_PASSWORD -C -b -Q "SELECT SUSER_SNAME(), DB_NAME();" 2>&1
+              $authExitCode = $LASTEXITCODE
+              $safeAuth = (($auth -join ' ') -replace '(?i)(password|secret|token)(\s*[:=]\s*)\S+', '$1$2[REDACTED]')
+              Write-Host "authentication_exit_code=$authExitCode output=$safeAuth"
+          } else {
+              Write-Host "authentication_validation=NOT_RUN container_status=$status sqlcmd_paths=$($availablePaths.Count)"
           }
 
       - name: Verify Baseline Freeze Manifest Integrity
