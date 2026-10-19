@@ -41,10 +41,11 @@ BEGIN TRY
     PRINT '-> Caso 1: Validando rechazo ante ejecutor nulo...';
     DECLARE @corr1 UNIQUEIDENTIFIER = NEWID();
     DECLARE @idSinEjecutor UNIQUEIDENTIFIER = NEWID();
+    DECLARE @nombreSinEjecutor NVARCHAR(50) = CONCAT(N'Facultad sin ejecutor ', SUBSTRING(CONVERT(NVARCHAR(36), NEWID()), 1, 8));
     INSERT INTO #facultadResultado
     EXEC dbo.usp_crear_facultad
         @id = @idSinEjecutor,
-        @nombre = CONCAT(N'Facultad sin ejecutor ', SUBSTRING(CONVERT(NVARCHAR(36), NEWID()), 1, 8)),
+        @nombre = @nombreSinEjecutor,
         @idInstitucion = @idInstitucion,
         @idDecano = @idDecano,
         @idCorrelacion = @corr1,
