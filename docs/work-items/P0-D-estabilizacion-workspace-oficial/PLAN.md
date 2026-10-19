@@ -33,12 +33,15 @@ procedimientos, vistas, fixtures ni datos.
 
 1. El password SQL debe venir de un secret/entorno explícito; no existe fallback
    hardcodeado.
-2. SonarCloud requiere SONAR_TOKEN, SONAR_ORGANIZATION y
-   SONAR_PROJECT_KEY; si faltan, el job debe fallar de forma explícita.
+2. SonarCloud requiere `SONAR_TOKEN` desde GitHub Secrets. La organización y la
+   clave de proyecto se leen de `sonar-project.properties`, que conserva la
+   configuración oficial `johnjduque` / `johnjduque_gestion-asistencia-db`;
+   el workflow no exige variables vacías `SONAR_ORGANIZATION` ni
+   `SONAR_PROJECT_KEY`.
 3. El resumen CI debe reflejar TOTAL_EXPECTED, TOTAL_EXECUTED, PASSED,
    FAILED y SKIPPED emitidos por test_summary.ps1.
-4. La configuración de Sonar no conserva una organización personal como source
-   of truth del repositorio.
+4. El análisis debe ejecutarse sin `continue-on-error` y esperar el Quality Gate;
+   un análisis omitido se reporta como `NOT_RUN` y falla la verificación crítica.
 
 ## Definition of Ready
 

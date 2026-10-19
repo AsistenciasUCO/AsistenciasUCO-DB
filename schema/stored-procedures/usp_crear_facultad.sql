@@ -60,7 +60,7 @@ BEGIN
             @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
             @estadoResultado = @estadoResultado OUTPUT;
 
-        -- PASO 1.5: Validación obligatoria de presencia y perfil RBAC del ejecutor
+        -- PASO 1.5: Validación de presencia del ejecutor y perfil RBAC
         IF @estadoResultado = 1 AND @idUsuarioEjecutor IS NULL
         BEGIN
             EXEC dbo.usp_obtener_mensaje_catalogo
