@@ -3,7 +3,7 @@
 #
 # Dot-source this file:  . (Join-Path $PSScriptRoot 'scripts/secret-hygiene.ps1')
 
-$script:SecretNameRx = '(?i)(?<![A-Za-z0-9])(MSSQL_SA_PASSWORD|SQL_CONTAINER_PASSWORD|SA_PASSWORD|DB_PASSWORD|DATABASE_PASSWORD|Password|Pwd)["'']?\s*[:=]\s*(?<value>.*)$'
+$script:SecretNameRx = '(?i)(?<![A-Za-z0-9_])(?<!\$\{)(MSSQL_SA_PASSWORD|SQL_CONTAINER_PASSWORD|SA_PASSWORD|DB_PASSWORD|DATABASE_PASSWORD|Password|Pwd)["'']?\s*[:=]\s*(?<value>.*)$'
 $script:SecretCliRx = '(?<![A-Za-z0-9])-P\s+(?<value>["'']?[^\s"''$][^\s"'']*)'
 $script:SecretSafeValueRx = '^(?i:(CHANGE_?ME|REPLACE_?ME|YOUR_.*|PLACEHOLDER|TEST_ONLY.*|<.*>|\*+|x{3,}))$'
 $script:SecretEnvLikeRx = '(?i)(^\.env(\..+)?$|\.env$|\.properties$|\.ini$|\.cfg$|\.conf$|\.ya?ml$|\.json$)'

@@ -11,6 +11,9 @@ jobs:
   db-quality-gate:
     name: Database Deployment & Quality Gate
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
 
     steps:
       - name: Checkout Repository
@@ -20,57 +23,159 @@ jobs:
 
       - name: Set MSSQL Password Environment
         id: mssql-env
+        env:
+          MSSQL_SA_PASSWORD: ${{ secrets.MSSQL_SA_PASSWORD }}
+        shell: bash
         run: |
-          PASS="${{ secrets.MSSQL_SA_PASSWORD }}"
-          if [ -z "$PASS" ]; then
-            PASS="Strong_CI_DefaultPass_2026!"
+          set -euo pipefail
+          if [ -z "${MSSQL_SA_PASSWORD:-}" ]; then
+            echo "::error::MSSQL_SA_PASSWORD repository secret is required."
+            exit 1
           fi
-          echo "MSSQL_SA_PASSWORD=$PASS" >> $GITHUB_ENV
+          printf 'MSSQL_SA_PASSWORD=%s\n' "$MSSQL_SA_PASSWORD" >> "$GITHUB_ENV"
 
       - name: Start MSSQL Docker Container
+        env:
+          MSSQL_SA_PASSWORD: ${{ secrets.MSSQL_SA_PASSWORD }}
+        shell: bash
         run: |
+          set -euo pipefail
           docker run -d --name sqlserver \
             -e "ACCEPT_EULA=Y" \
-            -e "MSSQL_SA_PASSWORD=${{ env.MSSQL_SA_PASSWORD }}" \
+            -e "MSSQL_SA_PASSWORD=$MSSQL_SA_PASSWORD" \
             -p 1433:1433 \
             mcr.microsoft.com/mssql/server:2022-latest
 
       - name: Wait for MSSQL Engine Readiness
+        id: mssql-ready
         shell: pwsh
         run: |
-          $maxAttempts = 35
+          $maxAttempts = 60
           $attempt = 0
           $ready = $false
+          $sqlcmdPath = $null
+          $sqlcmdCandidates = @(
+              '/opt/mssql-tools18/bin/sqlcmd',
+              '/opt/mssql-tools/bin/sqlcmd'
+          )
+
           while (-not $ready -and $attempt -lt $maxAttempts) {
               $attempt++
               Write-Host "Waiting for MSSQL Server engine... (Attempt $attempt/$maxAttempts)"
-              Start-Sleep -Seconds 2
-              $check = docker exec sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P $env:MSSQL_SA_PASSWORD -C -Q "SELECT 1;" 2>&1
-              if ($LASTEXITCODE -eq 0) {
-                  $ready = $true
-                  Write-Host "MSSQL Server Engine is READY!" -ForegroundColor Green
+
+              $state = docker inspect sqlserver --format '{{.State.Status}}|{{.State.ExitCode}}' 2>&1
+              if ($LASTEXITCODE -ne 0) {
+                  Write-Host "MSSQL container state is not inspectable yet."
+                  Start-Sleep -Seconds 2
+                  continue
               }
+              $stateParts = ($state -join '') -split '\|'
+              if ($stateParts[0] -ne 'running') {
+                  throw "MSSQL container is not running (status=$($stateParts[0]); exit_code=$($stateParts[1]))."
+              }
+
+              if (-not $sqlcmdPath) {
+                  foreach ($candidate in $sqlcmdCandidates) {
+                      docker exec sqlserver sh -c "test -x '$candidate'" 2>$null
+                      if ($LASTEXITCODE -eq 0) {
+                          $sqlcmdPath = $candidate
+                          break
+                      }
+                  }
+              }
+
+              if (-not $sqlcmdPath) {
+                  if ($attempt -eq 1 -or $attempt % 10 -eq 0) {
+                      Write-Host 'sqlcmd was not found in the supported container paths yet.'
+                  }
+                  Start-Sleep -Seconds 2
+                  continue
+              }
+
+              $check = docker exec sqlserver $sqlcmdPath -S localhost -U sa -P $env:MSSQL_SA_PASSWORD -C -b -Q "SELECT 1;" 2>&1
+              $probeExitCode = $LASTEXITCODE
+              if ($probeExitCode -eq 0) {
+                  $ready = $true
+                  Write-Host "MSSQL Server Engine is READY! sqlcmd_path=$sqlcmdPath" -ForegroundColor Green
+              } elseif ($attempt -eq 1 -or $attempt % 10 -eq 0) {
+                  $safeCheck = (($check -join ' ') -replace '(?i)(password|secret|token)(\s*[:=]\s*)\S+', '$1$2[REDACTED]')
+                  Write-Host "MSSQL readiness probe still pending (sqlcmd_path=$sqlcmdPath; exit_code=$probeExitCode; output=$safeCheck)"
+              }
+              Start-Sleep -Seconds 2
           }
           if (-not $ready) {
               throw "MSSQL Server failed to start within time limit."
           }
 
+      - name: Diagnose MSSQL readiness failure
+        if: always() && steps.mssql-ready.outcome != 'success'
+        continue-on-error: true
+        env:
+          MSSQL_SA_PASSWORD: ${{ secrets.MSSQL_SA_PASSWORD }}
+        shell: pwsh
+        run: |
+          Write-Host '--- docker ps -a ---'
+          docker ps -a --no-trunc --filter "name=sqlserver"
+
+          Write-Host '--- docker inspect (sanitized state only) ---'
+          $inspect = docker inspect sqlserver --format '{{json .State}}' 2>&1
+          $safeInspect = (($inspect -join [Environment]::NewLine) -replace '(?i)(password|secret|token)(\s*[:=]\s*)\S+', '$1$2[REDACTED]')
+          Write-Host $safeInspect
+
+          Write-Host '--- container logs (sanitized, last 200 lines) ---'
+          $logs = docker logs --tail 200 sqlserver 2>&1
+          $safeLogs = (($logs -join [Environment]::NewLine) -replace '(?i)(password|secret|token)(\s*[:=]\s*)\S+', '$1$2[REDACTED]')
+          Write-Host $safeLogs
+
+          Write-Host '--- sqlcmd availability ---'
+          $sqlcmdCandidates = @(
+              '/opt/mssql-tools18/bin/sqlcmd',
+              '/opt/mssql-tools/bin/sqlcmd'
+          )
+          $availablePaths = @()
+          foreach ($candidate in $sqlcmdCandidates) {
+              docker exec sqlserver sh -c "test -x '$candidate'" 2>$null
+              $available = ($LASTEXITCODE -eq 0)
+              Write-Host "$candidate available=$available"
+              if ($available) {
+                  $availablePaths += $candidate
+              }
+          }
+
+          Write-Host '--- authentication validation ---'
+          $status = docker inspect sqlserver --format '{{.State.Status}}' 2>$null
+          if ($status -eq 'running' -and $availablePaths.Count -gt 0) {
+              $auth = docker exec sqlserver $availablePaths[0] -S localhost -U sa -P $env:MSSQL_SA_PASSWORD -C -b -Q "SELECT SUSER_SNAME(), DB_NAME();" 2>&1
+              $authExitCode = $LASTEXITCODE
+              $safeAuth = (($auth -join ' ') -replace '(?i)(password|secret|token)(\s*[:=]\s*)\S+', '$1$2[REDACTED]')
+              Write-Host "authentication_exit_code=$authExitCode output=$safeAuth"
+          } else {
+              Write-Host "authentication_validation=NOT_RUN container_status=$status sqlcmd_paths=$($availablePaths.Count)"
+          }
+
       - name: Verify Baseline Freeze Manifest Integrity
+        id: freeze-manifest
         shell: pwsh
         run: |
           ./scripts/freeze-manifest.ps1 -Mode Verify
 
       - name: Deploy Database Schema (deploy_schema.ps1)
+        id: deploy-schema
         shell: pwsh
         run: |
           ./deploy_schema.ps1 -ContainerName "sqlserver" -Password $env:MSSQL_SA_PASSWORD
 
       - name: Execute DB Quality Gate (test_summary.ps1)
+        id: db-quality
         shell: pwsh
         run: |
-          ./test_summary.ps1 -ContainerName "sqlserver" -Password $env:MSSQL_SA_PASSWORD
+          & ./test_summary.ps1 -ContainerName "sqlserver" -Password $env:MSSQL_SA_PASSWORD *>&1 | Tee-Object -FilePath db-quality-summary.log
+          if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+          }
 
       - name: Trivy Security Scan (Filesystem)
+        id: trivy-scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
@@ -80,9 +185,13 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: 0
 
-      - name: SonarCloud Analysis
-        continue-on-error: true
+      - name: SonarCloud Analysis and Quality Gate
+        id: sonar-analysis
         uses: SonarSource/sonarcloud-github-action@master
+        with:
+          args: >
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -91,10 +200,79 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          "### 🛡️ Resumen de Puerta de Calidad (DB Quality Gate)" >> $env:GITHUB_STEP_SUMMARY
-          "- **Motor:** SQL Server 2022 (Linux Container)" >> $env:GITHUB_STEP_SUMMARY
-          "- **Manifiesto de Congelamiento:** ✅ Verificado contra SHA256" >> $env:GITHUB_STEP_SUMMARY
-          "- **Despliegue de Esquema:** ✅ Exitoso (deploy_schema.ps1)" >> $env:GITHUB_STEP_SUMMARY
-          "- **Suite de Pruebas T-SQL:** ✅ 100% PASS (225/225 pruebas)" >> $env:GITHUB_STEP_SUMMARY
-          "- **Higiene de Secretos:** ✅ PASS (NO_HARDCODED_DB_PASSWORD)" >> $env:GITHUB_STEP_SUMMARY
-          "- **Escaneo de Seguridad Trivy:** ✅ Completado (Vulnerabilidades, Misconfigs y Secretos)" >> $env:GITHUB_STEP_SUMMARY
+          $summaryLines = @(
+              '### 🛡️ Resumen de Puerta de Calidad (DB Quality Gate)',
+              '- **Motor:** SQL Server 2022 (Linux Container)'
+          )
+          $readyStatus = '${{ steps.mssql-ready.outcome }}'
+          $manifestStatus = '${{ steps.freeze-manifest.outcome }}'
+          $schemaStatus = '${{ steps.deploy-schema.outcome }}'
+          $dbStatus = '${{ steps.db-quality.outcome }}'
+          $trivyStatus = '${{ steps.trivy-scan.outcome }}'
+          $sonarStatus = '${{ steps.sonar-analysis.outcome }}'
+          $summaryLines += "- **Readiness SQL Server:** $readyStatus"
+          $summaryLines += "- **Manifiesto de Congelamiento:** $manifestStatus"
+          $summaryLines += "- **Despliegue de Esquema:** $schemaStatus"
+          $summaryPath = Join-Path $env:GITHUB_WORKSPACE 'db-quality-summary.log'
+          $verificationFailures = @()
+          if (Test-Path $summaryPath) {
+              $summary = Get-Content $summaryPath -Raw
+              $expected = [regex]::Match($summary, '(?m)^TOTAL_EXPECTED=(\d+)').Groups[1].Value
+              $executed = [regex]::Match($summary, '(?m)^TOTAL_EXECUTED=(\d+)').Groups[1].Value
+              $passed = [regex]::Match($summary, '(?m)^PASSED=(\d+)').Groups[1].Value
+              $failed = [regex]::Match($summary, '(?m)^FAILED=(\d+)').Groups[1].Value
+              $skipped = [regex]::Match($summary, '(?m)^SKIPPED=(\d+)').Groups[1].Value
+              $allowedSkipped = [regex]::Match($summary, '(?m)^ALLOWED_SKIPPED=(\d+)').Groups[1].Value
+              $criticalMissing = [regex]::Match($summary, '(?m)^CRITICAL_MISSING=(\d+)').Groups[1].Value
+              $sqlExit = [regex]::Match($summary, '(?m)^SQLCMD_EXIT_CODE=(-?\d+)').Groups[1].Value
+              $sqlErrors = [regex]::Match($summary, '(?m)^SQL_ERROR_COUNT=(\d+)').Groups[1].Value
+              $unauthorizedSkips = [regex]::Match($summary, '(?m)^UNAUTHORIZED_SKIPS=(\d+)').Groups[1].Value
+              $secretStatus = if ($summary -match '(?m)^TEST_PASS:NO_HARDCODED_DB_PASSWORD\s*$') { 'PASS' } else { 'NOT_RUN' }
+              $summaryLines += "- **Suite de Pruebas T-SQL:** Expected=$expected; Executed=$executed; Passed=$passed; Failed=$failed; Skipped=$skipped; AllowedSkipped=$allowedSkipped"
+              $summaryLines += "- **Integridad de ejecución SQL:** CriticalMissing=$criticalMissing; SQLCMD=$sqlExit; SQLErrors=$sqlErrors; UnauthorizedSkips=$unauthorizedSkips"
+              $summaryLines += "- **Higiene de Secretos:** $secretStatus"
+              $summaryLines += "- **Escaneo Trivy:** $trivyStatus"
+              if ($summary -notmatch '(?m)^TOTAL_EXPECTED=\d+$' -or $summary -notmatch '(?m)^TOTAL_EXECUTED=\d+$' -or $summary -notmatch '(?m)^PASSED=\d+$' -or $summary -notmatch '(?m)^FAILED=\d+$' -or $summary -notmatch '(?m)^SKIPPED=\d+$' -or $summary -notmatch '(?m)^CRITICAL_MISSING=\d+$') {
+                  $verificationFailures += 'DB test summary is incomplete.'
+              }
+              if ($failed -ne '0' -or $criticalMissing -ne '0' -or $sqlExit -ne '0' -or $sqlErrors -ne '0' -or $unauthorizedSkips -ne '0') {
+                  $verificationFailures += 'DB quality gate counters are not clean.'
+              }
+              if ($secretStatus -ne 'PASS') {
+                  $verificationFailures += 'Secret hygiene evidence is missing.'
+              }
+          } else {
+              $summaryLines += '- **Suite de Pruebas T-SQL:** NOT_RUN (summary unavailable)'
+              $summaryLines += '- **Integridad de ejecución SQL:** NOT_RUN'
+              $summaryLines += '- **Higiene de Secretos:** NOT_RUN'
+              $verificationFailures += 'DB test summary was not produced.'
+          }
+          $sonarGateStatus = if ($sonarStatus -eq 'success') { 'PASS' } elseif ($sonarStatus -eq 'skipped') { 'NOT_RUN' } else { 'FAIL' }
+          $summaryLines += "- **SonarCloud Analysis:** $sonarStatus"
+          $summaryLines += "- **SonarCloud Quality Gate:** $sonarGateStatus"
+          if ($readyStatus -ne 'success') { $verificationFailures += "SQL Server readiness status=$readyStatus." }
+          if ($manifestStatus -ne 'success') { $verificationFailures += "Manifest validation status=$manifestStatus." }
+          if ($schemaStatus -ne 'success') { $verificationFailures += "Schema deployment status=$schemaStatus." }
+          if ($dbStatus -ne 'success') { $verificationFailures += "SQL test gate status=$dbStatus." }
+          if ($trivyStatus -ne 'success') { $verificationFailures += "Trivy security scan status=$trivyStatus." }
+          if ($sonarStatus -ne 'success') { $verificationFailures += "Sonar analysis/quality gate status=$sonarStatus." }
+          if ($verificationFailures.Count -gt 0) {
+              $summaryLines += "- **Critical verification result:** FAIL ($($verificationFailures -join ' | '))"
+          } else {
+              $summaryLines += '- **Critical verification result:** PASS'
+          }
+          $summaryLines | Set-Content -Path (Join-Path $env:GITHUB_WORKSPACE 'ci-gate-evidence.md') -Encoding utf8
+          $summaryLines | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+          if ($verificationFailures.Count -gt 0) {
+              throw ($verificationFailures -join ' ')
+          }
+
+      - name: Upload DB quality evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-quality-evidence
+          path: |
+            db-quality-summary.log
+            ci-gate-evidence.md
+          if-no-files-found: error
