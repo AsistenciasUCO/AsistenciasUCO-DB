@@ -14,8 +14,16 @@ IF @idInstitucion IS NULL SET @idInstitucion = (SELECT TOP 1 id FROM dbo.Institu
 DECLARE @idDecano UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_decano);
 IF @idDecano IS NULL SET @idDecano = (SELECT TOP 1 id FROM dbo.Decano);
 
+DECLARE @idUsuarioEjecutor UNIQUEIDENTIFIER = (
+    SELECT TOP 1 idUsuario
+    FROM dbo.uv_administrador
+    WHERE estaActivoAdministrador = 1
+    ORDER BY idUsuario
+);
+
 IF @idInstitucion IS NULL THROW 51500, 'TEST FAILED: Fixture uv_institucion no disponible.', 1;
 IF @idDecano IS NULL THROW 51501, 'TEST FAILED: Fixture uv_decano no disponible.', 1;
+IF @idUsuarioEjecutor IS NULL THROW 51506, 'TEST FAILED: Fixture administrador activo no disponible.', 1;
 
 BEGIN TRANSACTION;
 BEGIN TRY
@@ -28,21 +36,49 @@ BEGIN TRY
     );
 
     -- =========================================================================
-    -- CASO 1: Validación de obligatoriedad (Nombre nulo o en blanco)
+    -- CASO 1: El ejecutor es obligatorio y la ausencia falla cerrada.
     -- =========================================================================
-    PRINT '-> Caso 1: Validando rechazo ante nombre en blanco o nulo...';
+    PRINT '-> Caso 1: Validando rechazo ante ejecutor nulo...';
     DECLARE @corr1 UNIQUEIDENTIFIER = NEWID();
+    DECLARE @idSinEjecutor UNIQUEIDENTIFIER = NEWID();
+    INSERT INTO #facultadResultado
+    EXEC dbo.usp_crear_facultad
+        @id = @idSinEjecutor,
+        @nombre = CONCAT(N'Facultad sin ejecutor ', SUBSTRING(CONVERT(NVARCHAR(36), NEWID()), 1, 8)),
+        @idInstitucion = @idInstitucion,
+        @idDecano = @idDecano,
+        @idCorrelacion = @corr1,
+        @idUsuarioEjecutor = NULL;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM #facultadResultado
+        WHERE estadoResultado = 0
+          AND idCorrelacion = @corr1
+          AND mensajeTecnicoResultado LIKE N'DBCODE=GEN_002|%'
+    )
+        THROW 51502, 'TEST FAILED: usp_crear_facultad no rechazo ejecutor nulo con GEN_002.', 1;
+
+    PRINT 'TEST_PASS:HU116_FACULTY_CREATE_EXECUTOR_REQUIRED';
+
+    TRUNCATE TABLE #facultadResultado;
+
+    -- =========================================================================
+    -- CASO 2: Validación de obligatoriedad (Nombre nulo o en blanco)
+    -- =========================================================================
+    PRINT '-> Caso 2: Validando rechazo ante nombre en blanco...';
+    DECLARE @corr2 UNIQUEIDENTIFIER = NEWID();
     INSERT INTO #facultadResultado
     EXEC dbo.usp_crear_facultad
         @id = NULL,
         @nombre = N'   ',
         @idInstitucion = @idInstitucion,
         @idDecano = @idDecano,
-        @idCorrelacion = @corr1,
-        @idUsuarioEjecutor = NULL;
+        @idCorrelacion = @corr2,
+        @idUsuarioEjecutor = @idUsuarioEjecutor;
 
-    IF NOT EXISTS (SELECT 1 FROM #facultadResultado WHERE estadoResultado = 0 AND idCorrelacion = @corr1)
-        THROW 51502, 'TEST FAILED: usp_crear_facultad no rechazo nombre en blanco.', 1;
+    IF NOT EXISTS (SELECT 1 FROM #facultadResultado WHERE estadoResultado = 0 AND idCorrelacion = @corr2)
+        THROW 51507, 'TEST FAILED: usp_crear_facultad no rechazo nombre en blanco.', 1;
 
     TRUNCATE TABLE #facultadResultado;
 
@@ -52,7 +88,7 @@ BEGIN TRY
     PRINT '-> Caso 2: Validando insercion exitosa de nueva facultad...';
     DECLARE @nombreValido NVARCHAR(50) = CONCAT(N'Facultad QA ', SUBSTRING(CONVERT(NVARCHAR(36), NEWID()), 1, 8));
     DECLARE @idGenerado UNIQUEIDENTIFIER = NEWID();
-    DECLARE @corr2 UNIQUEIDENTIFIER = NEWID();
+    DECLARE @corr3 UNIQUEIDENTIFIER = NEWID();
 
     INSERT INTO #facultadResultado
     EXEC dbo.usp_crear_facultad
@@ -60,10 +96,10 @@ BEGIN TRY
         @nombre = @nombreValido,
         @idInstitucion = @idInstitucion,
         @idDecano = @idDecano,
-        @idCorrelacion = @corr2,
-        @idUsuarioEjecutor = NULL;
+        @idCorrelacion = @corr3,
+        @idUsuarioEjecutor = @idUsuarioEjecutor;
 
-    IF NOT EXISTS (SELECT 1 FROM #facultadResultado WHERE estadoResultado = 1 AND idCorrelacion = @corr2)
+    IF NOT EXISTS (SELECT 1 FROM #facultadResultado WHERE estadoResultado = 1 AND idCorrelacion = @corr3)
         THROW 51503, 'TEST FAILED: usp_crear_facultad no retorno estadoResultado = 1 para facultad valida.', 1;
 
     IF NOT EXISTS (SELECT 1 FROM dbo.Facultad WHERE id = @idGenerado AND nombre = @nombreValido AND estado = 1)
@@ -76,7 +112,7 @@ BEGIN TRY
     -- =========================================================================
     PRINT '-> Caso 3: Validando rechazo ante nombre duplicado...';
     DECLARE @nombreDuplicado NVARCHAR(50) = LOWER(@nombreValido);
-    DECLARE @corr3 UNIQUEIDENTIFIER = NEWID();
+    DECLARE @corr4 UNIQUEIDENTIFIER = NEWID();
 
     INSERT INTO #facultadResultado
     EXEC dbo.usp_crear_facultad
@@ -84,11 +120,13 @@ BEGIN TRY
         @nombre = @nombreDuplicado,
         @idInstitucion = @idInstitucion,
         @idDecano = @idDecano,
-        @idCorrelacion = @corr3,
-        @idUsuarioEjecutor = NULL;
+        @idCorrelacion = @corr4,
+        @idUsuarioEjecutor = @idUsuarioEjecutor;
 
-    IF NOT EXISTS (SELECT 1 FROM #facultadResultado WHERE estadoResultado = 0 AND idCorrelacion = @corr3)
+    IF NOT EXISTS (SELECT 1 FROM #facultadResultado WHERE estadoResultado = 0 AND idCorrelacion = @corr4)
         THROW 51505, 'TEST FAILED: usp_crear_facultad permitio duplicar nombre de facultad.', 1;
+
+    PRINT 'TEST_PASS:HU116_FACULTY_CREATE_SUCCESS';
 
     DROP TABLE #facultadResultado;
 

@@ -41,3 +41,20 @@ procedimientos, vistas, fixtures ni datos.
    of truth del repositorio.
 
 ## Definition of Ready
+
+## Addendum de cierre P0 autorizado — 2026-10-18
+
+La autorización explícita de cierre de P0 permite, dentro de este mismo work
+item y sin crear una fase nueva, corregir el contrato ya identificado de
+`usp_crear_facultad` HU116 y sus pruebas/fixtures directamente asociados. El
+alcance queda limitado a:
+
+- `schema/stored-procedures/usp_crear_facultad.sql`;
+- `test/test_usp_crear_facultad.sql`, `test_suite.sql` y
+  `test_summary.ps1` para ejecutar y contabilizar el caso;
+- `scripts/secret-hygiene.ps1` para corregir el falso positivo del gate sin
+  reducir su protección.
+
+El cambio no introduce migraciones, no modifica el resultado público canónico
+de cuatro columnas, no cambia otros procedimientos ni datos persistentes, y
+no autoriza merge hasta contar con la suite CI completa y revisión del owner DB.

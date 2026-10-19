@@ -9,6 +9,7 @@ PRINT '======================================================================';
 
 :r /tmp/test/test_public_objects.sql
 :r /tmp/test/test_contract_closure.sql
+:r /tmp/test/test_usp_crear_facultad.sql
 :r /tmp/test/test_user_dean_close.sql
 :r /tmp/test/test_subject_catalog.sql
 :r /tmp/test/test_reactive_academic.sql
