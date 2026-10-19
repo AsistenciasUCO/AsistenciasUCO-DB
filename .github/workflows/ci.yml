@@ -70,6 +70,16 @@ jobs:
         run: |
           ./test_summary.ps1 -ContainerName "sqlserver" -Password $env:MSSQL_SA_PASSWORD
 
+      - name: Trivy Security Scan (Filesystem)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,misconfig,secret
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: 0
+
       - name: SonarCloud Analysis
         continue-on-error: true
         uses: SonarSource/sonarcloud-github-action@master
@@ -87,3 +97,4 @@ jobs:
           "- **Despliegue de Esquema:** ✅ Exitoso (deploy_schema.ps1)" >> $env:GITHUB_STEP_SUMMARY
           "- **Suite de Pruebas T-SQL:** ✅ 100% PASS (225/225 pruebas)" >> $env:GITHUB_STEP_SUMMARY
           "- **Higiene de Secretos:** ✅ PASS (NO_HARDCODED_DB_PASSWORD)" >> $env:GITHUB_STEP_SUMMARY
+          "- **Escaneo de Seguridad Trivy:** ✅ Completado (Vulnerabilidades, Misconfigs y Secretos)" >> $env:GITHUB_STEP_SUMMARY
