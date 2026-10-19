@@ -71,17 +71,11 @@ jobs:
           ./test_summary.ps1 -ContainerName "sqlserver" -Password $env:MSSQL_SA_PASSWORD
 
       - name: SonarCloud Analysis
-        if: ${{ secrets.SONAR_TOKEN != '' }}
         continue-on-error: true
         uses: SonarSource/sonarcloud-github-action@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
-      - name: SonarCloud Skipped Notice
-        if: ${{ secrets.SONAR_TOKEN == '' }}
-        run: |
-          echo "::notice::SONAR_TOKEN no está configurado en los secrets del repositorio. Análisis SonarCloud omitido."
 
       - name: Generate CI Job Summary
         if: always()
