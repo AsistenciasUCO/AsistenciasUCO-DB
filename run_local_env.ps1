@@ -36,7 +36,9 @@ if (Test-Path $envFile) {
 }
 
 $ContainerName = if ($env:SQL_CONTAINER_NAME) { $env:SQL_CONTAINER_NAME } else { "sqlserver" }
-$Password = if ($env:SQL_CONTAINER_PASSWORD) { $env:SQL_CONTAINER_PASSWORD } elseif ($env:MSSQL_SA_PASSWORD) { $env:MSSQL_SA_PASSWORD } else { "PasswordSeguro123!" }
+$Password = if ($env:SQL_CONTAINER_PASSWORD) { $env:SQL_CONTAINER_PASSWORD } elseif ($env:MSSQL_SA_PASSWORD) { $env:MSSQL_SA_PASSWORD } else {
+    throw "SQL password is required. Set SQL_CONTAINER_PASSWORD or MSSQL_SA_PASSWORD in the local ignored .env file."
+}
 
 function Start-SqlServerContainer {
     Write-Host "🐳 [1/4] Iniciando contenedor SQL Server ($ContainerName)..." -ForegroundColor Cyan
