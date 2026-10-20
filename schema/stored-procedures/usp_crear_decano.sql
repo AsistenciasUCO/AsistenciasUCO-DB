@@ -7,23 +7,23 @@ GO
 
 CREATE OR ALTER PROCEDURE [dbo].[usp_crear_decano]
 (
-    @idDecano               UNIQUEIDENTIFIER,
+    @idDecano               UNIQUEIDENTIFIER = NULL,
     @numeroIdentificacion    INT,
     @primerNombre            NVARCHAR(50),
     @segundoNombre           NVARCHAR(50),
     @primerApellido          NVARCHAR(50),
     @segundoApellido         NVARCHAR(50),
     @correo                  NVARCHAR(100),
-    @idFacultad              UNIQUEIDENTIFIER,
-    @nombreFacultad          NVARCHAR(150),
+    @idFacultad              UNIQUEIDENTIFIER = NULL,
+    @nombreFacultad          NVARCHAR(150)    = NULL,
     @password                NVARCHAR(500),
     @idCorrelacion           UNIQUEIDENTIFIER,
     @idUsuarioEjecutor       UNIQUEIDENTIFIER = NULL
 )
 AS
     DECLARE @idCorrelacionDefecto     UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idCorrelacion, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
-    DECLARE @idDecanoDefecto          UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idDecano, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
-    DECLARE @idFacultadDefecto        UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idFacultad, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
+    DECLARE @idDecanoDefecto          UNIQUEIDENTIFIER = @idDecano;
+    DECLARE @idFacultadDefecto        UNIQUEIDENTIFIER = @idFacultad;
     DECLARE @idUsuarioEjecutorDefecto UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idUsuarioEjecutor, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
     DECLARE @nombreFacultadDef        NVARCHAR(150)    = TRIM(@nombreFacultad);
 
@@ -137,6 +137,9 @@ BEGIN
         BEGIN
             IF NOT EXISTS (SELECT 1 FROM dbo.Decano WHERE usuario = @idUsuarioCreado)
             BEGIN
+                IF @idDecanoDefecto IS NULL
+                    SET @idDecanoDefecto = NEWID();
+
                 INSERT INTO dbo.Decano (id, usuario)
                 VALUES (@idDecanoDefecto, @idUsuarioCreado);
             END

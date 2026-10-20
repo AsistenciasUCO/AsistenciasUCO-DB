@@ -19,11 +19,11 @@ SELECT		di.id,
 			idPerfil = p.id,
 			codigoPerfil = p.codigo,
 			nombrePerfil = p.nombre,
-			estaActivoDecano = IIF(di.estaActivoUsuario = 1 AND f.estaActivaFacultad = 1, 1, 0),
-			estaActivoTextoDecano = IIF(di.estaActivoUsuario = 1 AND f.estaActivaFacultad = 1, 'SI', 'NO')
+			estaActivoDecano = IIF(di.estaActivoUsuario = 1 AND (f.id IS NULL OR f.estaActivaFacultad = 1), 1, 0),
+			estaActivoTextoDecano = IIF(di.estaActivoUsuario = 1 AND (f.id IS NULL OR f.estaActivaFacultad = 1), 'SI', 'NO')
 
 FROM		uv_decano_identidad di
-INNER JOIN  uv_facultad f 
+LEFT JOIN   uv_facultad f 
 ON			di.id = f.idDecano
 CROSS JOIN	(SELECT TOP 1 id, codigo, nombre FROM uv_perfil WHERE codigo = 'DE') p
 GO
