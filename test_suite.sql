@@ -9,6 +9,7 @@ PRINT '======================================================================';
 
 :r /tmp/test/test_public_objects.sql
 :r /tmp/test/test_contract_closure.sql
+:r /tmp/test/test_usp_crear_facultad.sql
 :r /tmp/test/test_user_dean_close.sql
 :r /tmp/test/test_subject_catalog.sql
 :r /tmp/test/test_reactive_academic.sql
@@ -29,6 +30,7 @@ PRINT '======================================================================';
 :r /tmp/test/test_titularidad_jerarquica.sql
 :r /tmp/test/test_attendance_commands.sql
 :r /tmp/test/test_attendance_review.sql
+:r /tmp/test/test_lb004d_support_binding.sql
 :r /tmp/test/test_usp_crear_coordinador.sql
 :r /tmp/test/test_usp_resolver_solicitud_matricula.sql
 :r /tmp/test/test_golden_path_immutability.sql
