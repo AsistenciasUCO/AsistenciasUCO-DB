@@ -102,6 +102,46 @@ PRINT 'TEST_PASS:DEAN_SUCCESS';
 GO
 
 SET NOCOUNT ON;
+SET XACT_ABORT OFF;
+DECLARE @adminUserNoFac UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_administrador WHERE estaActivoUsuario = 1);
+DECLARE @newDeanNoFac UNIQUEIDENTIFIER = NEWID(), @corrNoFac UNIQUEIDENTIFIER = NEWID();
+DECLARE @emailNoFac NVARCHAR(100) = CONCAT(N'qa.deannofac.', LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 18), N'@test.local');
+DECLARE @numberNoFac INT = 1600000000 + ABS(CHECKSUM(NEWID()) % 300000000);
+DECLARE @userMsgNoFac NVARCHAR(4000), @techMsgNoFac NVARCHAR(4000);
+IF @adminUserNoFac IS NULL THROW 51936, 'TEST FAILED: DEAN_WITHOUT_FACULTY admin fixture missing.', 1;
+CREATE TABLE #deanNoFacResult (idCorrelacion UNIQUEIDENTIFIER NULL, mensajeUsuarioResultado NVARCHAR(MAX),
+    mensajeTecnicoResultado NVARCHAR(MAX), estadoResultado INT NOT NULL);
+BEGIN TRANSACTION;
+BEGIN TRY
+    EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = 'GEN_004', @p_param1 = 'Decano',
+        @mensajeUsuarioResultado = @userMsgNoFac OUTPUT, @mensajeTecnicoResultado = @techMsgNoFac OUTPUT;
+    INSERT INTO #deanNoFacResult
+    EXEC dbo.usp_crear_decano @idDecano = @newDeanNoFac, @numeroIdentificacion = @numberNoFac,
+        @primerNombre = N'DecanoSinFac', @segundoNombre = N'QA', @primerApellido = N'Quality',
+        @segundoApellido = N'Gate', @correo = @emailNoFac, @idFacultad = NULL,
+        @nombreFacultad = NULL, @password = N'HashBackend_QaDean1234567890',
+        @idCorrelacion = @corrNoFac, @idUsuarioEjecutor = @adminUserNoFac;
+    IF (SELECT COUNT(*) FROM #deanNoFacResult WHERE idCorrelacion = @corrNoFac AND estadoResultado = 1
+        AND mensajeUsuarioResultado = @userMsgNoFac
+        AND mensajeTecnicoResultado = CONCAT(@techMsgNoFac, ' Correlacion: ', @corrNoFac)) <> 1
+        THROW 51937, 'TEST FAILED: DEAN_WITHOUT_FACULTY_SUCCESS wrong canonical result.', 1;
+    IF NOT EXISTS (SELECT 1 FROM dbo.uv_decano WHERE id = @newDeanNoFac AND idFacultad IS NULL)
+        THROW 51938, 'TEST FAILED: DEAN_WITHOUT_FACULTY_SUCCESS not visible in uv_decano with idFacultad NULL.', 1;
+    IF NOT EXISTS (SELECT 1 FROM dbo.Usuario u JOIN dbo.Decano d ON d.usuario = u.id
+        WHERE u.correo = @emailNoFac AND d.id = @newDeanNoFac)
+        THROW 51939, 'TEST FAILED: DEAN_WITHOUT_FACULTY_SUCCESS did not persist user/dean.', 1;
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+    THROW;
+END CATCH;
+ROLLBACK TRANSACTION;
+IF EXISTS (SELECT 1 FROM dbo.Usuario WHERE correo = @emailNoFac) OR EXISTS (SELECT 1 FROM dbo.Decano WHERE id = @newDeanNoFac)
+    THROW 51940, 'TEST FAILED: DEAN_WITHOUT_FACULTY_SUCCESS leaked fixture.', 1;
+PRINT 'TEST_PASS:DEAN_WITHOUT_FACULTY_SUCCESS';
+GO
+
+SET NOCOUNT ON;
 DECLARE @session UNIQUEIDENTIFIER, @group UNIQUEIDENTIFIER, @teacher UNIQUEIDENTIFIER;
 SELECT TOP 1 @session = s.id, @group = s.idGrupo, @teacher = g.idDocente
 FROM dbo.uv_sesion s JOIN dbo.uv_grupo g ON g.id = s.idGrupo
