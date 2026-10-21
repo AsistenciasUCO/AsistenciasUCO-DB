@@ -135,6 +135,35 @@ BEGIN TRY
     )
         THROW 51412, 'TEST FAILED: coordinador SUCCESS no completo Usuario/Coordinador/Programa.', 1;
 
+    TRUNCATE TABLE #coordinadorResultado;
+    DECLARE @corrSinPrograma UNIQUEIDENTIFIER = NEWID();
+    DECLARE @idCoordinadorSinProg UNIQUEIDENTIFIER = NEWID();
+    DECLARE @correo5 NVARCHAR(100) = N'coord.sin-programa.qa@test.local';
+    INSERT INTO #coordinadorResultado
+    EXEC dbo.usp_crear_coordinador
+        @idCoordinador = @idCoordinadorSinProg,
+        @numeroIdentificacion = 914000005,
+        @primerNombre = N'Coord',
+        @segundoNombre = N'Disponible',
+        @primerApellido = N'QA',
+        @segundoApellido = N'SinPrograma',
+        @correo = @correo5,
+        @idPrograma = NULL,
+        @idFacultad = @idFacultadCorrecta,
+        @password = N'HashBackend_QaCoord1234567890',
+        @idCorrelacion = @corrSinPrograma,
+        @idUsuarioEjecutor = @idUsuarioDecano;
+
+    IF NOT EXISTS (SELECT 1 FROM #coordinadorResultado WHERE estadoResultado = 1)
+        THROW 51416, 'TEST FAILED: Coordinador sin programa (@idPrograma = NULL) no retorno SUCCESS.', 1;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM dbo.uv_coordinador vc
+        WHERE vc.id = @idCoordinadorSinProg AND vc.idPrograma IS NULL AND vc.estaActivoCoordinador = 1
+    )
+        THROW 51417, 'TEST FAILED: uv_coordinador no expone al coordinador creado sin programa.', 1;
+
     DROP TABLE #coordinadorResultado;
 END TRY
 BEGIN CATCH
@@ -143,7 +172,7 @@ BEGIN CATCH
 END CATCH
 ROLLBACK TRANSACTION;
 
-IF EXISTS (SELECT 1 FROM dbo.Usuario WHERE correo IN (@correo1, @correo2, @correo3, @correo4))
+IF EXISTS (SELECT 1 FROM dbo.Usuario WHERE correo IN (@correo1, @correo2, @correo3, @correo4, @correo5))
     THROW 51413, 'TEST FAILED: coordinador dejo datos permanentes.', 1;
 
 IF @@TRANCOUNT <> 0 THROW 51414, 'TEST FAILED: coordinador dejo transacciones abiertas.', 1;

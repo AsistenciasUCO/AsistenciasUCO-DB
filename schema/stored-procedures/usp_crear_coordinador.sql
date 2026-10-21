@@ -7,14 +7,14 @@ GO
 
 CREATE OR ALTER PROCEDURE [dbo].[usp_crear_coordinador]
 (
-    @idCoordinador           UNIQUEIDENTIFIER,
+    @idCoordinador           UNIQUEIDENTIFIER = NULL,
     @numeroIdentificacion    INT,
     @primerNombre            NVARCHAR(50),
     @segundoNombre           NVARCHAR(50),
     @primerApellido          NVARCHAR(50),
     @segundoApellido         NVARCHAR(50),
     @correo                  NVARCHAR(100),
-    @idPrograma              UNIQUEIDENTIFIER,
+    @idPrograma              UNIQUEIDENTIFIER = NULL,
     @idFacultad              UNIQUEIDENTIFIER,
     @password                NVARCHAR(500),
     @idCorrelacion           UNIQUEIDENTIFIER,
@@ -22,8 +22,8 @@ CREATE OR ALTER PROCEDURE [dbo].[usp_crear_coordinador]
 )
 AS
     DECLARE @idCorrelacionDefecto     UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idCorrelacion, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
-    DECLARE @idCoordinadorDefecto     UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idCoordinador, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
-    DECLARE @idProgramaDefecto        UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idPrograma, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
+    DECLARE @idCoordinadorDefecto     UNIQUEIDENTIFIER = @idCoordinador;
+    DECLARE @idProgramaDefecto        UNIQUEIDENTIFIER = @idPrograma;
     DECLARE @idFacultadDefecto        UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idFacultad, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
     DECLARE @idUsuarioEjecutorDefecto UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idUsuarioEjecutor, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
 
@@ -75,8 +75,8 @@ BEGIN
 
         END
 
-        -- PASO 2: Validar programa académico consultando uv_programa
-        IF @estadoResultado = 1
+        -- PASO 2: Validar programa académico consultando uv_programa (cuando se suministra @idPrograma)
+        IF @estadoResultado = 1 AND @idProgramaDefecto IS NOT NULL
         BEGIN
             IF NOT EXISTS (SELECT 1 FROM [dbo].[uv_programa] WHERE id = @idProgramaDefecto)
             BEGIN
@@ -107,8 +107,8 @@ BEGIN
             END
         END
 
-        -- PASO 2C: Validar que el Programa pertenezca a la Facultad indicada (uv_programa.idFacultad)
-        IF @estadoResultado = 1
+        -- PASO 2C: Validar que el Programa pertenezca a la Facultad indicada (cuando se suministra @idPrograma)
+        IF @estadoResultado = 1 AND @idProgramaDefecto IS NOT NULL
         BEGIN
             IF NOT EXISTS (
                 SELECT 1 FROM [dbo].[uv_programa]
@@ -188,11 +188,16 @@ BEGIN
             END
         END
 
-        -- PASO 4: Asignación reactiva de rol Coordinador y adscripción al Programa
+        -- PASO 4: Asignación reactiva de rol Coordinador y adscripción opcional al Programa
         IF @estadoResultado = 1
         BEGIN
             IF NOT EXISTS (SELECT 1 FROM dbo.Coordinador WHERE usuario = @idUsuarioCreado)
             BEGIN
+                IF @idCoordinadorDefecto IS NULL
+                BEGIN
+                    SET @idCoordinadorDefecto = NEWID();
+                END
+
                 INSERT INTO dbo.Coordinador (id, usuario)
                 VALUES (@idCoordinadorDefecto, @idUsuarioCreado);
             END
@@ -201,9 +206,12 @@ BEGIN
                 SELECT TOP 1 @idCoordinadorDefecto = id FROM dbo.Coordinador WHERE usuario = @idUsuarioCreado;
             END
 
-            UPDATE dbo.Programa
-            SET coordinador = @idCoordinadorDefecto
-            WHERE id = @idProgramaDefecto;
+            IF @idProgramaDefecto IS NOT NULL
+            BEGIN
+                UPDATE dbo.Programa
+                SET coordinador = @idCoordinadorDefecto
+                WHERE id = @idProgramaDefecto;
+            END
 
             EXEC dbo.usp_obtener_mensaje_catalogo
                 @p_codigo = 'GEN_004',

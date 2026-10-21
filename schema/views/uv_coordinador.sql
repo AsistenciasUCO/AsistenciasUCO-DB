@@ -24,11 +24,11 @@ SELECT		ci.id,
 			codigoPerfil = p.codigo,
 			nombrePerfil = p.nombre,
 
-			estaActivoCoordinador = IIF(ci.estaActivoUsuario = 1 AND pr.estaActivoPrograma = 1, 1, 0),
-			estaActivoTextoCoordinador = IIF(ci.estaActivoUsuario = 1 AND pr.estaActivoPrograma = 1, 'SI', 'NO')
+			estaActivoCoordinador = IIF(ci.estaActivoUsuario = 1 AND (pr.id IS NULL OR pr.estaActivoPrograma = 1), 1, 0),
+			estaActivoTextoCoordinador = IIF(ci.estaActivoUsuario = 1 AND (pr.id IS NULL OR pr.estaActivoPrograma = 1), 'SI', 'NO')
 
 FROM		uv_coordinador_identidad ci
-INNER JOIN	uv_programa pr 
+LEFT JOIN	uv_programa pr 
 ON			ci.id = pr.idCoordinador
 CROSS JOIN	(SELECT TOP 1 id, codigo, nombre FROM uv_perfil WHERE codigo = 'CD') p
 GO
