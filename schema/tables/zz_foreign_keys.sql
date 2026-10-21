@@ -280,3 +280,19 @@ BEGIN
     FOREIGN KEY ([estado]) REFERENCES [dbo].[Estado] ([id]);
 END
 GO
+
+-- 36. ArchivoSoporte -> Usuario (LB-004D)
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_ArchivoSoporte_Usuario')
+BEGIN
+    ALTER TABLE [dbo].[ArchivoSoporte] ADD CONSTRAINT [FK_ArchivoSoporte_Usuario] 
+    FOREIGN KEY ([usuarioPropietario]) REFERENCES [dbo].[Usuario] ([id]);
+END
+GO
+
+-- 37. ArchivoSoporte -> SolicitudRevisionAsistencia (LB-004D, sin ON DELETE CASCADE)
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_ArchivoSoporte_SolicitudRevisionAsistencia')
+BEGIN
+    ALTER TABLE [dbo].[ArchivoSoporte] ADD CONSTRAINT [FK_ArchivoSoporte_SolicitudRevisionAsistencia] 
+    FOREIGN KEY ([solicitudRevisionAsistencia]) REFERENCES [dbo].[SolicitudRevisionAsistencia] ([id]);
+END
+GO

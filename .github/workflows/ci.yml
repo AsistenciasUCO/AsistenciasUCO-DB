@@ -165,6 +165,12 @@ jobs:
         run: |
           ./deploy_schema.ps1 -ContainerName "sqlserver" -Password $env:MSSQL_SA_PASSWORD
 
+      - name: Prepare LB-004D test fixture
+        id: lb004d-fixture
+        shell: pwsh
+        run: |
+          ./test/prepare_lb004d_fixture.ps1 -ContainerName "sqlserver" -AdminPassword $env:MSSQL_SA_PASSWORD
+
       - name: Execute DB Quality Gate (test_summary.ps1)
         id: db-quality
         shell: pwsh
@@ -173,6 +179,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
               exit $LASTEXITCODE
           }
+
+      - name: Cleanup LB-004D test fixture
+        if: always()
+        id: lb004d-fixture-cleanup
+        shell: pwsh
+        run: |
+          ./test/cleanup_lb004d_fixture.ps1 -ContainerName "sqlserver" -AdminPassword $env:MSSQL_SA_PASSWORD
 
       - name: Trivy Security Scan (Filesystem)
         id: trivy-scan
