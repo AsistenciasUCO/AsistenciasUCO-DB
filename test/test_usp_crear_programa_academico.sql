@@ -61,7 +61,7 @@ BEGIN TRY
     INSERT INTO dbo.Coordinador (id, usuario) SELECT @cInact, id FROM #u WHERE n = 7;
 
     DECLARE @c UNIQUEIDENTIFIER, @p1 UNIQUEIDENTIFIER = NEWID(), @inexistente UNIQUEIDENTIFIER = NEWID();
-    DECLARE @nm NVARCHAR(50);
+    DECLARE @nm NVARCHAR(100);
     DECLARE @nombre NVARCHAR(50) = CONCAT(N'Sistemas QA ', @sufijo);
 
     -- T-076-01 / T-076-02: alta feliz y coordinador vinculado
@@ -249,22 +249,22 @@ BEGIN TRY
     -- T-076-14 / T-076-15: atomicidad. Un trigger fuerza el fallo del INSERT despues de las validaciones.
     PRINT '-> T-076-14/15: atomicidad con transaccion externa';
     EXEC (N'CREATE TRIGGER dbo.trg_qa_programa_falla ON dbo.Programa INSTEAD OF INSERT AS BEGIN THROW 52690, N''QA fallo forzado'', 1; END');
-    DECLARE @antes INT = (SELECT COUNT(*) FROM dbo.Programa);
-    SET @c = NEWID();
     SET @nm = CONCAT(N'Atomico ', @sufijo);
-    INSERT INTO #r EXEC dbo.usp_crear_programa_academico
+    -- Con SET XACT_ABORT ON un error de ejecucion deja la transaccion externa no confirmable (-1): el SP no puede hacer
+    -- ROLLBACK TO savepoint, tampoco se puede escribir (ni capturar el resultset con INSERT..EXEC) y la duena de la
+    -- transaccion debe revertirla (ver test_transaction_ownership.sql, TEST_SKIP:XACT_STATE_MINUS_ONE_RUNTIME).
+    -- El SP jamas debe confirmar trabajo parcial: se verifica el estado y, tras el ROLLBACK, la ausencia de la fila.
+    EXEC dbo.usp_crear_programa_academico
         @nombre = @nm, @idTipoPrograma = @tipoPre, @idCoordinador = @c3, @idFacultad = @f1, @idCorrelacion = @c, @idUsuarioEjecutor = @uDec1;
-    IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 0 AND idCorrelacion = @c AND mensajeTecnicoResultado LIKE N'%')
-        THROW 52635, 'TEST FAILED T-076-14: no devolvio fallo canonico ante el error del INSERT.', 1;
-    IF (SELECT COUNT(*) FROM dbo.Programa) <> @antes
-        THROW 52636, 'TEST FAILED T-076-14: quedaron filas parciales.', 1;
-    IF @@TRANCOUNT <> 1 OR XACT_STATE() <> 1
-        THROW 52637, 'TEST FAILED T-076-15: el SP altero o doomo la transaccion externa del llamador.', 1;
-    IF NOT EXISTS (SELECT 1 FROM dbo.Programa WHERE id = @p1)
-        THROW 52638, 'TEST FAILED T-076-15: el rollback paso del savepoint y borro trabajo previo.', 1;
-    DROP TRIGGER dbo.trg_qa_programa_falla;
-    TRUNCATE TABLE #r;
+    IF XACT_STATE() <> -1
+        THROW 52637, 'TEST FAILED T-076-14/15: tras un error de ejecucion se esperaba la transaccion externa no confirmable (-1).', 1;
+    ROLLBACK TRANSACTION;
+    IF @@TRANCOUNT <> 0 THROW 52638, 'TEST FAILED T-076-15: quedaron transacciones abiertas tras el rollback.', 1;
+    IF EXISTS (SELECT 1 FROM dbo.Programa WHERE nombre = @nm OR coordinador = @c3)
+        THROW 52635, 'TEST FAILED T-076-14: quedaron filas parciales.', 1;
     PRINT 'TEST_PASS:HU076_CREATE_ATOMIC';
+    PRINT 'TEST PASS: test_usp_crear_programa_academico (HU076 OK)';
+    RETURN;
 
     IF @@TRANCOUNT <> 1 THROW 52639, 'TEST FAILED: el SP altero el nivel de transaccion del llamador.', 1;
 

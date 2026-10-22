@@ -60,7 +60,7 @@ BEGIN TRY
     INSERT INTO dbo.Coordinador (id, usuario) SELECT @c3, id FROM #u WHERE n = 5;
     INSERT INTO dbo.Coordinador (id, usuario) SELECT @c4, id FROM #u WHERE n = 6;
 
-    DECLARE @nm NVARCHAR(50);
+    DECLARE @nm NVARCHAR(100);
     DECLARE @c UNIQUEIDENTIFIER, @inexistente UNIQUEIDENTIFIER = NEWID();
     DECLARE @p1 UNIQUEIDENTIFIER = NEWID(), @p2 UNIQUEIDENTIFIER = NEWID();
     DECLARE @n1 NVARCHAR(50) = CONCAT(N'Sistemas QA ', @sufijo), @n2 NVARCHAR(50) = CONCAT(N'Industrial QA ', @sufijo);

@@ -28,12 +28,19 @@ CREATE TABLE #academicResult (idCorrelacion UNIQUEIDENTIFIER NULL, mensajeUsuari
     mensajeTecnicoResultado NVARCHAR(MAX), estadoResultado INT NOT NULL);
 BEGIN TRANSACTION;
 BEGIN TRY
+    -- HU076 (contrato formal): el alta exige un coordinador libre (1 a 1). Se aprovisiona uno propio dentro de la transaccion.
+    SET @coordinator = NEWID();
+    SET @coordinatorUser = NEWID();
+    INSERT INTO dbo.Usuario (id, tipoIdIdentificacion, numeroIdentificacion, primerApellido, segundoApellido, primerNombre, segundoNombre, correo, correoConfirmado, estado, password)
+    VALUES (@coordinatorUser, (SELECT TOP 1 id FROM dbo.TipoIdentificacion), 500000000 + ABS(CHECKSUM(NEWID()) % 99999999), N'QA', N'Reactivo', N'Coord', N'X',
+            CONCAT(CONVERT(NVARCHAR(36), @coordinatorUser), N'@qa.test'), 1, 1, N'x');
+    INSERT INTO dbo.Coordinador (id, usuario) VALUES (@coordinator, @coordinatorUser);
     SET @corr = NEWID();
     EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = 'GEN_004', @p_param1 = 'Programa Academico',
         @mensajeUsuarioResultado = @userMsg OUTPUT, @mensajeTecnicoResultado = @techMsg OUTPUT;
     INSERT INTO #academicResult
     EXEC dbo.usp_crear_programa_academico
-        @idPrograma = @programRequested, @codigo = 101, @nombre = @programName,
+        @idPrograma = @programRequested, @nombre = @programName,
         @idCoordinador = @coordinator, @idFacultad = @faculty, @idTipoPrograma = @programType,
         @idCorrelacion = @corr, @idUsuarioEjecutor = @deanUser;
     IF (SELECT COUNT(*) FROM #academicResult WHERE idCorrelacion = @corr AND estadoResultado = 1
@@ -49,17 +56,16 @@ BEGIN TRY
 
     TRUNCATE TABLE #academicResult;
     SET @corr = NEWID();
-    EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = 'GEN_004', @p_param1 = 'Programa Academico',
-        @mensajeUsuarioResultado = @userMsg OUTPUT, @mensajeTecnicoResultado = @techMsg OUTPUT;
     INSERT INTO #academicResult
     EXEC dbo.usp_crear_programa_academico
-        @idPrograma = @program, @codigo = 101, @nombre = @programName,
+        @idPrograma = @program, @nombre = @programName,
         @idCoordinador = @coordinator, @idFacultad = @faculty, @idTipoPrograma = @programType,
         @idCorrelacion = @corr, @idUsuarioEjecutor = @deanUser;
-    IF (SELECT COUNT(*) FROM #academicResult WHERE idCorrelacion = @corr AND estadoResultado = 1
-        AND mensajeUsuarioResultado = @userMsg) <> 1 OR
+    -- HU076: el SP dejo de ser UPSERT; repetir un id existente se rechaza con PROG_002 y no modifica el programa.
+    IF (SELECT COUNT(*) FROM #academicResult WHERE idCorrelacion = @corr AND estadoResultado = 0
+        AND mensajeTecnicoResultado LIKE N'DBCODE=PROG_002|%') <> 1 OR
         (SELECT COUNT(*) FROM dbo.Programa WHERE id = @program) <> 1
-        THROW 51993, 'TEST FAILED: PROGRAM_UPSERT_UPDATE wrong result/row count.', 1;
+        THROW 51993, 'TEST FAILED: PROGRAM_CREATE_EXISTING_ID wrong result/row count (PROG_002 esperado).', 1;
 
     INSERT INTO dbo.PlanEstudio (id, programa, inp, estado) VALUES (@planRequested, @program, TRY_CAST(@planCode AS INT), 1);
     SELECT @plan = id FROM dbo.uv_plan_estudio WHERE idPrograma = @program AND inp = TRY_CAST(@planCode AS INT);
