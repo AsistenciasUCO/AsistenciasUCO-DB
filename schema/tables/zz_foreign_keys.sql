@@ -296,3 +296,18 @@ BEGIN
     FOREIGN KEY ([solicitudRevisionAsistencia]) REFERENCES [dbo].[SolicitudRevisionAsistencia] ([id]);
 END
 GO
+
+-- HU077: Programa -> Modalidad / Jornada
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_Programa_Modalidad')
+BEGIN
+    ALTER TABLE [dbo].[Programa] ADD CONSTRAINT [FK_Programa_Modalidad]
+    FOREIGN KEY ([modalidad]) REFERENCES [dbo].[Modalidad] ([id]);
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_Programa_Jornada')
+BEGIN
+    ALTER TABLE [dbo].[Programa] ADD CONSTRAINT [FK_Programa_Jornada]
+    FOREIGN KEY ([jornada]) REFERENCES [dbo].[Jornada] ([id]);
+END
+GO
