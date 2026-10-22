@@ -51,6 +51,7 @@ USING (VALUES
     ('FAC_001', 'BUSINESS_ERROR', 'MEDIO', 'La facultad especificada no existe en el sistema.'),
     ('DEC_001', 'BUSINESS_ERROR', 'MEDIO', 'El decano especificado no existe en el sistema.'),
     ('FAC_002', 'BUSINESS_ERROR', 'ALTO', 'El decano seleccionado ya es titular de otra facultad activa.'),
+    ('COO_001', 'BUSINESS_ERROR', 'ALTO', 'No se puede desactivar al coordinador mientras tenga un programa activo a cargo. Reasigne o desactive el programa primero.'),
     ('ERR_PROGRAMA_GRUPO_NO_ENCONTRADO', 'BUSINESS_ERROR', 'ALTO', 'No se encontro un programa academico asociado a este grupo.'),
 
     ('GRUP_001', 'BUSINESS_ERROR', 'MEDIO', 'El grupo seleccionado no existe o no se encuentra habilitado.'),
@@ -160,6 +161,7 @@ USING (VALUES
     ('FAC_001', 'BUSINESS_ERROR', 'MEDIO', 'Error de búsqueda: No se encontró la facultad en uv_facultad: {}.'),
     ('DEC_001', 'BUSINESS_ERROR', 'MEDIO', 'Error de búsqueda: No se encontró el decano en uv_decano_identidad: {}.'),
     ('FAC_002', 'BUSINESS_ERROR', 'ALTO', 'Regla de unicidad de titularidad: el decano {} ya es titular de otra facultad activa.'),
+    ('COO_001', 'BUSINESS_ERROR', 'ALTO', 'Regla de negocio: el coordinador {} coordina el programa activo {}.'),
     ('ERR_PROGRAMA_GRUPO_NO_ENCONTRADO', 'BUSINESS_ERROR', 'ALTO', 'Error: Trazabilidad rota para Grupo ID {}.'),
 
     ('GRUP_001', 'BUSINESS_ERROR', 'MEDIO', 'Error de búsqueda: Grupo inexistente o deshabilitado en uv_grupo: {}.'),
