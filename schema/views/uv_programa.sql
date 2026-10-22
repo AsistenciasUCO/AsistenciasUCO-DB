@@ -20,11 +20,25 @@ SELECT		pr.id,
 			nombreCoordinador = ci.nombreCompleto,
 			
 			estaActivoPrograma = pr.estado,
-			estaActivoTextoPrograma = IIF(pr.estado = 1, 'SI', 'NO')
+			estaActivoTextoPrograma = IIF(pr.estado = 1, 'SI', 'NO'),
+
+			-- HU076/HU077 (aditivo): tipo, modalidad y jornada
+			idTipoPrograma = tp.id,
+			nombreTipoPrograma = tp.nombre,
+			idModalidad = m.id,
+			nombreModalidad = m.nombre,
+			idJornada = j.id,
+			nombreJornada = j.nombre
 
 FROM		Programa pr
 INNER JOIN	uv_facultad f 
 ON			pr.facultad = f.id
 LEFT JOIN	uv_coordinador_identidad ci 
 ON			pr.coordinador = ci.id
+LEFT JOIN	uv_tipo_programa tp
+ON			pr.tipoDePrograma = tp.id
+LEFT JOIN	uv_modalidad m
+ON			pr.modalidad = m.id
+LEFT JOIN	uv_jornada j
+ON			pr.jornada = j.id
 GO

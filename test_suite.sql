@@ -40,6 +40,10 @@ PRINT '======================================================================';
 :r /tmp/test/test_utc_d06_procedencia_temporal.sql
 :r /tmp/test/test_authorized_views_rbac.sql
 :r /tmp/test/test_usp_consultar_grupos_paginado.sql
+:r /tmp/test/test_usp_crear_programa_academico.sql
+:r /tmp/test/test_usp_actualizar_programa_academico.sql
+:r /tmp/test/test_usp_cambiar_estado_programa_academico.sql
+:r /tmp/test/test_usp_consultar_programas_academicos.sql
 :r /tmp/test/test_uv_estudiante_programa_no_duplicates.sql
 :r /tmp/test/test_usp_consultar_detalle_solicitud_revision_docente.sql
 
