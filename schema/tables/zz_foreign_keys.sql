@@ -296,3 +296,24 @@ BEGIN
     FOREIGN KEY ([solicitudRevisionAsistencia]) REFERENCES [dbo].[SolicitudRevisionAsistencia] ([id]);
 END
 GO
+
+-- 38. DocentePrograma -> Docente (HU091)
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_DocentePrograma_Docente')
+BEGIN
+    ALTER TABLE [dbo].[DocentePrograma] ADD CONSTRAINT [FK_DocentePrograma_Docente] FOREIGN KEY ([docente]) REFERENCES [dbo].[Docente] ([id]);
+END
+GO
+
+-- 39. DocentePrograma -> Programa (HU091)
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_DocentePrograma_Programa')
+BEGIN
+    ALTER TABLE [dbo].[DocentePrograma] ADD CONSTRAINT [FK_DocentePrograma_Programa] FOREIGN KEY ([programa]) REFERENCES [dbo].[Programa] ([id]);
+END
+GO
+
+-- 40. DocentePrograma -> TipoVinculacion (HU091)
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_DocentePrograma_TipoVinculacion')
+BEGIN
+    ALTER TABLE [dbo].[DocentePrograma] ADD CONSTRAINT [FK_DocentePrograma_TipoVinculacion] FOREIGN KEY ([tipoVinculacion]) REFERENCES [dbo].[TipoVinculacion] ([id]);
+END
+GO
