@@ -10,6 +10,8 @@ PRINT '======================================================================';
 :r /tmp/test/test_public_objects.sql
 :r /tmp/test/test_contract_closure.sql
 :r /tmp/test/test_usp_crear_facultad.sql
+:r /tmp/test/test_usp_actualizar_facultad.sql
+:r /tmp/test/test_usp_cambiar_estado_facultad.sql
 :r /tmp/test/test_user_dean_close.sql
 :r /tmp/test/test_subject_catalog.sql
 :r /tmp/test/test_reactive_academic.sql
@@ -44,6 +46,7 @@ PRINT '======================================================================';
 :r /tmp/test/test_authorized_views_rbac.sql
 :r /tmp/test/test_usp_consultar_grupos_paginado.sql
 :r /tmp/test/test_uv_estudiante_programa_no_duplicates.sql
+:r /tmp/test/test_usp_consultar_detalle_solicitud_revision_docente.sql
 
 IF @@TRANCOUNT <> 0
 BEGIN

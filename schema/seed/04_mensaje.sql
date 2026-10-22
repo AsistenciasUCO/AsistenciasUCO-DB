@@ -48,6 +48,9 @@ USING (VALUES
     ('ERR_DOCENTE_NO_TITULAR_GRUPO', 'BUSINESS_ERROR', 'ALTO', 'El docente indicado no es el titular del grupo seleccionado.'),
 
     ('PROG_001', 'BUSINESS_ERROR', 'ALTO', 'El programa académico especificado no existe en el sistema.'),
+    ('FAC_001', 'BUSINESS_ERROR', 'MEDIO', 'La facultad especificada no existe en el sistema.'),
+    ('DEC_001', 'BUSINESS_ERROR', 'MEDIO', 'El decano especificado no existe en el sistema.'),
+    ('FAC_002', 'BUSINESS_ERROR', 'ALTO', 'El decano seleccionado ya es titular de otra facultad activa.'),
     ('ERR_PROGRAMA_GRUPO_NO_ENCONTRADO', 'BUSINESS_ERROR', 'ALTO', 'No se encontro un programa academico asociado a este grupo.'),
 
     ('GRUP_001', 'BUSINESS_ERROR', 'MEDIO', 'El grupo seleccionado no existe o no se encuentra habilitado.'),
@@ -154,6 +157,9 @@ USING (VALUES
     ('ERR_DOCENTE_NO_TITULAR_GRUPO', 'BUSINESS_ERROR', 'ALTO', 'Docente {} no es titular del Grupo {} (uv_grupo.idDocente).'),
 
     ('PROG_001', 'BUSINESS_ERROR', 'ALTO', 'Error de búsqueda: No se encontró el programa en uv_programa: {}.'),
+    ('FAC_001', 'BUSINESS_ERROR', 'MEDIO', 'Error de búsqueda: No se encontró la facultad en uv_facultad: {}.'),
+    ('DEC_001', 'BUSINESS_ERROR', 'MEDIO', 'Error de búsqueda: No se encontró el decano en uv_decano_identidad: {}.'),
+    ('FAC_002', 'BUSINESS_ERROR', 'ALTO', 'Regla de unicidad de titularidad: el decano {} ya es titular de otra facultad activa.'),
     ('ERR_PROGRAMA_GRUPO_NO_ENCONTRADO', 'BUSINESS_ERROR', 'ALTO', 'Error: Trazabilidad rota para Grupo ID {}.'),
 
     ('GRUP_001', 'BUSINESS_ERROR', 'MEDIO', 'Error de búsqueda: Grupo inexistente o deshabilitado en uv_grupo: {}.'),
