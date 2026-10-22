@@ -11,7 +11,6 @@ SELECT  id,
 		nombre,
 		codigo,
 		estaActivoTipoPrograma =  estado,
-		estaActivoTextoTipoPrograma = IIF(estado = 1, 'SI', 'NO'),
-		codigo
+		estaActivoTextoTipoPrograma = IIF(estado = 1, 'SI', 'NO')
 FROM	TipoPrograma
 GO
