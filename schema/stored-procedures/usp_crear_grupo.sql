@@ -117,6 +117,18 @@ BEGIN
                 @estadoResultado = @estadoResultado OUTPUT;
         END
 
+        -- PASO 4B (HU093/D12): el titular no puede tener su vinculo con el programa inactivado
+        IF @estadoResultado = 1
+        BEGIN
+            EXEC dbo.usp_validar_docente_vinculo_activo_programa_interno
+                @idDocente = @idDocenteDefecto,
+                @idAsignatura = @idAsignaturaDefecto,
+                @idCorrelacion = @idCorrelacionDefecto,
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+                @estadoResultado = @estadoResultado OUTPUT;
+        END
+
         -- PASO 5: Validar unicidad de código de grupo en el período consultando uv_grupo
         IF @estadoResultado = 1
         BEGIN

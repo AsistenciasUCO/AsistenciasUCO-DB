@@ -196,6 +196,8 @@ DECLARE @badResultSets TABLE (
 --                                            NON_GOLDEN_PATH_EXTENSION, no es un SP de comando/mutacion.
 --   usp_consultar_archivo_soporte_autorizado / usp_consultar_solicitudes_revision_docente (LB-004D)
 --                                            READ_QUERY_RESULTSET: devuelven filas de datos; NON_GOLDEN_PATH_EXTENSION.
+--   usp_consultar_docentes_programa / usp_consultar_candidatos_docente_programa (HU062/HU091)
+--                                            READ_QUERY_RESULTSET: devuelven filas de datos; NON_GOLDEN_PATH_EXTENSION.
 --   usp_consultar_detalle_solicitud_revision_docente (HU035/HU036)
 --                                            READ_QUERY_RESULTSET: 0..1 fila de detalle; NON_GOLDEN_PATH_EXTENSION.
 --   usp_consultar_programas_academicos (HU108)
@@ -211,7 +213,7 @@ WHERE SCHEMA_NAME(sp.schema_id) = 'dbo'
   AND sp.name NOT LIKE '%[_]interno'
   AND sp.name <> 'usp_obtener_mensaje_catalogo'
   AND sp.name <> 'usp_consultar_grupos_paginado'
-  AND sp.name NOT IN ('usp_consultar_archivo_soporte_autorizado', 'usp_consultar_solicitudes_revision_docente', 'usp_consultar_detalle_solicitud_revision_docente', 'usp_consultar_programas_academicos')
+  AND sp.name NOT IN ('usp_consultar_archivo_soporte_autorizado', 'usp_consultar_solicitudes_revision_docente', 'usp_consultar_detalle_solicitud_revision_docente', 'usp_consultar_programas_academicos', 'usp_consultar_docentes_programa', 'usp_consultar_candidatos_docente_programa')
   AND sp.name <> 'usp_establecer_contexto_usuario_ejecutor'
   AND d.error_number IS NOT NULL;
 
@@ -224,7 +226,7 @@ WHERE SCHEMA_NAME(sp.schema_id) = 'dbo'
   AND sp.name NOT LIKE '%[_]interno'
   AND sp.name <> 'usp_obtener_mensaje_catalogo'
   AND sp.name <> 'usp_consultar_grupos_paginado'
-  AND sp.name NOT IN ('usp_consultar_archivo_soporte_autorizado', 'usp_consultar_solicitudes_revision_docente', 'usp_consultar_detalle_solicitud_revision_docente', 'usp_consultar_programas_academicos')
+  AND sp.name NOT IN ('usp_consultar_archivo_soporte_autorizado', 'usp_consultar_solicitudes_revision_docente', 'usp_consultar_detalle_solicitud_revision_docente', 'usp_consultar_programas_academicos', 'usp_consultar_docentes_programa', 'usp_consultar_candidatos_docente_programa')
   AND sp.name <> 'usp_establecer_contexto_usuario_ejecutor'
   AND d.error_number IS NULL
 GROUP BY sp.name
@@ -239,7 +241,7 @@ WHERE SCHEMA_NAME(sp.schema_id) = 'dbo'
   AND sp.name NOT LIKE '%[_]interno'
   AND sp.name <> 'usp_obtener_mensaje_catalogo'
   AND sp.name <> 'usp_consultar_grupos_paginado'
-  AND sp.name NOT IN ('usp_consultar_archivo_soporte_autorizado', 'usp_consultar_solicitudes_revision_docente', 'usp_consultar_detalle_solicitud_revision_docente', 'usp_consultar_programas_academicos')
+  AND sp.name NOT IN ('usp_consultar_archivo_soporte_autorizado', 'usp_consultar_solicitudes_revision_docente', 'usp_consultar_detalle_solicitud_revision_docente', 'usp_consultar_programas_academicos', 'usp_consultar_docentes_programa', 'usp_consultar_candidatos_docente_programa')
   AND sp.name <> 'usp_establecer_contexto_usuario_ejecutor'
   AND d.error_number IS NULL
   AND (

@@ -99,6 +99,20 @@ BEGIN
                 @estadoResultado = @estadoResultado OUTPUT;
         END
 
+        -- PASO 3B (HU093/D12): un titular NUEVO no puede tener su vinculo con el programa inactivado.
+        -- Si el titular no cambia no se revalida (editar cupo u otros datos de un grupo ya asignado sigue permitido).
+        IF @estadoResultado = 1 AND @idDocente IS NOT NULL
+           AND NOT EXISTS (SELECT 1 FROM [dbo].[uv_grupo] WHERE id = @idGrupoDefecto AND idDocente = @idDocenteDefecto)
+        BEGIN
+            EXEC dbo.usp_validar_docente_vinculo_activo_programa_interno
+                @idDocente = @idDocenteDefecto,
+                @idAsignatura = @idAsigCurrent,
+                @idCorrelacion = @idCorrelacionDefecto,
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+                @estadoResultado = @estadoResultado OUTPUT;
+        END
+
         -- PASO 4: Validar conflicto de unicidad de código
         IF @estadoResultado = 1 AND @codigo IS NOT NULL AND @codigo > 0
         BEGIN

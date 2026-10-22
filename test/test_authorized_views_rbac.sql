@@ -24,6 +24,7 @@ INSERT @expectedAuthViews (viewName, clasificacion) VALUES
     ('uv_auth_decano', 'DIRECT_CONTEXT_FILTER'),
     ('uv_auth_coordinador', 'DIRECT_CONTEXT_FILTER'),
     ('uv_auth_docente', 'DIRECT_CONTEXT_FILTER'),
+    ('uv_auth_docente_programa', 'DIRECT_CONTEXT_FILTER'),
     ('uv_auth_estudiante', 'DIRECT_CONTEXT_FILTER'),
     ('uv_auth_periodo_academico', 'INHERITS_AUTH_VIEW'),
     ('uv_auth_sesion', 'INHERITS_AUTH_VIEW'),
