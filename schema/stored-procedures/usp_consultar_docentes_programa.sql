@@ -25,7 +25,9 @@ CREATE OR ALTER PROCEDURE [dbo].[usp_consultar_docentes_programa]
     @tamanoPagina       INT              = 10,
     @busqueda           NVARCHAR(50)     = NULL,
     @estaActivo         BIT              = NULL,
-    @idTipoVinculacion  UNIQUEIDENTIFIER = NULL
+    @idTipoVinculacion  UNIQUEIDENTIFIER = NULL,
+    @idDocente          UNIQUEIDENTIFIER = NULL,
+    @idUsuario          UNIQUEIDENTIFIER = NULL
 )
 AS
 BEGIN
@@ -100,6 +102,8 @@ BEGIN
         WHERE d.idPrograma = @idProgramaDefecto
           AND (@estaActivo IS NULL OR d.estaActivoDocentePrograma = @estaActivo)
           AND (@idTipoVinculacion IS NULL OR d.idTipoVinculacion = @idTipoVinculacion)
+          AND (@idDocente IS NULL OR d.idDocente = @idDocente)
+          AND (@idUsuario IS NULL OR d.idUsuario = @idUsuario)
           AND (
                 @patron IS NULL
                 OR (@soloDigitos = 1 AND CAST(d.numeroIdentificacion AS NVARCHAR(12)) LIKE @patron ESCAPE '\')

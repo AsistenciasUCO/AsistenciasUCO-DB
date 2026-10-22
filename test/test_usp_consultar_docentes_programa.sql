@@ -103,6 +103,21 @@ BEGIN TRY
         THROW 52241, 'T-089-01 FAILED: filtro activo+PLA debio traer 4.', 1;
     PRINT 'TEST_PASS:T-089-01';
 
+    -- Filtros por docente / usuario (relectura del vinculo recien creado por el backend)
+    DECLARE @unDocente UNIQUEIDENTIFIER, @unUsuario UNIQUEIDENTIFIER;
+    SELECT TOP 1 @unDocente = idDocente, @unUsuario = idUsuario FROM dbo.uv_docente_programa WHERE idPrograma = @p1 ORDER BY numeroIdentificacion;
+    TRUNCATE TABLE #q;
+    INSERT INTO #q EXEC dbo.usp_consultar_docentes_programa
+        @idUsuarioEjecutor = @uC1, @idCorrelacion = @corr, @idPrograma = @p1, @numeroPagina = 1, @tamanoPagina = 50, @idDocente = @unDocente;
+    IF (SELECT COUNT(*) FROM #q) <> 1 OR NOT EXISTS (SELECT 1 FROM #q WHERE idDocente = @unDocente)
+        THROW 52245, 'TEST FAILED: filtro @idDocente debio traer exactamente ese vinculo.', 1;
+    TRUNCATE TABLE #q;
+    INSERT INTO #q EXEC dbo.usp_consultar_docentes_programa
+        @idUsuarioEjecutor = @uC1, @idCorrelacion = @corr, @idPrograma = @p1, @numeroPagina = 1, @tamanoPagina = 50, @idUsuario = @unUsuario;
+    IF (SELECT COUNT(*) FROM #q) <> 1 OR NOT EXISTS (SELECT 1 FROM #q WHERE idUsuario = @unUsuario)
+        THROW 52246, 'TEST FAILED: filtro @idUsuario debio traer exactamente ese vinculo.', 1;
+    PRINT 'TEST_PASS:FILTROS_DOCENTE_USUARIO';
+
     -- T-062-03: ambito fail-closed. C1 consultando P2 -> error de titularidad; un docente -> error de RBAC.
     DECLARE @fallo BIT = 0;
     TRUNCATE TABLE #q;
