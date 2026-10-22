@@ -48,6 +48,7 @@ USING (VALUES
     ('ERR_DOCENTE_NO_TITULAR_GRUPO', 'BUSINESS_ERROR', 'ALTO', 'El docente indicado no es el titular del grupo seleccionado.'),
 
     ('PROG_001', 'BUSINESS_ERROR', 'ALTO', 'El programa académico especificado no existe en el sistema.'),
+    ('COO_001', 'BUSINESS_ERROR', 'ALTO', 'No se puede desactivar al coordinador mientras tenga un programa activo a cargo. Reasigne o desactive el programa primero.'),
     ('ERR_PROGRAMA_GRUPO_NO_ENCONTRADO', 'BUSINESS_ERROR', 'ALTO', 'No se encontro un programa academico asociado a este grupo.'),
 
     ('GRUP_001', 'BUSINESS_ERROR', 'MEDIO', 'El grupo seleccionado no existe o no se encuentra habilitado.'),
@@ -154,6 +155,7 @@ USING (VALUES
     ('ERR_DOCENTE_NO_TITULAR_GRUPO', 'BUSINESS_ERROR', 'ALTO', 'Docente {} no es titular del Grupo {} (uv_grupo.idDocente).'),
 
     ('PROG_001', 'BUSINESS_ERROR', 'ALTO', 'Error de búsqueda: No se encontró el programa en uv_programa: {}.'),
+    ('COO_001', 'BUSINESS_ERROR', 'ALTO', 'Regla de negocio: el coordinador {} coordina el programa activo {}.'),
     ('ERR_PROGRAMA_GRUPO_NO_ENCONTRADO', 'BUSINESS_ERROR', 'ALTO', 'Error: Trazabilidad rota para Grupo ID {}.'),
 
     ('GRUP_001', 'BUSINESS_ERROR', 'MEDIO', 'Error de búsqueda: Grupo inexistente o deshabilitado en uv_grupo: {}.'),
