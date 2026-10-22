@@ -18,11 +18,15 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 
-function Invoke-Sql([string]$Query) {
-    $out = $Query | docker exec -i $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P $Password -C -d $Database -y 0 -b -h -1 2>&1
+# El script T-SQL viaja en base64 y se decodifica dentro del contenedor (PowerShell 5.1 antepone un BOM al canalizar texto).
+$runSql = {
+    param($Container, $Pwd, $Db, $Query)
+    $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Query))
+    $out = docker exec $Container bash -c "echo $b64 | base64 -d | /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P '$Pwd' -C -d $Db -b -h -1 -W" 2>&1
     if ($LASTEXITCODE -ne 0) { throw "sqlcmd fallo: $out" }
     return ($out | Out-String).Trim()
 }
+function Invoke-Sql([string]$Query) { & $runSql $ContainerName $Password $Database $Query }
 
 $sufijo = ([guid]::NewGuid().ToString('N')).Substring(0, 8)
 $setup = @"
@@ -49,30 +53,26 @@ SET NOCOUNT ON;
 DECLARE @t0 DATETIME2 = SYSUTCDATETIME();
 CREATE TABLE #r (idCorrelacion UNIQUEIDENTIFIER, mu NVARCHAR(4000), mt NVARCHAR(4000), ok BIT);
 BEGIN TRANSACTION;
+DECLARE @cc UNIQUEIDENTIFIER = NEWID();
 INSERT INTO #r EXEC dbo.usp_crear_programa_academico @nombre = N'$nombre', @idTipoPrograma = '$tipo', @idCoordinador = '$coord',
-    @idFacultad = '$fac', @idCorrelacion = NEWID(), @idUsuarioEjecutor = '$uDec';
+    @idFacultad = '$fac', @idCorrelacion = @cc, @idUsuarioEjecutor = '$uDec';
 $espera
 COMMIT TRANSACTION;
-SELECT CONCAT((SELECT ok FROM #r), '|', LEFT((SELECT mt FROM #r), 40), '|', DATEDIFF(MILLISECOND, @t0, SYSUTCDATETIME()), '|', @@TRANCOUNT);
+SELECT CONCAT((SELECT ok FROM #r), '#', LEFT((SELECT mt FROM #r), 40), '#', DATEDIFF(MILLISECOND, @t0, SYSUTCDATETIME()), '#', @@TRANCOUNT);
 "@
 }
 
 try {
-    $jobA = Start-Job -ScriptBlock {
-        param($c, $p, $d, $q)
-        $q | docker exec -i $c /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P $p -C -d $d -y 0 -b -h -1 2>&1 | Out-String
-    } -ArgumentList $ContainerName, $Password, $Database, (New-Call "QA Conc A $sufijo" "WAITFOR DELAY '00:00:04';")
+    $jobBlock = { param($f, $c, $p, $d, $q) & ([scriptblock]::Create($f)) $c $p $d $q }
+    $jobA = Start-Job -ScriptBlock $jobBlock -ArgumentList $runSql.ToString(), $ContainerName, $Password, $Database, (New-Call "QA Conc A $sufijo" "WAITFOR DELAY '00:00:04';")
     Start-Sleep -Seconds 1
-    $jobB = Start-Job -ScriptBlock {
-        param($c, $p, $d, $q)
-        $q | docker exec -i $c /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P $p -C -d $d -y 0 -b -h -1 2>&1 | Out-String
-    } -ArgumentList $ContainerName, $Password, $Database, (New-Call "QA Conc B $sufijo" "")
+    $jobB = Start-Job -ScriptBlock $jobBlock -ArgumentList $runSql.ToString(), $ContainerName, $Password, $Database, (New-Call "QA Conc B $sufijo" "")
     $resA = (Receive-Job $jobA -Wait).Trim()
     $resB = (Receive-Job $jobB -Wait).Trim()
     Write-Host "A: $resA"
     Write-Host "B: $resB"
 
-    $a = $resA.Split('|'); $b = $resB.Split('|')
+    $a = $resA.Split('#'); $b = $resB.Split('#')
     $exitos = @($a[0], $b[0]) | Where-Object { $_ -eq '1' }
     if ($exitos.Count -ne 1) { throw "TEST FAILED T-076-07: se esperaba exactamente 1 exito, hubo $($exitos.Count)." }
     $perdedor = if ($a[0] -eq '0') { $resA } else { $resB }
