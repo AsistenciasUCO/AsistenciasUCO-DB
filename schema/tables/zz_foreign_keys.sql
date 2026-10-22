@@ -296,3 +296,12 @@ BEGIN
     FOREIGN KEY ([solicitudRevisionAsistencia]) REFERENCES [dbo].[SolicitudRevisionAsistencia] ([id]);
 END
 GO
+
+-- 7b. Coordinador -> Facultad (HU121/HU122, D2)
+IF COL_LENGTH('dbo.Coordinador', 'facultad') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_Coordinador_Facultad')
+BEGIN
+    ALTER TABLE [dbo].[Coordinador] ADD CONSTRAINT [FK_Coordinador_Facultad]
+    FOREIGN KEY ([facultad]) REFERENCES [dbo].[Facultad] ([id]);
+END
+GO
