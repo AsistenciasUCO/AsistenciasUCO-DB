@@ -39,6 +39,7 @@ PRINT '======================================================================';
 :r /tmp/test/test_authorized_views_rbac.sql
 :r /tmp/test/test_usp_consultar_grupos_paginado.sql
 :r /tmp/test/test_uv_estudiante_programa_no_duplicates.sql
+:r /tmp/test/test_usp_consultar_detalle_solicitud_revision_docente.sql
 
 IF @@TRANCOUNT <> 0
 BEGIN
