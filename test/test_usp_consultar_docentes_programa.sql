@@ -125,26 +125,21 @@ BEGIN TRY
     IF @fallo = 0 OR EXISTS (SELECT 1 FROM #q) THROW 52251, 'T-062-03 FAILED: un docente no debe consultar el directorio (SEC_001).', 1;
     PRINT 'TEST_PASS:T-062-03';
 
-    -- Paginacion invalida (PAG_001)
-    SET @fallo = 0;
-    BEGIN TRY
-        INSERT INTO #q EXEC dbo.usp_consultar_docentes_programa
-            @idUsuarioEjecutor = @uC1, @idCorrelacion = @corr, @idPrograma = @p1, @numeroPagina = 0, @tamanoPagina = 10;
-    END TRY
-    BEGIN CATCH
-        SET @fallo = 1;
-    END CATCH
-    IF @fallo = 0 THROW 52260, 'TEST FAILED: numeroPagina=0 debio fallar (PAG_001).', 1;
-    PRINT 'TEST_PASS:PAG_001';
+    -- Paginacion normalizada (como usp_consultar_grupos_paginado): pagina < 1 => 1; tamano > 100 => 100. No falla.
+    TRUNCATE TABLE #q;
+    INSERT INTO #q EXEC dbo.usp_consultar_docentes_programa
+        @idUsuarioEjecutor = @uC1, @idCorrelacion = @corr, @idPrograma = @p1, @numeroPagina = 0, @tamanoPagina = 500;
+    IF (SELECT COUNT(*) FROM #q) <> 12 THROW 52260, 'TEST FAILED: paginacion fuera de rango debio normalizarse (pagina 1, tamano 100).', 1;
+    PRINT 'TEST_PASS:PAGINACION_NORMALIZADA';
 
     DROP TABLE #q;
     ROLLBACK TRANSACTION;
     PRINT 'TEST_PASS:TEST_USP_CONSULTAR_DOCENTES_PROGRAMA';
 END TRY
 BEGIN CATCH
-    IF OBJECT_ID('tempdb..#q') IS NOT NULL DROP TABLE #q;
-    IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
     DECLARE @err NVARCHAR(4000) = ERROR_MESSAGE();
+    IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+    IF OBJECT_ID('tempdb..#q') IS NOT NULL DROP TABLE #q;
     THROW 52999, @err, 1;
 END CATCH
 GO

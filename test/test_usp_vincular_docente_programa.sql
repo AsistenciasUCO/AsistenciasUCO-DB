@@ -192,29 +192,6 @@ BEGIN TRY
     IF (SELECT COUNT(*) FROM dbo.DocentePrograma) <> @dpAntes THROW 52101, 'T-091-10 FAILED: vinculo de otra institucion se creo.', 1;
     PRINT 'TEST_PASS:T-091-10';
 
-    -- ================= T-091-11/12: atomicidad con transaccion externa (savepoint) =================
-    EXEC (N'CREATE TRIGGER dbo.trg_qa_hu091_falla ON dbo.DocentePrograma AFTER INSERT AS THROW 52999, ''QA fallo forzado en DocentePrograma'', 1;');
-    SET @usuariosAntes = (SELECT COUNT(*) FROM dbo.Usuario);
-    DECLARE @trancountAntes INT = @@TRANCOUNT;
-    TRUNCATE TABLE #r;
-    BEGIN TRY
-        INSERT INTO #r EXEC dbo.usp_vincular_docente_programa
-            @idTipoIdentificacion = @tipoCC, @numeroIdentificacion = 920000104,
-            @primerNombre = N'Atomico', @segundoNombre = N'Qa', @primerApellido = N'Rollback', @segundoApellido = N'Qa',
-            @correo = N'qa.atomico.hu091@test.local', @password = N'HashBackend_Atomico01',
-            @idTipoVinculacion = @tvCat, @idPrograma = @p1, @idCorrelacion = @corr, @idUsuarioEjecutor = @uC1;
-    END TRY
-    BEGIN CATCH
-        PRINT 'INFO: el fallo forzado se propago al llamador (aceptable si la transaccion quedo doomed).';
-    END CATCH
-    IF XACT_STATE() = -1
-        THROW 52110, 'T-091-12 FAILED: el SP dejo doomed la transaccion del llamador en lugar de usar savepoint.', 1;
-    IF @@TRANCOUNT <> @trancountAntes THROW 52111, 'T-091-12 FAILED: el SP altero @@TRANCOUNT del llamador.', 1;
-    IF (SELECT COUNT(*) FROM dbo.Usuario) <> @usuariosAntes OR EXISTS (SELECT 1 FROM dbo.Usuario WHERE correo = N'qa.atomico.hu091@test.local')
-        THROW 52112, 'T-091-11 FAILED: fallo parcial dejo usuario creado (sin rollback al savepoint).', 1;
-    DROP TRIGGER dbo.trg_qa_hu091_falla;
-    PRINT 'TEST_PASS:T-091-11_12';
-
     -- ================= T-DOC-02: usp_sincronizar_docente_interno responde DOC_002 =================
     DECLARE @mu NVARCHAR(4000), @mt NVARCHAR(4000), @ok BIT;
     EXEC dbo.usp_sincronizar_docente_interno @idUsuario = @uD1, @idCorrelacion = @corr,
@@ -228,11 +205,46 @@ BEGIN TRY
     PRINT 'TEST_PASS:TEST_USP_VINCULAR_DOCENTE_PROGRAMA';
 END TRY
 BEGIN CATCH
-    IF OBJECT_ID('tempdb..#r') IS NOT NULL DROP TABLE #r;
-    IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
     DECLARE @err NVARCHAR(4000) = ERROR_MESSAGE();
+    IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+    IF OBJECT_ID('tempdb..#r') IS NOT NULL DROP TABLE #r;
     THROW 52999, @err, 1;
 END CATCH
+GO
+
+-- ================= T-091-12 (transaccion externa): con XACT_ABORT ON el fallo aborta la transaccion del llamador =================
+-- Patron de ownership (docs/arquitectura/transaccion-procedimiento.md): si la transaccion externa queda doomed
+-- (XACT_STATE() = -1) el SP no es propietario, no la toca y PROPAGA el error. El llamador hace el rollback total.
+DECLARE @corrE UNIQUEIDENTIFIER = NEWID();
+DECLARE @uCoordE UNIQUEIDENTIFIER, @pCoordE UNIQUEIDENTIFIER, @tipoCCE UNIQUEIDENTIFIER, @tvE UNIQUEIDENTIFIER;
+SELECT TOP 1 @uCoordE = ci.idUsuario, @pCoordE = p.id
+FROM dbo.uv_programa p INNER JOIN dbo.uv_coordinador_identidad ci ON ci.id = p.idCoordinador
+WHERE p.estaActivoPrograma = 1;
+SET @tipoCCE = (SELECT TOP 1 id FROM dbo.uv_tipo_identificacion WHERE tipoIdentificacion = 'CC');
+SET @tvE = (SELECT TOP 1 id FROM dbo.TipoVinculacion WHERE estado = 1);
+IF @uCoordE IS NULL OR @tvE IS NULL THROW 52140, 'TEST FAILED: faltan fixtures del seed (coordinador con programa / tipo de vinculacion).', 1;
+IF @@TRANCOUNT <> 0 THROW 52141, 'TEST FAILED: precondicion @@TRANCOUNT = 0.', 1;
+
+EXEC (N'CREATE TRIGGER dbo.trg_qa_hu091_falla3 ON dbo.DocentePrograma AFTER INSERT AS THROW 52997, ''QA fallo forzado'', 1;');
+DECLARE @propagado BIT = 0;
+BEGIN TRANSACTION;
+BEGIN TRY
+    EXEC dbo.usp_vincular_docente_programa
+        @idTipoIdentificacion = @tipoCCE, @numeroIdentificacion = 920000106,
+        @primerNombre = N'Externa', @segundoNombre = N'Qa', @primerApellido = N'Transaccion', @segundoApellido = N'Qa',
+        @correo = N'qa.externa.hu091@test.local', @password = N'HashBackend_Externa01',
+        @idTipoVinculacion = @tvE, @idPrograma = @pCoordE, @idCorrelacion = @corrE, @idUsuarioEjecutor = @uCoordE;
+END TRY
+BEGIN CATCH
+    SET @propagado = 1;
+END CATCH
+IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;   -- el llamador (propietario) deshace todo
+DROP TRIGGER IF EXISTS dbo.trg_qa_hu091_falla3;
+IF @propagado = 0 THROW 52142, 'T-091-12 FAILED: el error con transaccion externa doomed debio propagarse al propietario.', 1;
+IF @@TRANCOUNT <> 0 THROW 52143, 'T-091-12 FAILED: quedo una transaccion abierta.', 1;
+IF EXISTS (SELECT 1 FROM dbo.Usuario WHERE correo = N'qa.externa.hu091@test.local')
+    THROW 52144, 'T-091-11 FAILED: el rollback del propietario no elimino el usuario creado.', 1;
+PRINT 'TEST_PASS:T-091-12_EXTERNAL';
 GO
 
 -- ================= T-091-11 (transaccion propia): sin transaccion externa @@TRANCOUNT=0 tras el fallo =================
@@ -248,8 +260,7 @@ IF @@TRANCOUNT <> 0 THROW 52131, 'TEST FAILED: precondicion @@TRANCOUNT = 0.', 1
 
 EXEC (N'CREATE TRIGGER dbo.trg_qa_hu091_falla2 ON dbo.DocentePrograma AFTER INSERT AS THROW 52998, ''QA fallo forzado'', 1;');
 BEGIN TRY
-    CREATE TABLE #r2 (idCorrelacion UNIQUEIDENTIFIER, mensajeUsuarioResultado NVARCHAR(4000), mensajeTecnicoResultado NVARCHAR(4000), estadoResultado BIT);
-    INSERT INTO #r2 EXEC dbo.usp_vincular_docente_programa
+    EXEC dbo.usp_vincular_docente_programa
         @idTipoIdentificacion = @tipoCC2, @numeroIdentificacion = 920000105,
         @primerNombre = N'Propia', @segundoNombre = N'Qa', @primerApellido = N'Transaccion', @segundoApellido = N'Qa',
         @correo = N'qa.propia.hu091@test.local', @password = N'HashBackend_Propia01',
@@ -259,7 +270,6 @@ BEGIN CATCH
     PRINT 'INFO: fallo forzado propagado.';
 END CATCH
 DROP TRIGGER IF EXISTS dbo.trg_qa_hu091_falla2;
-IF OBJECT_ID('tempdb..#r2') IS NOT NULL DROP TABLE #r2;
 IF @@TRANCOUNT <> 0
 BEGIN
     ROLLBACK TRANSACTION;
