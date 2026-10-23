@@ -51,6 +51,11 @@ PRINT '======================================================================';
 :r /tmp/test/test_usp_consultar_programas_academicos.sql
 :r /tmp/test/test_uv_estudiante_programa_no_duplicates.sql
 :r /tmp/test/test_usp_consultar_detalle_solicitud_revision_docente.sql
+:r /tmp/test/test_usp_consultar_estudiantes_paginado.sql
+:r /tmp/test/test_usp_consultar_estudiantes_grupo_paginado.sql
+:r /tmp/test/test_usp_consultar_docentes_paginado.sql
+:r /tmp/test/test_usp_consultar_sesiones_y_asistencias_paginado.sql
+:r /tmp/test/test_usp_consultar_catalogos_y_revisiones_paginado.sql
 
 IF @@TRANCOUNT <> 0
 BEGIN
