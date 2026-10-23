@@ -13,10 +13,11 @@
 #>
 param(
     [string]$ContainerName = 'sql_server_asistencias',
-    [string]$Password = 'TuPasswordSeguro123',
+    [string]$Password = $(if ($env:SQL_CONTAINER_PASSWORD) { $env:SQL_CONTAINER_PASSWORD } else { $env:MSSQL_SA_PASSWORD }),
     [string]$Database = 'gestionasistenciadb'
 )
 $ErrorActionPreference = 'Stop'
+if (-not $Password) { throw 'SQL password is required: pass -Password or set SQL_CONTAINER_PASSWORD/MSSQL_SA_PASSWORD.' }
 
 # El script T-SQL viaja en base64 y se decodifica dentro del contenedor (PowerShell 5.1 antepone un BOM al canalizar texto).
 $runSql = {
