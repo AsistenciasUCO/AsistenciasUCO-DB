@@ -28,6 +28,7 @@ DELETE FROM dbo.EstudianteGrupo
  WHERE id = @fixtureEnrollment OR estudiante = @fixtureStudent OR grupo = @fixtureGroup;
 DELETE FROM dbo.Grupo WHERE id = @fixtureGroup;
 DELETE FROM dbo.Estudiante WHERE id = @fixtureStudent AND usuario = @fixtureStudentUser;
+DELETE FROM dbo.DocentePrograma WHERE docente = @fixtureTeacher;
 DELETE FROM dbo.Docente WHERE id = @fixtureTeacher AND usuario = @fixtureTeacherUser;
 DELETE FROM dbo.Usuario WHERE id IN (@fixtureTeacherUser, @fixtureStudentUser);
 
