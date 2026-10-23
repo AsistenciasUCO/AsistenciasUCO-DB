@@ -40,6 +40,8 @@ FROM		Coordinador c
 INNER JOIN	Usuario u
 ON			c.usuario = u.id
 CROSS JOIN	(SELECT TOP 1 id, codigo, nombre FROM Perfil WHERE codigo = 'CD') p
+-- HU121/HU122 (D1): un rol de coordinador inactivo deja de figurar como perfil (RBAC y roles activos)
+WHERE		c.estado = 1
 
 UNION
 

@@ -296,3 +296,48 @@ BEGIN
     FOREIGN KEY ([solicitudRevisionAsistencia]) REFERENCES [dbo].[SolicitudRevisionAsistencia] ([id]);
 END
 GO
+
+-- 7b. Coordinador -> Facultad (HU121/HU122, D2)
+IF COL_LENGTH('dbo.Coordinador', 'facultad') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_Coordinador_Facultad')
+BEGIN
+    ALTER TABLE [dbo].[Coordinador] ADD CONSTRAINT [FK_Coordinador_Facultad]
+    FOREIGN KEY ([facultad]) REFERENCES [dbo].[Facultad] ([id]);
+END
+GO
+
+-- HU077: Programa -> Modalidad / Jornada
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_Programa_Modalidad')
+BEGIN
+    ALTER TABLE [dbo].[Programa] ADD CONSTRAINT [FK_Programa_Modalidad]
+    FOREIGN KEY ([modalidad]) REFERENCES [dbo].[Modalidad] ([id]);
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_Programa_Jornada')
+BEGIN
+    ALTER TABLE [dbo].[Programa] ADD CONSTRAINT [FK_Programa_Jornada]
+    FOREIGN KEY ([jornada]) REFERENCES [dbo].[Jornada] ([id]);
+END
+GO
+
+-- 38. DocentePrograma -> Docente (HU091)
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_DocentePrograma_Docente')
+BEGIN
+    ALTER TABLE [dbo].[DocentePrograma] ADD CONSTRAINT [FK_DocentePrograma_Docente] FOREIGN KEY ([docente]) REFERENCES [dbo].[Docente] ([id]);
+END
+GO
+
+-- 39. DocentePrograma -> Programa (HU091)
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_DocentePrograma_Programa')
+BEGIN
+    ALTER TABLE [dbo].[DocentePrograma] ADD CONSTRAINT [FK_DocentePrograma_Programa] FOREIGN KEY ([programa]) REFERENCES [dbo].[Programa] ([id]);
+END
+GO
+
+-- 40. DocentePrograma -> TipoVinculacion (HU091)
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_DocentePrograma_TipoVinculacion')
+BEGIN
+    ALTER TABLE [dbo].[DocentePrograma] ADD CONSTRAINT [FK_DocentePrograma_TipoVinculacion] FOREIGN KEY ([tipoVinculacion]) REFERENCES [dbo].[TipoVinculacion] ([id]);
+END
+GO

@@ -19,3 +19,16 @@ CREATE TABLE [dbo].[Programa] (
 ALTER TABLE [dbo].[Programa] ADD CONSTRAINT [PK__Programa__3213E83F41C65B8B] PRIMARY KEY CLUSTERED ([id]);
 END
 GO
+
+-- HU077: modalidad y jornada del programa (nullable, retrocompatible). Idempotente para BD existentes.
+IF COL_LENGTH('dbo.Programa', 'modalidad') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[Programa] ADD [modalidad] uniqueidentifier NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.Programa', 'jornada') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[Programa] ADD [jornada] uniqueidentifier NULL;
+END
+GO

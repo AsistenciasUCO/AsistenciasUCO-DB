@@ -17,7 +17,13 @@ SELECT  p.id,
         p.idCoordinador,
         p.nombreCoordinador,
         p.estaActivoPrograma,
-        p.estaActivoTextoPrograma
+        p.estaActivoTextoPrograma,
+        p.idTipoPrograma,
+        p.nombreTipoPrograma,
+        p.idModalidad,
+        p.nombreModalidad,
+        p.idJornada,
+        p.nombreJornada
 FROM    dbo.uv_programa p
 WHERE   dbo.ufn_obtener_usuario_ejecutor_contexto() IS NOT NULL   -- fail closed: sin contexto => 0 filas
    AND  (

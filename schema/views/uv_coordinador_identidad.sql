@@ -11,9 +11,18 @@ SELECT		c.id,
 			idUsuario = u.id,
 			u.numeroIdentificacion,
 			u.nombreCompleto,
-			u.estaActivoUsuario
+			u.estaActivoUsuario,
+
+			-- HU121/HU122: datos editables y estado/facultad propios del rol
+			u.primerNombre,
+			u.segundoNombre,
+			u.primerApellido,
+			u.segundoApellido,
+			u.correo,
+			estaActivoRolCoordinador = c.estado,
+			idFacultadCoordinador = c.facultad
 
 FROM		Coordinador c
-INNER JOIN	uv_usuario u 
+INNER JOIN	uv_usuario u
 ON			c.usuario = u.id
 GO

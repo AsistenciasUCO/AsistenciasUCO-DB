@@ -65,8 +65,7 @@ BEGIN
             IF EXISTS (SELECT 1 FROM dbo.Docente WHERE usuario = @idUsuarioDefecto)
             BEGIN
                 EXEC dbo.usp_obtener_mensaje_catalogo
-                    @p_codigo = 'VAL_006',
-                    @p_param1 = 'Docente',
+                    @p_codigo = 'DOC_002',
                     @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                     @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
 

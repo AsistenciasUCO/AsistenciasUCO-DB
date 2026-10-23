@@ -9,6 +9,7 @@ CREATE OR ALTER  VIEW [dbo].[uv_tipo_programa]
 AS
 SELECT  id,
 		nombre,
+		codigo,
 		estaActivoTipoPrograma =  estado,
 		estaActivoTextoTipoPrograma = IIF(estado = 1, 'SI', 'NO')
 FROM	TipoPrograma

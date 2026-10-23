@@ -198,12 +198,16 @@ BEGIN
                     SET @idCoordinadorDefecto = NEWID();
                 END
 
-                INSERT INTO dbo.Coordinador (id, usuario)
-                VALUES (@idCoordinadorDefecto, @idUsuarioCreado);
+                -- HU121/HU122 (D2): el coordinador conserva su facultad aunque aun no tenga programa
+                INSERT INTO dbo.Coordinador (id, usuario, facultad)
+                VALUES (@idCoordinadorDefecto, @idUsuarioCreado, @idFacultadDefecto);
             END
             ELSE
             BEGIN
                 SELECT TOP 1 @idCoordinadorDefecto = id FROM dbo.Coordinador WHERE usuario = @idUsuarioCreado;
+
+                UPDATE dbo.Coordinador SET facultad = @idFacultadDefecto
+                WHERE id = @idCoordinadorDefecto AND facultad IS NULL;
             END
 
             IF @idProgramaDefecto IS NOT NULL

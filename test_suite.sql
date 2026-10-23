@@ -19,7 +19,6 @@ PRINT '======================================================================';
 :r /tmp/test/test_usp_registrar_estudiante_en_grupo_usuario_no_existente.sql
 :r /tmp/test/test_usp_registrar_estudiante_en_grupo_autonomo.sql
 :r /tmp/test/test_usp_registrar_docente_en_grupo_usuario_no_existente.sql
-:r /tmp/test/test_usp_registrar_docente_en_grupo_autonomo.sql
 :r /tmp/test/test_transaction_ownership.sql
 :r /tmp/test/test_usp_sincronizar_usuario.sql
 :r /tmp/test/test_usp_registrar_o_actualizar_plan_estudio.sql
@@ -34,14 +33,29 @@ PRINT '======================================================================';
 :r /tmp/test/test_attendance_review.sql
 :r /tmp/test/test_lb004d_support_binding.sql
 :r /tmp/test/test_usp_crear_coordinador.sql
+:r /tmp/test/test_migracion_docente_programa.sql
+:r /tmp/test/test_usp_vincular_docente_programa.sql
+:r /tmp/test/test_usp_consultar_docentes_programa.sql
+:r /tmp/test/test_usp_consultar_candidatos_docente_programa.sql
+:r /tmp/test/test_usp_actualizar_docente_programa.sql
+:r /tmp/test/test_usp_cambiar_estado_docente_programa.sql
 :r /tmp/test/test_usp_resolver_solicitud_matricula.sql
 :r /tmp/test/test_golden_path_immutability.sql
 :r /tmp/test/test_utc_d06_readonly_contract.sql
 :r /tmp/test/test_utc_d06_procedencia_temporal.sql
 :r /tmp/test/test_authorized_views_rbac.sql
 :r /tmp/test/test_usp_consultar_grupos_paginado.sql
+:r /tmp/test/test_usp_crear_programa_academico.sql
+:r /tmp/test/test_usp_actualizar_programa_academico.sql
+:r /tmp/test/test_usp_cambiar_estado_programa_academico.sql
+:r /tmp/test/test_usp_consultar_programas_academicos.sql
 :r /tmp/test/test_uv_estudiante_programa_no_duplicates.sql
 :r /tmp/test/test_usp_consultar_detalle_solicitud_revision_docente.sql
+:r /tmp/test/test_usp_consultar_estudiantes_paginado.sql
+:r /tmp/test/test_usp_consultar_estudiantes_grupo_paginado.sql
+:r /tmp/test/test_usp_consultar_docentes_paginado.sql
+:r /tmp/test/test_usp_consultar_sesiones_y_asistencias_paginado.sql
+:r /tmp/test/test_usp_consultar_catalogos_y_revisiones_paginado.sql
 
 IF @@TRANCOUNT <> 0
 BEGIN
