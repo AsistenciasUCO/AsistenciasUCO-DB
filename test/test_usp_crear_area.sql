@@ -87,7 +87,7 @@ BEGIN TRY
     PRINT '-> DB-05: codigo duplicado';
     SET @c = NEWID();
     INSERT INTO #r EXEC dbo.usp_crear_area @codigo = @cod, @nombre = @nomOtro, @idCorrelacion = @c, @idUsuarioEjecutor = @idEjecutor;
-    IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE N'DBCODE=GEN_003|%')
+    IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE N'DBCODE=ARE_002|%')
         THROW 52715, 'TEST FAILED DB-05: acepto codigo duplicado.', 1;
     TRUNCATE TABLE #r;
 
@@ -95,7 +95,7 @@ BEGIN TRY
     PRINT '-> DB-06: nombre duplicado';
     SET @c = NEWID();
     INSERT INTO #r EXEC dbo.usp_crear_area @codigo = N'ZZ2', @nombre = @nomUpper, @idCorrelacion = @c, @idUsuarioEjecutor = @idEjecutor;
-    IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE N'DBCODE=GEN_003|%')
+    IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE N'DBCODE=ARE_002|%')
         THROW 52716, 'TEST FAILED DB-06: acepto nombre duplicado.', 1;
     IF EXISTS (SELECT 1 FROM dbo.uv_area WHERE codigo = N'ZZ2')
         THROW 52717, 'TEST FAILED DB-06: persistio pese al rechazo.', 1;
