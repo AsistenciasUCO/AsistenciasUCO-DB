@@ -49,6 +49,8 @@ USING (VALUES
 
     ('PROG_001', 'BUSINESS_ERROR', 'ALTO', 'El programa académico especificado no existe en el sistema.'),
     ('FAC_001', 'BUSINESS_ERROR', 'MEDIO', 'La facultad especificada no existe en el sistema.'),
+    ('TPR_001', 'BUSINESS_ERROR', 'MEDIO', 'El tipo de programa especificado no existe en el sistema.'),
+    ('ARE_001', 'BUSINESS_ERROR', 'MEDIO', 'El área de conocimiento especificada no existe en el sistema.'),
     ('DEC_001', 'BUSINESS_ERROR', 'MEDIO', 'El decano especificado no existe en el sistema.'),
     ('FAC_002', 'BUSINESS_ERROR', 'ALTO', 'El decano seleccionado ya es titular de otra facultad activa.'),
     ('COO_001', 'BUSINESS_ERROR', 'ALTO', 'No se puede desactivar al coordinador mientras tenga un programa activo a cargo. Reasigne o desactive el programa primero.'),
@@ -159,6 +161,8 @@ USING (VALUES
 
     ('PROG_001', 'BUSINESS_ERROR', 'ALTO', 'Error de búsqueda: No se encontró el programa en uv_programa: {}.'),
     ('FAC_001', 'BUSINESS_ERROR', 'MEDIO', 'Error de búsqueda: No se encontró la facultad en uv_facultad: {}.'),
+    ('TPR_001', 'BUSINESS_ERROR', 'MEDIO', 'Error de búsqueda: No se encontró el tipo de programa en uv_tipo_programa: {}.'),
+    ('ARE_001', 'BUSINESS_ERROR', 'MEDIO', 'Error de búsqueda: No se encontró el área de conocimiento en uv_area: {}.'),
     ('DEC_001', 'BUSINESS_ERROR', 'MEDIO', 'Error de búsqueda: No se encontró el decano en uv_decano_identidad: {}.'),
     ('FAC_002', 'BUSINESS_ERROR', 'ALTO', 'Regla de unicidad de titularidad: el decano {} ya es titular de otra facultad activa.'),
     ('COO_001', 'BUSINESS_ERROR', 'ALTO', 'Regla de negocio: el coordinador {} coordina el programa activo {}.'),
