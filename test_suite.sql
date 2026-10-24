@@ -56,6 +56,12 @@ PRINT '======================================================================';
 :r /tmp/test/test_usp_consultar_docentes_paginado.sql
 :r /tmp/test/test_usp_consultar_sesiones_y_asistencias_paginado.sql
 :r /tmp/test/test_usp_consultar_catalogos_y_revisiones_paginado.sql
+:r /tmp/test/test_ufn_clasificar_permanencia.sql
+:r /tmp/test/test_uv_resumen_asistencia_estudiante_grupo.sql
+:r /tmp/test/test_usp_consultar_kpis_coordinador.sql
+:r /tmp/test/test_usp_consultar_alerta_temprana_programa.sql
+:r /tmp/test/test_usp_consultar_bitacora_estudiante_programa.sql
+:r /tmp/test/test_usp_consultar_ficha_estudiante_programa.sql
 
 IF @@TRANCOUNT <> 0
 BEGIN
