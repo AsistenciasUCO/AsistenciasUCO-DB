@@ -5,7 +5,7 @@ SET NOCOUNT ON;
 SET XACT_ABORT OFF;
 
 PRINT '==================================================';
-PRINT 'TEST START: test_usp_cambiar_estado_area (HU154)';
+PRINT 'TEST START: test_usp_cambiar_estado_area (HU151/HU152)';
 PRINT '==================================================';
 
 DECLARE @idEjecutor UNIQUEIDENTIFIER = (
@@ -108,6 +108,6 @@ IF @@TRANCOUNT <> 0
     THROW 52799, 'TEST FAILED: test_usp_cambiar_estado_area dejo transacciones abiertas.', 1;
 
 PRINT '==================================================';
-PRINT 'TEST PASS: test_usp_cambiar_estado_area (HU154 OK)';
+PRINT 'TEST PASS: test_usp_cambiar_estado_area (HU151/HU152 OK)';
 PRINT '==================================================';
 GO
