@@ -32,7 +32,7 @@ BEGIN TRY
     -- Fixtures propios (rollback al final): 8 usuarios, 2 decanos, 2 facultades, coordinadores libres
     CREATE TABLE #u (n INT IDENTITY(1,1), id UNIQUEIDENTIFIER);
     DECLARE @i INT = 1;
-    WHILE @i <= 8
+    WHILE @i <= 10
     BEGIN
         DECLARE @uid UNIQUEIDENTIFIER = NEWID();
         INSERT INTO dbo.Usuario (id, tipoIdIdentificacion, numeroIdentificacion, primerApellido, segundoApellido, primerNombre, segundoNombre, correo, correoConfirmado, estado, password)
@@ -54,11 +54,14 @@ BEGIN TRY
     INSERT INTO dbo.Facultad (id, nombre, institucion, decano, estado) VALUES (@f2, CONCAT(N'QA Prog Dos ', @sufijo), @idInstitucion, @dec2, 1);
 
     DECLARE @c1 UNIQUEIDENTIFIER = NEWID(), @c2 UNIQUEIDENTIFIER = NEWID(), @c3 UNIQUEIDENTIFIER = NEWID(), @c4 UNIQUEIDENTIFIER = NEWID(), @cInact UNIQUEIDENTIFIER = NEWID();
-    INSERT INTO dbo.Coordinador (id, usuario) SELECT @c1, id FROM #u WHERE n = 3;
-    INSERT INTO dbo.Coordinador (id, usuario) SELECT @c2, id FROM #u WHERE n = 4;
-    INSERT INTO dbo.Coordinador (id, usuario) SELECT @c3, id FROM #u WHERE n = 5;
-    INSERT INTO dbo.Coordinador (id, usuario) SELECT @c4, id FROM #u WHERE n = 6;
-    INSERT INTO dbo.Coordinador (id, usuario) SELECT @cInact, id FROM #u WHERE n = 7;
+    DECLARE @cAjeno UNIQUEIDENTIFIER = NEWID(), @cRolInactivo UNIQUEIDENTIFIER = NEWID();
+    INSERT INTO dbo.Coordinador (id, usuario, facultad) SELECT @c1, id, @f1 FROM #u WHERE n = 3;
+    INSERT INTO dbo.Coordinador (id, usuario, facultad) SELECT @c2, id, @f2 FROM #u WHERE n = 4;
+    INSERT INTO dbo.Coordinador (id, usuario, facultad) SELECT @c3, id, @f1 FROM #u WHERE n = 5;
+    INSERT INTO dbo.Coordinador (id, usuario, facultad) SELECT @c4, id, @f1 FROM #u WHERE n = 6;
+    INSERT INTO dbo.Coordinador (id, usuario, facultad) SELECT @cInact, id, @f1 FROM #u WHERE n = 7;
+    INSERT INTO dbo.Coordinador (id, usuario, facultad) SELECT @cAjeno, id, @f2 FROM #u WHERE n = 9;               -- libre, pero de la facultad F2
+    INSERT INTO dbo.Coordinador (id, usuario, facultad, estado) SELECT @cRolInactivo, id, @f1, 0 FROM #u WHERE n = 10;   -- usuario activo, rol inactivo (HU122)
 
     DECLARE @c UNIQUEIDENTIFIER, @p1 UNIQUEIDENTIFIER = NEWID(), @inexistente UNIQUEIDENTIFIER = NEWID();
     DECLARE @nm NVARCHAR(100);
@@ -140,6 +143,40 @@ BEGIN TRY
         @nombre = @nm, @idTipoPrograma = @tipoPre, @idCoordinador = @inexistente, @idFacultad = @f1, @idCorrelacion = @c, @idUsuarioEjecutor = @uDec1;
     IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 0 AND idCorrelacion = @c AND mensajeTecnicoResultado LIKE N'DBCODE=PROG_005|%')
         THROW 52621, 'TEST FAILED T-076-16: acepto un coordinador inexistente.', 1;
+    TRUNCATE TABLE #r;
+
+    -- HU121/HU122: el coordinador libre debe pertenecer a la facultad del decano y tener el rol activo
+    PRINT '-> T-076-17: coordinador libre de otra facultad';
+    SET @c = NEWID();
+    SET @nm = CONCAT(N'OtraFac ', @sufijo);
+    INSERT INTO #r EXEC dbo.usp_crear_programa_academico
+        @nombre = @nm, @idTipoPrograma = @tipoPre, @idCoordinador = @cAjeno, @idFacultad = @f1, @idCorrelacion = @c, @idUsuarioEjecutor = @uDec1;
+    IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 0 AND idCorrelacion = @c AND mensajeTecnicoResultado LIKE N'DBCODE=PROG_005|%')
+        THROW 52640, 'TEST FAILED T-076-17: acepto un coordinador libre de otra facultad.', 1;
+    IF EXISTS (SELECT 1 FROM dbo.Programa WHERE coordinador = @cAjeno)
+        THROW 52641, 'TEST FAILED T-076-17: se creo un programa pese al rechazo.', 1;
+    TRUNCATE TABLE #r;
+
+    PRINT '-> T-076-18: coordinador con rol inactivo (usuario activo)';
+    SET @c = NEWID();
+    SET @nm = CONCAT(N'RolOff ', @sufijo);
+    INSERT INTO #r EXEC dbo.usp_crear_programa_academico
+        @nombre = @nm, @idTipoPrograma = @tipoPre, @idCoordinador = @cRolInactivo, @idFacultad = @f1, @idCorrelacion = @c, @idUsuarioEjecutor = @uDec1;
+    IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 0 AND idCorrelacion = @c AND mensajeTecnicoResultado LIKE N'DBCODE=PROG_005|%')
+        THROW 52642, 'TEST FAILED T-076-18: acepto un coordinador con el rol inactivo.', 1;
+    IF EXISTS (SELECT 1 FROM dbo.Programa WHERE coordinador = @cRolInactivo)
+        THROW 52643, 'TEST FAILED T-076-18: se creo un programa pese al rechazo.', 1;
+    TRUNCATE TABLE #r;
+
+    PRINT '-> T-076-19: coordinador libre sin facultad asignada (dato heredado)';
+    UPDATE dbo.Coordinador SET facultad = NULL WHERE id = @c4;
+    SET @c = NEWID();
+    SET @nm = CONCAT(N'SinFac ', @sufijo);
+    INSERT INTO #r EXEC dbo.usp_crear_programa_academico
+        @nombre = @nm, @idTipoPrograma = @tipoPre, @idCoordinador = @c4, @idFacultad = @f1, @idCorrelacion = @c, @idUsuarioEjecutor = @uDec1;
+    IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 0 AND idCorrelacion = @c AND mensajeTecnicoResultado LIKE N'DBCODE=PROG_005|%')
+        THROW 52644, 'TEST FAILED T-076-19: acepto un coordinador libre sin facultad.', 1;
+    UPDATE dbo.Coordinador SET facultad = @f1 WHERE id = @c4;
     TRUNCATE TABLE #r;
 
     -- T-076-08: tipo inexistente / inactivo
