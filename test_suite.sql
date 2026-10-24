@@ -62,6 +62,10 @@ PRINT '======================================================================';
 :r /tmp/test/test_usp_consultar_alerta_temprana_programa.sql
 :r /tmp/test/test_usp_consultar_bitacora_estudiante_programa.sql
 :r /tmp/test/test_usp_consultar_ficha_estudiante_programa.sql
+:r /tmp/test/test_usp_resolvers_decano.sql
+:r /tmp/test/test_usp_consultar_kpis_decano.sql
+:r /tmp/test/test_usp_consultar_comparativa_programas_facultad.sql
+:r /tmp/test/test_usp_consultar_aforo_grupos_facultad.sql
 
 IF @@TRANCOUNT <> 0
 BEGIN
