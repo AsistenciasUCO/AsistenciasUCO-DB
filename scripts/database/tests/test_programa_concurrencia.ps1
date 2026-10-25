@@ -41,7 +41,7 @@ VALUES (@ud, @tid, 600000000 + ABS(CHECKSUM(NEWID()) % 9999999), N'QA', N'Conc',
        (@uc, @tid, 610000000 + ABS(CHECKSUM(NEWID()) % 9999999), N'QA', N'Conc', N'Coo', N'X', CONCAT(CONVERT(NVARCHAR(36), @uc), N'@qa.test'), 1, 1, N'x');
 INSERT INTO dbo.Decano (id, usuario) VALUES (@d, @ud);
 INSERT INTO dbo.Facultad (id, nombre, institucion, decano, estado) VALUES (@f, N'QA Conc $sufijo', @inst, @d, 1);
-INSERT INTO dbo.Coordinador (id, usuario) VALUES (@co, @uc);
+INSERT INTO dbo.Coordinador (id, usuario, facultad) VALUES (@co, @uc, @f);
 SELECT CONCAT(@ud, '|', @f, '|', @co, '|', @tipo, '|', @d, '|', @uc);
 "@
 $fx = (Invoke-Sql $setup).Split('|')
