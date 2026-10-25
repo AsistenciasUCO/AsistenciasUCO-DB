@@ -66,6 +66,10 @@ PRINT '======================================================================';
 :r /tmp/test/test_usp_consultar_kpis_decano.sql
 :r /tmp/test/test_usp_consultar_comparativa_programas_facultad.sql
 :r /tmp/test/test_usp_consultar_aforo_grupos_facultad.sql
+:r /tmp/test/test_usp_resolvers_institucion_admin.sql
+:r /tmp/test/test_usp_consultar_kpis_institucion.sql
+:r /tmp/test/test_usp_consultar_comparativa_facultades.sql
+:r /tmp/test/test_usp_consultar_tendencia_ausentismo.sql
 
 IF @@TRANCOUNT <> 0
 BEGIN
