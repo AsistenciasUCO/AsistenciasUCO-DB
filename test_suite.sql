@@ -23,6 +23,7 @@ PRINT '======================================================================';
 :r /tmp/test/test_usp_sincronizar_usuario.sql
 :r /tmp/test/test_usp_registrar_o_actualizar_plan_estudio.sql
 :r /tmp/test/test_usp_plan_estudio_estado_semestres.sql
+:r /tmp/test/test_usp_periodo_academico_gestion.sql
 :r /tmp/test/test_usp_crear_actualizar_grupo.sql
 :r /tmp/test/test_usp_crear_actualizar_sesion.sql
 :r /tmp/test/test_usp_validar_sesion_operacion_interno.sql
