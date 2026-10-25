@@ -272,7 +272,7 @@ BEGIN TRY
     UPDATE dbo.CatalogoParametro SET estaActivo = 1 WHERE grupo = N'ASISTENCIA' AND clave = N'UMBRAL_ALERTA_PERDIDA';
 
     -- T-KPI-05: sin periodo vigente => una fila con ceros y porcentajes NULL (no es error)
-    UPDATE dbo.PeriodoAcademico SET fechaFin = DATEADD(DAY, -1, @hoy), fechaInicio = DATEADD(DAY, -90, @hoy) WHERE id = @per;
+    UPDATE dbo.PeriodoAcademico SET fechaFin = DATEADD(DAY, -3, @hoy), fechaInicio = DATEADD(DAY, -90, @hoy) WHERE id = @per;
     INSERT INTO #k EXEC dbo.usp_consultar_kpis_coordinador @idUsuarioEjecutor = @uC1, @idCorrelacion = @c, @idPeriodoAcademico = NULL;
     IF NOT (EXISTS (SELECT 1 FROM #k WHERE idPeriodoAcademico IS NULL AND totalEstudiantes = 0 AND sesionesProgramadas = 0 AND porcentajeCumplimiento IS NULL AND porcentajeProgresoCalendario IS NULL AND tasaPermanencia IS NULL))
         THROW 53215, 'TEST FAILED: T-KPI-05 sin periodo vigente', 1;

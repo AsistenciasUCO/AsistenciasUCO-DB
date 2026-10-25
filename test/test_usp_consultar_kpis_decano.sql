@@ -275,7 +275,7 @@ BEGIN TRY
     PRINT 'TEST_PASS:HU102_KPIS_AMBITO_Y_ERRORES';
 
     -- Sin periodo vigente (D7): una fila con ceros y NULL; el periodo anterior sigue consultable de forma explicita
-    UPDATE dbo.PeriodoAcademico SET fechaFin = DATEADD(DAY, -1, @hoy), fechaInicio = DATEADD(DAY, -90, @hoy) WHERE id = @per;
+    UPDATE dbo.PeriodoAcademico SET fechaFin = DATEADD(DAY, -3, @hoy), fechaInicio = DATEADD(DAY, -90, @hoy) WHERE id = @per;
     INSERT INTO #k EXEC dbo.usp_consultar_kpis_decano @idUsuarioEjecutor = @uDec, @idCorrelacion = @c, @idPeriodoAcademico = NULL;
     IF NOT EXISTS (SELECT 1 FROM #k WHERE idPeriodoAcademico IS NULL AND totalProgramas = 3 AND totalEstudiantes = 0 AND tasaRetencion IS NULL AND porcentajeAusentismo IS NULL AND gruposActivos = 0 AND tasaAforo IS NULL)
         THROW 53430, 'TEST FAILED: sin periodo vigente', 1;
