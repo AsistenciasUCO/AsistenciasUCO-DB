@@ -26,6 +26,7 @@ PRINT '======================================================================';
 :r /tmp/test/test_usp_periodo_academico_gestion.sql
 :r /tmp/test/test_consultas_coordinador_programa.sql
 :r /tmp/test/test_consultas_decano_facultad.sql
+:r /tmp/test/test_consultas_reclamos_estudiante.sql
 :r /tmp/test/test_usp_crear_actualizar_grupo.sql
 :r /tmp/test/test_usp_crear_actualizar_sesion.sql
 :r /tmp/test/test_usp_validar_sesion_operacion_interno.sql
