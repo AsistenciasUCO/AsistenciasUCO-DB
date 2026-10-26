@@ -288,3 +288,13 @@ Esta documentación especifica la arquitectura, reglas de negocio, contrato de f
 ## Verificación de Integridad y Despliegue
 
 Todos los procedimientos listados en esta documentación han sido compilados y probados en la base de datos `gestionasistenciadb` mediante la ejecución del script `deploy_schema.ps1`.
+
+---
+
+## Addendum HU096-HU098 (2026-10-25)
+
+### `dbo.usp_resolver_institucion_gestor_periodo_interno`
+- **Propósito**: resuelve la institución que gestiona períodos para el ejecutor: valida RBAC `ADMINISTRADOR` y toma `dbo.Administrador.institucion` si la institución está activa.
+- **Invocado por**: `usp_crear_periodo_academico`, `usp_actualizar_periodo_academico`, `usp_eliminar_periodo_academico`.
+- **Códigos de Catálogo Consumidos**: `PER_005` (sin institución activa como administrador).
+- Work item: `docs/work-items/HU096-HU097-HU098-periodos-academicos/`.

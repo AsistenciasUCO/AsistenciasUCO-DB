@@ -217,3 +217,33 @@ Contrato completo, decisiones y limitaciones: `docs/work-items/CC-003G-01-public
 - **Caso de uso**: alta/actualizacion del `inp` de un plan por el COORDINADOR titular del programa (`/api/v1/coordinador/planes-estudio`).
 - **Parametros**: `@idPlanEstudio`, `@idPrograma`, `@inp`, `@idCorrelacion`, `@idUsuarioEjecutor` (obligatorio, fail-closed).
 - **Flujo**: correlacion, RBAC `COORDINADOR`, titularidad `PROGRAMA`, validaciones de entrada, transaccion propia/savepoint con bloqueo de la fila del programa, upsert por id con unicidad (programa, inp).
+
+---
+
+## Addendum HU081-HU083 / HU096-HU098 / HU060-HU064 / HU104-HU145 (2026-10-25)
+
+Work items: `docs/work-items/HU081-HU082-HU083-plan-estudio-estado-semestres/`, `HU096-HU097-HU098-periodos-academicos/`, `HU064-HU060-HU061-consultas-coordinador/` y `HU104-HU105-HU109-HU119-HU145-lecturas-decano/`. Mensajes en `schema/seed/17_mensajes_plan_estudio.sql` (`PLA_002`..`PLA_006`) y `schema/seed/17_mensajes_periodo_academico.sql` (`PER_001`..`PER_006`).
+
+### Comandos (resultset canónico de 4 columnas, `@idUsuarioEjecutor` obligatorio)
+
+| SP | Caso de uso | RBAC / ámbito | Códigos |
+|---|---|---|---|
+| `dbo.usp_cambiar_estado_plan_estudio` | HU081 activar/inactivar el plan (`PlanEstudio.estado`) | `COORDINADOR` titular del programa | `PLA_002` |
+| `dbo.usp_agregar_semestre_plan_estudio` | HU082 añadir el siguiente semestre (máx. 10) | `COORDINADOR` titular | `PLA_002`, `PLA_003` |
+| `dbo.usp_quitar_semestre_plan_estudio` | HU083 quitar el último semestre sin asignaturas | `COORDINADOR` titular | `PLA_002`, `PLA_004`, `PLA_005`, `PLA_006` |
+| `dbo.usp_crear_periodo_academico` (reescrito) | HU096 crear período (`codigo`/`anio` derivados de `fechaInicio`) | `ADMINISTRADOR` de institución activa | `PER_002`, `PER_003`, `PER_005` |
+| `dbo.usp_actualizar_periodo_academico` | HU097 modificar nombre y fechas | `ADMINISTRADOR` | `PER_001`, `PER_002`, `PER_003`, `PER_005` |
+| `dbo.usp_eliminar_periodo_academico` | HU098 eliminar si no tiene grupos | `ADMINISTRADOR` | `PER_001`, `PER_004`, `PER_005`, `PER_006` |
+
+### Consultas (READ_QUERY_RESULTSET; fallas por `THROW`; `SESSION_CONTEXT` capturado y restaurado)
+
+| SP | Caso de uso | Ámbito | Códigos |
+|---|---|---|---|
+| `dbo.usp_consultar_estudiantes_facultad_paginado` | HU104/HU105 directorio y búsqueda de estudiantes | facultad del decano ejecutor (`uv_auth_estudiante`) | `VAL_001`, `PAG_001` |
+| `dbo.usp_consultar_estudiante_facultad_detalle` | HU105 ficha (matrículas) del estudiante | facultad del decano | `VAL_001` |
+| `dbo.usp_consultar_estructura_facultad` | HU109/HU119 Facultad → Programa → Plan | facultad del decano (`uv_auth_facultad`, `uv_auth_programa`) | `VAL_001` |
+| `dbo.usp_consultar_sesiones_facultad_paginado` | HU145 cronograma de sesiones por rango | facultad del decano (`uv_auth_sesion`, `uv_auth_grupo`) | `VAL_001`, `PAG_001` |
+
+HU064/HU060/HU061 consumen los SP existentes `usp_consultar_grupos_paginado`, `usp_consultar_sesiones_grupo_paginado` y `usp_consultar_asistencias_sesion_paginado` (sin cambios; ámbito por programa vía `uv_auth_grupo`/`uv_auth_sesion`).
+
+Permisos aditivos: `schema/security/rol_asistencias_runtime_hu081_hu083.sql`, `_hu096_hu098.sql`, `_hu060_hu064.sql` y `_hu104_hu145.sql`. Pruebas: `test/test_usp_plan_estudio_estado_semestres.sql`, `test/test_usp_periodo_academico_gestion.sql`, `test/test_consultas_coordinador_programa.sql` y `test/test_consultas_decano_facultad.sql`, registradas en `test_suite.sql`.
