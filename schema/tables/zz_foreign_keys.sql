@@ -341,3 +341,10 @@ BEGIN
     ALTER TABLE [dbo].[DocentePrograma] ADD CONSTRAINT [FK_DocentePrograma_TipoVinculacion] FOREIGN KEY ([tipoVinculacion]) REFERENCES [dbo].[TipoVinculacion] ([id]);
 END
 GO
+
+-- 41. IdentidadExterna -> Usuario (SEC-BASELINE-017)
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_IdentidadExterna_Usuario')
+BEGIN
+    ALTER TABLE [dbo].[IdentidadExterna] ADD CONSTRAINT [FK_IdentidadExterna_Usuario] FOREIGN KEY ([usuario]) REFERENCES [dbo].[Usuario] ([id]);
+END
+GO
