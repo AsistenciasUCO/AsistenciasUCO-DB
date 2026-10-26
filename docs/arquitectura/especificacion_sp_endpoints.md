@@ -493,3 +493,25 @@
 | `usp_sincronizar_docente_interno` | Persistencia | Crea registro `Docente` desde `Usuario` existente | `DocenteRepositorySqlServerAdapter` |
 | `usp_sincronizar_estudiante_interno` | Persistencia | Crea registro `Estudiante` desde `Usuario` existente | Orquestadores de registro estudiantil |
 | `usp_obtener_mensaje_catalogo` | Mensajería | Traduce códigos de catálogo a mensajes para usuario/técnico | Todos los SPs |
+
+---
+
+## Addendum 2026-10-25 — Plan de estudio, períodos y consultas de coordinador y decano
+
+| Endpoint | SP | HU |
+|:---|:---|:---|
+| `PATCH /api/v1/coordinador/planes-estudio/{id}/toggle-estado` | `usp_cambiar_estado_plan_estudio` | HU081 |
+| `POST /api/v1/coordinador/planes-estudio/{id}/semestres` | `usp_agregar_semestre_plan_estudio` | HU082 |
+| `DELETE /api/v1/coordinador/planes-estudio/{id}/semestres/{numero}` | `usp_quitar_semestre_plan_estudio` | HU083 |
+| `POST /api/v1/admin/periodos-academicos` | `usp_crear_periodo_academico` | HU096 |
+| `PUT /api/v1/admin/periodos-academicos/{id}` | `usp_actualizar_periodo_academico` | HU097 |
+| `DELETE /api/v1/admin/periodos-academicos/{id}` | `usp_eliminar_periodo_academico` | HU098 |
+| `GET /api/v1/coordinador/grupos` | `usp_consultar_grupos_paginado` | HU064 |
+| `GET /api/v1/coordinador/grupos/{id}/sesiones` | `usp_consultar_sesiones_grupo_paginado` | HU060 |
+| `GET /api/v1/coordinador/sesiones/{id}/asistencias` | `usp_consultar_asistencias_sesion_paginado` | HU061 |
+| `GET /api/v1/decano/estudiantes` | `usp_consultar_estudiantes_facultad_paginado` | HU104/HU105 |
+| `GET /api/v1/decano/estudiantes/{id}` | `usp_consultar_estudiante_facultad_detalle` | HU105 |
+| `GET /api/v1/decano/estructura` | `usp_consultar_estructura_facultad` | HU109/HU119 (y planes de HU108) |
+| `GET /api/v1/decano/sesiones` | `usp_consultar_sesiones_facultad_paginado` | HU145 |
+
+Firma de entrada/salida y códigos: `DOCUMENTACION_PROCEDIMIENTOS_PUBLICOS.md` (addendum 2026-10-25) y el `CONTRACT.md` de cada work item del backend.
