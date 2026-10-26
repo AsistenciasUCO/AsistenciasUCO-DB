@@ -202,6 +202,9 @@ DECLARE @badResultSets TABLE (
 --                                            READ_QUERY_RESULTSET: 0..1 fila de detalle; NON_GOLDEN_PATH_EXTENSION.
 --   usp_consultar_programas_academicos (HU108)
 --                                            READ_QUERY_RESULTSET: filas de programa + totalRegistros; NON_GOLDEN_PATH_EXTENSION.
+--   usp_consultar_estudiantes_facultad_paginado / usp_consultar_estudiante_facultad_detalle /
+--   usp_consultar_estructura_facultad / usp_consultar_sesiones_facultad_paginado (HU104/HU105/HU109/HU119/HU145)
+--                                            READ_QUERY_RESULTSET: filas de datos del decano; NON_GOLDEN_PATH_EXTENSION.
 --   usp_establecer_contexto_usuario_ejecutor helper de SESSION_CONTEXT: no devuelve resultset.
 -- El resultset canonico de 4 columnas es exclusivo de los SP de comando/mutacion del Golden Path.
 INSERT @badResultSets (procedureName, reason)
@@ -226,6 +229,7 @@ WHERE SCHEMA_NAME(sp.schema_id) = 'dbo'
   AND sp.name <> 'usp_consultar_programas_paginado'
   AND sp.name <> 'usp_consultar_facultades_paginado'
   AND sp.name <> 'usp_consultar_solicitudes_revision_asistencia_paginado'
+  AND sp.name NOT IN ('usp_consultar_estudiantes_facultad_paginado', 'usp_consultar_estudiante_facultad_detalle', 'usp_consultar_estructura_facultad', 'usp_consultar_sesiones_facultad_paginado')
   AND sp.name <> 'usp_establecer_contexto_usuario_ejecutor'
   AND d.error_number IS NOT NULL;
 
@@ -251,6 +255,7 @@ WHERE SCHEMA_NAME(sp.schema_id) = 'dbo'
   AND sp.name <> 'usp_consultar_programas_paginado'
   AND sp.name <> 'usp_consultar_facultades_paginado'
   AND sp.name <> 'usp_consultar_solicitudes_revision_asistencia_paginado'
+  AND sp.name NOT IN ('usp_consultar_estudiantes_facultad_paginado', 'usp_consultar_estudiante_facultad_detalle', 'usp_consultar_estructura_facultad', 'usp_consultar_sesiones_facultad_paginado')
   AND sp.name <> 'usp_establecer_contexto_usuario_ejecutor'
   AND d.error_number IS NULL
 GROUP BY sp.name
@@ -278,6 +283,7 @@ WHERE SCHEMA_NAME(sp.schema_id) = 'dbo'
   AND sp.name <> 'usp_consultar_programas_paginado'
   AND sp.name <> 'usp_consultar_facultades_paginado'
   AND sp.name <> 'usp_consultar_solicitudes_revision_asistencia_paginado'
+  AND sp.name NOT IN ('usp_consultar_estudiantes_facultad_paginado', 'usp_consultar_estudiante_facultad_detalle', 'usp_consultar_estructura_facultad', 'usp_consultar_sesiones_facultad_paginado')
   AND sp.name <> 'usp_establecer_contexto_usuario_ejecutor'
   AND d.error_number IS NULL
   AND (
