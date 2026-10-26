@@ -11,10 +11,12 @@ SELECT		pe.id,
 			idPrograma = pr.id,
 			nombrePrograma = pr.nombrePrograma,
 			inp = pe.inp,
-			estaActivoPlanEstudio = IIF(pr.estaActivoPrograma = 0, 0, 1),
-			estaActivoTextoPlanEstudio = IIF(pr.estaActivoPrograma = 0, 'NO', 'SI'),
+			-- HU081: el plan es activo solo si su programa esta activo y el propio plan (PlanEstudio.estado) tambien.
+			estaActivoPlanEstudio = IIF(pr.estaActivoPrograma = 0 OR pe.estado = 0, 0, 1),
+			estaActivoTextoPlanEstudio = IIF(pr.estaActivoPrograma = 0 OR pe.estado = 0, 'NO', 'SI'),
 			justificacionEstado =	CASE
 										WHEN pr.estaActivoPrograma = 0 THEN 'Plan Estudio inactivo porque programa est? inactivo.'
+										WHEN pe.estado = 0 THEN 'Plan Estudio inactivado por el coordinador del programa.'
 										ELSE 'Plan Estudio activo.'
 									END
 
