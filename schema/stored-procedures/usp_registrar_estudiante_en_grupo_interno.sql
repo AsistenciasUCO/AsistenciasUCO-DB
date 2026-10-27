@@ -122,6 +122,9 @@ BEGIN
             SELECT TOP 1 @idProgramaGrupo = pe.programa 
             FROM dbo.Grupo g 
             INNER JOIN dbo.Asignatura a ON g.asignatura = a.id
+            -- HU008 (regla de John 2026-10-27): solo una asignatura ESPECIFICA (componente ESP) inscribe al estudiante
+            -- en el programa; las transversales (BAS/INS) no crean fila en EstudiantePrograma.
+            INNER JOIN dbo.Componente comp ON comp.id = a.componente AND comp.codigo = 'ESP'
             INNER JOIN dbo.SemestrePlanEstudio sp ON a.semestrePlanEstudio = sp.id
             INNER JOIN dbo.PlanEstudio pe ON sp.planEstudio = pe.id
             WHERE g.id = @idGrupoDefecto;
