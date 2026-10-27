@@ -257,3 +257,14 @@ Work item: `docs/work-items/HU010-HU011-consulta-reclamos-estudiante/` (contrato
 | `dbo.usp_consultar_solicitudes_revision_estudiante` | HU010/HU011 "Mis Reclamos": solicitudes propias con estado, respuesta del docente y soporte vinculado; READ_QUERY_RESULTSET + `totalRegistros`, paginación acotada (1..100, sin `PAG_001`) | ownership en tablas base: `SolicitudRevisionAsistencia → Asistencia → EstudianteGrupo → Estudiante.usuario = @idUsuarioEjecutor` | `VAL_001` |
 
 Parámetros: `@idUsuarioEjecutor`, `@idCorrelacion`, `@codigoEstado` (P/A/R, opcional), `@numeroPagina`, `@tamanoPagina`. Resultset con las mismas columnas y tipos que `usp_consultar_solicitudes_revision_docente` (LB-004D, R2); el soporte se resuelve con el parámetro `ARCHIVO.ESTADO_ADJUNTO`. Permiso aditivo: `schema/security/rol_asistencias_runtime_hu010_hu011.sql`. Prueba: `test/test_consultas_reclamos_estudiante.sql` (E-01..E-08). Sin cambios de tablas ni de objetos congelados.
+
+## Addendum HU051 — retiro de un estudiante del grupo por el docente titular (2026-10-27)
+
+Work item: `docs/work-items/HU051-retirar-estudiante-grupo/` (contrato HTTP en el work item homónimo del backend).
+
+| SP | Caso de uso | Ámbito | Códigos |
+|---|---|---|---|
+| `dbo.usp_retirar_estudiante_grupo` | Comando (resultset canónico): matrícula activa → `I` (inactivo), auditoría `RETIRO_ESTUDIANTE_GRUPO` con el motivo en `AuditoriaEvento.metadata`; asistencias intactas; cupo liberado | docente titular (`Grupo.docente → Docente.usuario`) | `GEN_002`, `RET_001` grupo inexistente o ajeno, `RET_002` sin matrícula activa, `RET_003` período terminado (fecha local `TIEMPO.ZONA_HORARIA_SQLSERVER`), `RET_004` motivo 1..500, `RET_005` éxito |
+| `dbo.usp_consultar_destinatarios_retiro_estudiante_grupo` | Lectura: ESTUDIANTE, DOCENTE y COORDINADOR del programa con nombre, correo y contexto del grupo para el aviso | docente titular (otro ejecutor ⇒ 0 filas) | `VAL_001` (THROW) |
+
+Permiso aditivo: `schema/security/rol_asistencias_runtime_hu051.sql`. Mensajes: `schema/seed/21_mensajes_retiro_estudiante_grupo.sql`. Prueba: `test/test_usp_retirar_estudiante_grupo.sql` (R-01..R-09). Sin cambios de tablas ni de objetos congelados.
