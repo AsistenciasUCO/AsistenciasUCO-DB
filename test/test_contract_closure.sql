@@ -198,6 +198,8 @@ DECLARE @badResultSets TABLE (
 --                                            READ_QUERY_RESULTSET: devuelven filas de datos; NON_GOLDEN_PATH_EXTENSION.
 --   usp_consultar_docentes_programa / usp_consultar_candidatos_docente_programa (HU062/HU091)
 --                                            READ_QUERY_RESULTSET: devuelven filas de datos; NON_GOLDEN_PATH_EXTENSION.
+--   usp_consultar_solicitudes_revision_estudiante (HU010/HU011)
+--                                            READ_QUERY_RESULTSET: filas propias del estudiante + totalRegistros; NON_GOLDEN_PATH_EXTENSION.
 --   usp_consultar_detalle_solicitud_revision_docente (HU035/HU036)
 --                                            READ_QUERY_RESULTSET: 0..1 fila de detalle; NON_GOLDEN_PATH_EXTENSION.
 --   usp_consultar_programas_academicos (HU108)
@@ -217,7 +219,7 @@ WHERE SCHEMA_NAME(sp.schema_id) = 'dbo'
   AND sp.name NOT LIKE '%[_]interno'
   AND sp.name <> 'usp_obtener_mensaje_catalogo'
   AND sp.name <> 'usp_consultar_grupos_paginado'
-  AND sp.name NOT IN ('usp_consultar_archivo_soporte_autorizado', 'usp_consultar_solicitudes_revision_docente', 'usp_consultar_detalle_solicitud_revision_docente', 'usp_consultar_programas_academicos', 'usp_consultar_docentes_programa', 'usp_consultar_candidatos_docente_programa', 'usp_actualizar_coordinador', 'usp_cambiar_estado_coordinador', 'usp_consultar_kpis_coordinador', 'usp_consultar_alerta_temprana_programa', 'usp_consultar_bitacora_estudiante_programa', 'usp_consultar_ficha_estudiante_programa', 'usp_consultar_resumen_asistencia_estudiante_programa', 'usp_consultar_kpis_decano', 'usp_consultar_comparativa_programas_facultad', 'usp_consultar_aforo_grupos_facultad', 'usp_consultar_kpis_institucion', 'usp_consultar_comparativa_facultades', 'usp_consultar_tendencia_ausentismo')
+  AND sp.name NOT IN ('usp_consultar_archivo_soporte_autorizado', 'usp_consultar_solicitudes_revision_docente', 'usp_consultar_solicitudes_revision_estudiante', 'usp_consultar_detalle_solicitud_revision_docente', 'usp_consultar_programas_academicos', 'usp_consultar_docentes_programa', 'usp_consultar_candidatos_docente_programa', 'usp_actualizar_coordinador', 'usp_cambiar_estado_coordinador', 'usp_consultar_kpis_coordinador', 'usp_consultar_alerta_temprana_programa', 'usp_consultar_bitacora_estudiante_programa', 'usp_consultar_ficha_estudiante_programa', 'usp_consultar_resumen_asistencia_estudiante_programa', 'usp_consultar_kpis_decano', 'usp_consultar_comparativa_programas_facultad', 'usp_consultar_aforo_grupos_facultad', 'usp_consultar_kpis_institucion', 'usp_consultar_comparativa_facultades', 'usp_consultar_tendencia_ausentismo')
   AND sp.name <> 'usp_consultar_estudiantes_paginado'
   AND sp.name <> 'usp_consultar_estudiantes_grupo_paginado'
   AND sp.name <> 'usp_consultar_estudiante_por_id'
@@ -243,7 +245,7 @@ WHERE SCHEMA_NAME(sp.schema_id) = 'dbo'
   AND sp.name NOT LIKE '%[_]interno'
   AND sp.name <> 'usp_obtener_mensaje_catalogo'
   AND sp.name <> 'usp_consultar_grupos_paginado'
-  AND sp.name NOT IN ('usp_consultar_archivo_soporte_autorizado', 'usp_consultar_solicitudes_revision_docente', 'usp_consultar_detalle_solicitud_revision_docente', 'usp_consultar_programas_academicos', 'usp_consultar_docentes_programa', 'usp_consultar_candidatos_docente_programa', 'usp_actualizar_coordinador', 'usp_cambiar_estado_coordinador', 'usp_consultar_kpis_coordinador', 'usp_consultar_alerta_temprana_programa', 'usp_consultar_bitacora_estudiante_programa', 'usp_consultar_ficha_estudiante_programa', 'usp_consultar_resumen_asistencia_estudiante_programa', 'usp_consultar_kpis_decano', 'usp_consultar_comparativa_programas_facultad', 'usp_consultar_aforo_grupos_facultad', 'usp_consultar_kpis_institucion', 'usp_consultar_comparativa_facultades', 'usp_consultar_tendencia_ausentismo')
+  AND sp.name NOT IN ('usp_consultar_archivo_soporte_autorizado', 'usp_consultar_solicitudes_revision_docente', 'usp_consultar_solicitudes_revision_estudiante', 'usp_consultar_detalle_solicitud_revision_docente', 'usp_consultar_programas_academicos', 'usp_consultar_docentes_programa', 'usp_consultar_candidatos_docente_programa', 'usp_actualizar_coordinador', 'usp_cambiar_estado_coordinador', 'usp_consultar_kpis_coordinador', 'usp_consultar_alerta_temprana_programa', 'usp_consultar_bitacora_estudiante_programa', 'usp_consultar_ficha_estudiante_programa', 'usp_consultar_resumen_asistencia_estudiante_programa', 'usp_consultar_kpis_decano', 'usp_consultar_comparativa_programas_facultad', 'usp_consultar_aforo_grupos_facultad', 'usp_consultar_kpis_institucion', 'usp_consultar_comparativa_facultades', 'usp_consultar_tendencia_ausentismo')
   AND sp.name <> 'usp_consultar_estudiantes_paginado'
   AND sp.name <> 'usp_consultar_estudiantes_grupo_paginado'
   AND sp.name <> 'usp_consultar_estudiante_por_id'
@@ -271,7 +273,7 @@ WHERE SCHEMA_NAME(sp.schema_id) = 'dbo'
   AND sp.name NOT LIKE '%[_]interno'
   AND sp.name <> 'usp_obtener_mensaje_catalogo'
   AND sp.name <> 'usp_consultar_grupos_paginado'
-  AND sp.name NOT IN ('usp_consultar_archivo_soporte_autorizado', 'usp_consultar_solicitudes_revision_docente', 'usp_consultar_detalle_solicitud_revision_docente', 'usp_consultar_programas_academicos', 'usp_consultar_docentes_programa', 'usp_consultar_candidatos_docente_programa', 'usp_actualizar_coordinador', 'usp_cambiar_estado_coordinador', 'usp_consultar_kpis_coordinador', 'usp_consultar_alerta_temprana_programa', 'usp_consultar_bitacora_estudiante_programa', 'usp_consultar_ficha_estudiante_programa', 'usp_consultar_resumen_asistencia_estudiante_programa', 'usp_consultar_kpis_decano', 'usp_consultar_comparativa_programas_facultad', 'usp_consultar_aforo_grupos_facultad', 'usp_consultar_kpis_institucion', 'usp_consultar_comparativa_facultades', 'usp_consultar_tendencia_ausentismo')
+  AND sp.name NOT IN ('usp_consultar_archivo_soporte_autorizado', 'usp_consultar_solicitudes_revision_docente', 'usp_consultar_solicitudes_revision_estudiante', 'usp_consultar_detalle_solicitud_revision_docente', 'usp_consultar_programas_academicos', 'usp_consultar_docentes_programa', 'usp_consultar_candidatos_docente_programa', 'usp_actualizar_coordinador', 'usp_cambiar_estado_coordinador', 'usp_consultar_kpis_coordinador', 'usp_consultar_alerta_temprana_programa', 'usp_consultar_bitacora_estudiante_programa', 'usp_consultar_ficha_estudiante_programa', 'usp_consultar_resumen_asistencia_estudiante_programa', 'usp_consultar_kpis_decano', 'usp_consultar_comparativa_programas_facultad', 'usp_consultar_aforo_grupos_facultad', 'usp_consultar_kpis_institucion', 'usp_consultar_comparativa_facultades', 'usp_consultar_tendencia_ausentismo')
   AND sp.name <> 'usp_consultar_estudiantes_paginado'
   AND sp.name <> 'usp_consultar_estudiantes_grupo_paginado'
   AND sp.name <> 'usp_consultar_estudiante_por_id'

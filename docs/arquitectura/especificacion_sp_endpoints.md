@@ -460,7 +460,7 @@
 | `uv_periodo_academico` | Listar periodos académicos | `GET /api/v1/coordinador/periodos-academicos` | `COORDINADOR`, `ADMIN` |
 | `uv_horario_docente` | Consultar horario del docente | `GET /api/v1/docente/horarios` | `DOCENTE` |
 | `uv_horario_estudiante` | Consultar horario del estudiante | `GET /api/v1/estudiante/horarios` | `ESTUDIANTE` |
-| `uv_solicitud_revision_asistencia` | Listar reclamos del estudiante / docente | `GET /api/v1/estudiante/reclamos`, `GET /api/v1/docente/reclamos` | `ESTUDIANTE`, `DOCENTE` |
+| `uv_solicitud_revision_asistencia` | Listar reclamos (histórico; hoy el estudiante usa `usp_consultar_solicitudes_revision_estudiante` y el docente `usp_consultar_solicitudes_revision_docente`) | `GET /api/v1/estudiante/reclamos`, `GET /api/v1/docente/reclamos` | `ESTUDIANTE`, `DOCENTE` |
 | `uv_tipo_identificacion` | Listar tipos de identificación | `GET /api/v1/tipos-identificacion` | `TODOS` |
 | `uv_usuario_perfil` | Consultar perfil del usuario autenticado | `GET /api/v1/usuarios/perfil` | `TODOS` (autenticado) |
 
@@ -513,5 +513,6 @@
 | `GET /api/v1/decano/estudiantes/{id}` | `usp_consultar_estudiante_facultad_detalle` | HU105 |
 | `GET /api/v1/decano/estructura` | `usp_consultar_estructura_facultad` | HU109/HU119 (y planes de HU108) |
 | `GET /api/v1/decano/sesiones` | `usp_consultar_sesiones_facultad_paginado` | HU145 |
+| `GET /api/v1/estudiante/reclamos` | `usp_consultar_solicitudes_revision_estudiante` | HU010/HU011 (consulta) |
 
-Firma de entrada/salida y códigos: `DOCUMENTACION_PROCEDIMIENTOS_PUBLICOS.md` (addendum 2026-10-25) y el `CONTRACT.md` de cada work item del backend.
+Firma de entrada/salida y códigos: `DOCUMENTACION_PROCEDIMIENTOS_PUBLICOS.md` (addendums 2026-10-25 y HU010/HU011) y el `CONTRACT.md` de cada work item del backend.
