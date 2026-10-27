@@ -67,7 +67,7 @@ BEGIN TRY
     PRINT '-> DB-09: nombre de otro registro';
     SET @c = NEWID();
     INSERT INTO #r EXEC dbo.usp_actualizar_tipo_programa @id = @id1, @nombre = @nom2Upper, @idCorrelacion = @c, @idUsuarioEjecutor = @idEjecutor;
-    IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE N'DBCODE=GEN_003|%')
+    IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE N'DBCODE=TPR_002|%')
         THROW 52633, 'TEST FAILED DB-09: acepto nombre duplicado.', 1;
     TRUNCATE TABLE #r;
 

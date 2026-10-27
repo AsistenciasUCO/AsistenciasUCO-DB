@@ -8,6 +8,9 @@ GO
 CREATE OR ALTER  VIEW [dbo].[uv_area]
 AS
 SELECT  id,
-		nombre
+		nombre,
+		codigo,
+		estaActivaArea = estado,
+		estaActivaTextoArea = IIF(estado = 1, 'SI', 'NO')
 FROM	Area
 GO

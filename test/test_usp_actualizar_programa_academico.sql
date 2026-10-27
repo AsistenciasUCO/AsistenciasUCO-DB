@@ -33,7 +33,7 @@ BEGIN TRY
 
     CREATE TABLE #u (n INT IDENTITY(1,1), id UNIQUEIDENTIFIER);
     DECLARE @i INT = 1;
-    WHILE @i <= 8
+    WHILE @i <= 10
     BEGIN
         DECLARE @uid UNIQUEIDENTIFIER = NEWID();
         INSERT INTO dbo.Usuario (id, tipoIdIdentificacion, numeroIdentificacion, primerApellido, segundoApellido, primerNombre, segundoNombre, correo, correoConfirmado, estado, password)
@@ -55,10 +55,13 @@ BEGIN TRY
     INSERT INTO dbo.Facultad (id, nombre, institucion, decano, estado) VALUES (@f2, CONCAT(N'QA Prog Dos ', @sufijo), @idInstitucion, @dec2, 1);
 
     DECLARE @c1 UNIQUEIDENTIFIER = NEWID(), @c2 UNIQUEIDENTIFIER = NEWID(), @c3 UNIQUEIDENTIFIER = NEWID(), @c4 UNIQUEIDENTIFIER = NEWID();
-    INSERT INTO dbo.Coordinador (id, usuario) SELECT @c1, id FROM #u WHERE n = 3;
-    INSERT INTO dbo.Coordinador (id, usuario) SELECT @c2, id FROM #u WHERE n = 4;
-    INSERT INTO dbo.Coordinador (id, usuario) SELECT @c3, id FROM #u WHERE n = 5;
-    INSERT INTO dbo.Coordinador (id, usuario) SELECT @c4, id FROM #u WHERE n = 6;
+    DECLARE @cAjeno UNIQUEIDENTIFIER = NEWID(), @cRolInactivo UNIQUEIDENTIFIER = NEWID();
+    INSERT INTO dbo.Coordinador (id, usuario, facultad) SELECT @c1, id, @f1 FROM #u WHERE n = 3;
+    INSERT INTO dbo.Coordinador (id, usuario, facultad) SELECT @c2, id, @f2 FROM #u WHERE n = 4;
+    INSERT INTO dbo.Coordinador (id, usuario, facultad) SELECT @c3, id, @f1 FROM #u WHERE n = 5;
+    INSERT INTO dbo.Coordinador (id, usuario, facultad) SELECT @c4, id, @f1 FROM #u WHERE n = 6;
+    INSERT INTO dbo.Coordinador (id, usuario, facultad) SELECT @cAjeno, id, @f2 FROM #u WHERE n = 9;               -- libre, de la facultad F2
+    INSERT INTO dbo.Coordinador (id, usuario, facultad, estado) SELECT @cRolInactivo, id, @f1, 0 FROM #u WHERE n = 10;   -- rol inactivo (HU122)
 
     DECLARE @nm NVARCHAR(100);
     DECLARE @c UNIQUEIDENTIFIER, @inexistente UNIQUEIDENTIFIER = NEWID();
@@ -117,6 +120,33 @@ BEGIN TRY
     INSERT INTO #r EXEC dbo.usp_actualizar_programa_academico @idPrograma = @p1, @nombre = @n1, @idTipoPrograma = @tipoPre, @idCoordinador = @c2, @idModalidad = @modPre, @idJornada = @jorDiu, @idCorrelacion = @c, @idUsuarioEjecutor = @uDec1;
     IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 0 AND idCorrelacion = @c AND mensajeTecnicoResultado LIKE N'DBCODE=PROG_005|%')
         THROW 52718, 'TEST FAILED: reasignar a un coordinador con programa (esperaba PROG_005).', 1;
+    TRUNCATE TABLE #r;
+
+    -- HU121/HU122: al reasignar, el coordinador debe ser de la facultad y tener el rol activo
+    PRINT '-> T-077-07 reasignar a un coordinador libre de otra facultad';
+    SET @c = NEWID();
+    INSERT INTO #r EXEC dbo.usp_actualizar_programa_academico @idPrograma = @p1, @nombre = @n1, @idTipoPrograma = @tipoPre, @idCoordinador = @cAjeno, @idCorrelacion = @c, @idUsuarioEjecutor = @uDec1;
+    IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 0 AND idCorrelacion = @c AND mensajeTecnicoResultado LIKE N'DBCODE=PROG_005|%')
+        THROW 52740, 'TEST FAILED T-077-07: acepto reasignar a un coordinador de otra facultad.', 1;
+    TRUNCATE TABLE #r;
+
+    PRINT '-> T-077-08 reasignar a un coordinador con rol inactivo';
+    SET @c = NEWID();
+    INSERT INTO #r EXEC dbo.usp_actualizar_programa_academico @idPrograma = @p1, @nombre = @n1, @idTipoPrograma = @tipoPre, @idCoordinador = @cRolInactivo, @idCorrelacion = @c, @idUsuarioEjecutor = @uDec1;
+    IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 0 AND idCorrelacion = @c AND mensajeTecnicoResultado LIKE N'DBCODE=PROG_005|%')
+        THROW 52741, 'TEST FAILED T-077-08: acepto reasignar a un coordinador con el rol inactivo.', 1;
+    IF NOT EXISTS (SELECT 1 FROM dbo.Programa WHERE id = @p1 AND coordinador = @c3)
+        THROW 52742, 'TEST FAILED T-077-08: cambio el coordinador pese al rechazo.', 1;
+    TRUNCATE TABLE #r;
+
+    PRINT '-> T-077-09 editar sin cambiar de coordinador no exige que su rol siga activo';
+    UPDATE dbo.Coordinador SET estado = 0 WHERE id = @c3;
+    SET @c = NEWID();
+    SET @nm = CONCAT(N'Sistemas Renombrado ', @sufijo);
+    INSERT INTO #r EXEC dbo.usp_actualizar_programa_academico @idPrograma = @p1, @nombre = @nm, @idTipoPrograma = @tipoPre, @idCoordinador = @c3, @idCorrelacion = @c, @idUsuarioEjecutor = @uDec1;
+    IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 1 AND idCorrelacion = @c)
+        THROW 52743, 'TEST FAILED T-077-09: no permitio editar el programa con su coordinador actual.', 1;
+    UPDATE dbo.Coordinador SET estado = 1 WHERE id = @c3;
     TRUNCATE TABLE #r;
 
     PRINT '-> T-077-04 modalidad invalida';
