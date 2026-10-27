@@ -268,3 +268,18 @@ Work item: `docs/work-items/HU051-retirar-estudiante-grupo/` (contrato HTTP en e
 | `dbo.usp_consultar_destinatarios_retiro_estudiante_grupo` | Lectura: ESTUDIANTE, DOCENTE y COORDINADOR del programa con nombre, correo y contexto del grupo para el aviso | docente titular (otro ejecutor ⇒ 0 filas) | `VAL_001` (THROW) |
 
 Permiso aditivo: `schema/security/rol_asistencias_runtime_hu051.sql`. Mensajes: `schema/seed/21_mensajes_retiro_estudiante_grupo.sql`. Prueba: `test/test_usp_retirar_estudiante_grupo.sql` (R-01..R-09). Sin cambios de tablas ni de objetos congelados.
+
+## Addendum HU053/HU054/HU055 — solicitudes de ingreso a un grupo (2026-10-27)
+
+Work item: `docs/work-items/HU053-HU054-HU055-solicitudes-ingreso-grupo/` (tabla nueva `SolicitudIngresoGrupo` aprobada por John; análisis de impacto en el PLAN).
+
+| SP | Caso de uso | Ámbito | Códigos |
+|---|---|---|---|
+| `dbo.usp_registrar_solicitud_ingreso_grupo` | Comando: el estudiante solicita el ingreso (P) | estudiante ejecutor (`Estudiante.usuario`) | `GEN_002`, `SIG_001..SIG_006` |
+| `dbo.usp_resolver_solicitud_ingreso_grupo` | Comando + `codigoEstadoResultante`: ACEPTAR (con cupo A y matrícula vía `usp_registrar_estudiante_en_grupo_interno`; sin cupo E) o RECHAZAR con motivo (R); bloqueo `UPDLOCK, HOLDLOCK` del grupo | docente titular | `SIG_003`, `SIG_004`, `SIG_007..SIG_014` |
+| `dbo.usp_retirar_solicitud_ingreso_grupo` | Comando: el estudiante retira su solicitud abierta (X) | estudiante propietario | `SIG_007`, `SIG_008`, `SIG_015` |
+| `dbo.usp_consultar_solicitudes_ingreso_grupo_docente` | Lectura paginada: bandeja del grupo en orden de llegada con `posicionEspera` y cupo | docente titular | `VAL_001` (THROW) |
+| `dbo.usp_consultar_solicitudes_ingreso_estudiante` | Lectura paginada: mis solicitudes | estudiante | `VAL_001` (THROW) |
+| `dbo.usp_consultar_destinatarios_solicitud_ingreso_grupo` | Lectura: ESTUDIANTE y DOCENTE para los avisos | estudiante propietario o docente titular | `VAL_001` (THROW) |
+
+Permiso aditivo: `schema/security/rol_asistencias_runtime_hu053_hu055.sql`. Semillas: `22_estados_solicitud_ingreso_grupo.sql`, `23_mensajes_solicitud_ingreso_grupo.sql`. Prueba: `test/test_solicitud_ingreso_grupo.sql` (S-01..S-12).
