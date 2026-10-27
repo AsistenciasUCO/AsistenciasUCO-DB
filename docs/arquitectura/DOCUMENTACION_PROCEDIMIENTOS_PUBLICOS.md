@@ -247,3 +247,13 @@ Work items: `docs/work-items/HU081-HU082-HU083-plan-estudio-estado-semestres/`, 
 HU064/HU060/HU061 consumen los SP existentes `usp_consultar_grupos_paginado`, `usp_consultar_sesiones_grupo_paginado` y `usp_consultar_asistencias_sesion_paginado` (sin cambios; ámbito por programa vía `uv_auth_grupo`/`uv_auth_sesion`).
 
 Permisos aditivos: `schema/security/rol_asistencias_runtime_hu081_hu083.sql`, `_hu096_hu098.sql`, `_hu060_hu064.sql` y `_hu104_hu145.sql`. Pruebas: `test/test_usp_plan_estudio_estado_semestres.sql`, `test/test_usp_periodo_academico_gestion.sql`, `test/test_consultas_coordinador_programa.sql` y `test/test_consultas_decano_facultad.sql`, registradas en `test_suite.sql`.
+
+## Addendum HU010/HU011 — consulta de solicitudes de revisión del estudiante (2026-10-26)
+
+Work item: `docs/work-items/HU010-HU011-consulta-reclamos-estudiante/` (contrato HTTP en el work item homónimo del backend).
+
+| SP | Caso de uso | Ámbito | Códigos |
+|---|---|---|---|
+| `dbo.usp_consultar_solicitudes_revision_estudiante` | HU010/HU011 "Mis Reclamos": solicitudes propias con estado, respuesta del docente y soporte vinculado; READ_QUERY_RESULTSET + `totalRegistros`, paginación acotada (1..100, sin `PAG_001`) | ownership en tablas base: `SolicitudRevisionAsistencia → Asistencia → EstudianteGrupo → Estudiante.usuario = @idUsuarioEjecutor` | `VAL_001` |
+
+Parámetros: `@idUsuarioEjecutor`, `@idCorrelacion`, `@codigoEstado` (P/A/R, opcional), `@numeroPagina`, `@tamanoPagina`. Resultset con las mismas columnas y tipos que `usp_consultar_solicitudes_revision_docente` (LB-004D, R2); el soporte se resuelve con el parámetro `ARCHIVO.ESTADO_ADJUNTO`. Permiso aditivo: `schema/security/rol_asistencias_runtime_hu010_hu011.sql`. Prueba: `test/test_consultas_reclamos_estudiante.sql` (E-01..E-08). Sin cambios de tablas ni de objetos congelados.
