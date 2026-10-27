@@ -12,6 +12,14 @@ PRINT '======================================================================';
 :r /tmp/test/test_usp_crear_facultad.sql
 :r /tmp/test/test_usp_actualizar_facultad.sql
 :r /tmp/test/test_usp_cambiar_estado_facultad.sql
+:r /tmp/test/test_usp_crear_tipo_programa.sql
+:r /tmp/test/test_usp_actualizar_tipo_programa.sql
+:r /tmp/test/test_usp_cambiar_estado_tipo_programa.sql
+:r /tmp/test/test_uv_tipo_programa_contrato.sql
+:r /tmp/test/test_usp_crear_area.sql
+:r /tmp/test/test_usp_actualizar_area.sql
+:r /tmp/test/test_usp_cambiar_estado_area.sql
+:r /tmp/test/test_uv_area_contrato.sql
 :r /tmp/test/test_user_dean_close.sql
 :r /tmp/test/test_subject_catalog.sql
 :r /tmp/test/test_reactive_academic.sql
@@ -60,6 +68,20 @@ PRINT '======================================================================';
 :r /tmp/test/test_usp_consultar_docentes_paginado.sql
 :r /tmp/test/test_usp_consultar_sesiones_y_asistencias_paginado.sql
 :r /tmp/test/test_usp_consultar_catalogos_y_revisiones_paginado.sql
+:r /tmp/test/test_ufn_clasificar_permanencia.sql
+:r /tmp/test/test_uv_resumen_asistencia_estudiante_grupo.sql
+:r /tmp/test/test_usp_consultar_kpis_coordinador.sql
+:r /tmp/test/test_usp_consultar_alerta_temprana_programa.sql
+:r /tmp/test/test_usp_consultar_bitacora_estudiante_programa.sql
+:r /tmp/test/test_usp_consultar_ficha_estudiante_programa.sql
+:r /tmp/test/test_usp_resolvers_decano.sql
+:r /tmp/test/test_usp_consultar_kpis_decano.sql
+:r /tmp/test/test_usp_consultar_comparativa_programas_facultad.sql
+:r /tmp/test/test_usp_consultar_aforo_grupos_facultad.sql
+:r /tmp/test/test_usp_resolvers_institucion_admin.sql
+:r /tmp/test/test_usp_consultar_kpis_institucion.sql
+:r /tmp/test/test_usp_consultar_comparativa_facultades.sql
+:r /tmp/test/test_usp_consultar_tendencia_ausentismo.sql
 
 IF @@TRANCOUNT <> 0
 BEGIN

@@ -31,6 +31,7 @@ AS
     DECLARE @idCorrelacionDefecto UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idCorrelacion, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
     DECLARE @nombreDef            NVARCHAR(100)    = TRIM(@nombre);
     DECLARE @coordinadorBloqueado UNIQUEIDENTIFIER = NULL;
+    DECLARE @coordinadorActual    UNIQUEIDENTIFIER = NULL;
     DECLARE @msgP1 NVARCHAR(500), @msgP2 NVARCHAR(500);
 BEGIN
     SET NOCOUNT ON;
@@ -104,7 +105,14 @@ BEGIN
         SET @estadoResultado = 0;
     END
 
-    -- Coordinador: serializa por fila del coordinador y valida existencia, actividad y disponibilidad
+    -- Coordinador: serializa por fila del coordinador y valida existencia, actividad y disponibilidad.
+    -- HU121/HU122: si CAMBIA de coordinador, el nuevo debe tener el rol activo y pertenecer a la facultad
+    -- (Coordinador.facultad); editar el programa con su coordinador actual no exige revalidarlos.
+    IF @idPrograma IS NOT NULL
+    BEGIN
+        SELECT @coordinadorActual = pr.coordinador FROM dbo.Programa pr WHERE pr.id = @idPrograma;
+    END
+
     IF @estadoResultado = 1 AND @idCoordinador IS NOT NULL
     BEGIN
         SELECT @coordinadorBloqueado = c.id
@@ -112,7 +120,7 @@ BEGIN
         WHERE c.id = @idCoordinador;
     END
 
-    IF @estadoResultado = 1 AND (@idCoordinador IS NULL OR @coordinadorBloqueado IS NULL OR NOT EXISTS (SELECT 1 FROM dbo.uv_coordinador_identidad ci WHERE ci.id = @idCoordinador AND ci.estaActivoUsuario = 1) OR EXISTS (SELECT 1 FROM dbo.Programa pr WITH (UPDLOCK, HOLDLOCK) WHERE pr.coordinador = @idCoordinador AND (@idPrograma IS NULL OR pr.id <> @idPrograma)))
+    IF @estadoResultado = 1 AND (@idCoordinador IS NULL OR @coordinadorBloqueado IS NULL OR NOT EXISTS (SELECT 1 FROM dbo.uv_coordinador_identidad ci WHERE ci.id = @idCoordinador AND ci.estaActivoUsuario = 1) OR ((@coordinadorActual IS NULL OR @coordinadorActual <> @idCoordinador) AND NOT EXISTS (SELECT 1 FROM dbo.uv_coordinador_identidad ci WHERE ci.id = @idCoordinador AND ci.estaActivoRolCoordinador = 1 AND ci.idFacultadCoordinador = @idFacultad)) OR EXISTS (SELECT 1 FROM dbo.Programa pr WITH (UPDLOCK, HOLDLOCK) WHERE pr.coordinador = @idCoordinador AND (@idPrograma IS NULL OR pr.id <> @idPrograma)))
     BEGIN
         SET @msgP1 = CAST(CONVERT(NVARCHAR(36), @idCoordinador) AS NVARCHAR(500));
         EXEC dbo.usp_obtener_mensaje_catalogo

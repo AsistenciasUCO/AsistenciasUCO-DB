@@ -83,9 +83,7 @@ BEGIN
         IF @estadoResultado = 1 AND EXISTS (SELECT 1 FROM dbo.uv_tipo_programa WHERE LOWER(nombre) = LOWER(@nombreDef) AND id <> @id)
         BEGIN
             EXEC dbo.usp_obtener_mensaje_catalogo
-                @p_codigo = 'GEN_003',
-                @p_param1 = 'Tipo de Programa',
-                @p_param2 = 'nombre',
+                @p_codigo = 'TPR_002',
                 @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                 @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
             SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Conflicto de unicidad para nombre. Correlacion: ', @idCorrelacionDefecto);
