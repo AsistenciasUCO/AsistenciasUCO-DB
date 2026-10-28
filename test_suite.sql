@@ -39,6 +39,8 @@ PRINT '======================================================================';
 :r /tmp/test/test_solicitud_ingreso_grupo.sql
 :r /tmp/test/test_usp_consultar_historial_grupos_docente_programa.sql
 :r /tmp/test/test_usp_consultar_resumen_docentes_programa.sql
+:r /tmp/test/test_usp_consultar_oferta_grupos_estudiante.sql
+:r /tmp/test/test_hu008_regla_inscripcion_programa.sql
 :r /tmp/test/test_usp_crear_actualizar_grupo.sql
 :r /tmp/test/test_usp_crear_actualizar_sesion.sql
 :r /tmp/test/test_usp_validar_sesion_operacion_interno.sql

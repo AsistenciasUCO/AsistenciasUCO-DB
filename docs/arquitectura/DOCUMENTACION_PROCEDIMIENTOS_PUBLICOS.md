@@ -294,3 +294,15 @@ Work item: `docs/work-items/HU094-HU095-directorio-docentes-coordinador/` (contr
 | `dbo.usp_consultar_resumen_docentes_programa` | Lectura (HU095): vínculos activos e inactivos por tipo de vinculación (criterio `uv_docente_programa.estaActivoDocentePrograma`), incluidos los tipos activos sin docentes | programa del coordinador ejecutor | `VAL_001`, `KPI_001` (THROW) |
 
 Permiso aditivo: `schema/security/rol_asistencias_runtime_hu094_hu095.sql`. Pruebas: `test/test_usp_consultar_historial_grupos_docente_programa.sql` (H-01..H-06) y `test/test_usp_consultar_resumen_docentes_programa.sql` (R-01..R-03).
+
+## Addendum HU008 — oferta de grupos del estudiante y regla de inscripción en el programa (2026-10-27)
+
+Work item: `docs/work-items/HU008-oferta-grupos-estudiante/` (contrato HTTP en el work item homónimo del backend). Sin tablas nuevas.
+
+| Objeto | Cambio | Ámbito | Códigos |
+|---|---|---|---|
+| `dbo.usp_consultar_oferta_grupos_estudiante` | Lectura paginada nueva: grupos ESP de los programas del estudiante y, si `OFERTA.INCLUIR_TRANSVERSALES = 1`, BAS/INS de su institución, en períodos vigentes/próximos; docente, horario, cupos, `matriculado`, solicitud abierta y `codigoComponente` | estudiante ejecutor (`Estudiante.usuario`; otro rol = 0 filas) | `VAL_001` (THROW) |
+| `dbo.usp_registrar_estudiante_en_grupo_interno` / `_autonomo` | Regla de John: solo una asignatura **ESP** crea `EstudiantePrograma`; BAS/INS matriculan sin inscribir en el programa (JOIN a `Componente` con `codigo = 'ESP'`) | sin cambio | sin cambio |
+| `CatalogoParametro` `OFERTA.INCLUIR_TRANSVERSALES` | Parámetro nuevo (1 por defecto). `UPDATE ... SET valor = '0'` oculta las transversales de la oferta (solo enlace del docente) | — | — |
+
+Permiso aditivo: `schema/security/rol_asistencias_runtime_hu008.sql`. Seed: `24_parametro_oferta_grupos.sql`. Pruebas: `test/test_usp_consultar_oferta_grupos_estudiante.sql` (O-01..O-05) y `test/test_hu008_regla_inscripcion_programa.sql` (RI-01..RI-03).

@@ -515,6 +515,7 @@
 | `GET /api/v1/decano/sesiones` | `usp_consultar_sesiones_facultad_paginado` | HU145 |
 | `GET /api/v1/estudiante/reclamos` | `usp_consultar_solicitudes_revision_estudiante` | HU010/HU011 (consulta) |
 | `POST /api/v1/docente/grupos/{grupoId}/estudiantes/{estudianteId}/retiro` | `usp_retirar_estudiante_grupo` + `usp_consultar_destinatarios_retiro_estudiante_grupo` | HU051 |
+| `GET /api/v1/estudiante/oferta-academica` | `usp_consultar_oferta_grupos_estudiante` | HU008 |
 | `POST /api/v1/estudiante/solicitudes-matricula` | `usp_registrar_solicitud_ingreso_grupo` | HU053 |
 | `GET /api/v1/estudiante/solicitudes-matricula` | `usp_consultar_solicitudes_ingreso_estudiante` | HU053/HU055 |
 | `POST /api/v1/estudiante/solicitudes-matricula/{id}/retiro` | `usp_retirar_solicitud_ingreso_grupo` | HU055 |
@@ -523,4 +524,4 @@
 | `GET /api/v1/coordinador/docentes/{idDocente}/ficha` | `usp_consultar_docentes_programa` (cabecera, `@idDocente`) + `usp_consultar_historial_grupos_docente_programa` | HU094 |
 | `GET /api/v1/coordinador/docentes/resumen` | `usp_consultar_resumen_docentes_programa` | HU095 |
 
-Firma de entrada/salida y códigos: `DOCUMENTACION_PROCEDIMIENTOS_PUBLICOS.md` (addendums 2026-10-25, HU010/HU011, HU051, HU053-HU055 y HU094/HU095) y el `CONTRACT.md` de cada work item del backend.
+Firma de entrada/salida y códigos: `DOCUMENTACION_PROCEDIMIENTOS_PUBLICOS.md` (addendums 2026-10-25, HU010/HU011, HU051, HU053-HU055, HU008 y HU094/HU095) y el `CONTRACT.md` de cada work item del backend.
