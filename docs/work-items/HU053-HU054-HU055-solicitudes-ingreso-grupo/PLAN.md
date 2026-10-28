@@ -47,3 +47,7 @@ last-reviewed: 2026-10-27
 ## Rollback
 
 `DROP` de los 6 SP, de las 5 FKs y de la tabla; borrar los estados E/X y los mensajes `SIG_*`. Ninguna tabla existente requiere reversión.
+
+## Cambio posterior por HU008 (2026-10-27)
+
+Regla de John: el estudiante solo queda inscrito en un programa (`EstudiantePrograma`) cuando ingresa a un grupo de asignatura **específica (ESP)**; al aceptar una solicitud en una asignatura transversal (**BAS** o **INS**) se matricula en el grupo pero **no** se inscribe en el programa. Cambio de 1 línea en `usp_registrar_estudiante_en_grupo_interno` (y `_autonomo`), con regresión RI-01..RI-03 en `test/test_hu008_regla_inscripcion_programa.sql`; S-01..S-12 siguen en verde. Detalle e impacto: work item `HU008-oferta-grupos-estudiante`.
