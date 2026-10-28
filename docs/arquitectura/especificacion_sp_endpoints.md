@@ -521,5 +521,7 @@
 | `POST /api/v1/estudiante/solicitudes-matricula/{id}/retiro` | `usp_retirar_solicitud_ingreso_grupo` | HU055 |
 | `GET /api/v1/docente/grupos/{grupoId}/solicitudes-ingreso` | `usp_consultar_solicitudes_ingreso_grupo_docente` | HU053-HU055 |
 | `PATCH /api/v1/docente/solicitudes-ingreso/{id}` | `usp_resolver_solicitud_ingreso_grupo` (+ destinatarios) | HU053/HU054/HU055 |
+| `GET /api/v1/coordinador/docentes/{idDocente}/ficha` | `usp_consultar_docentes_programa` (cabecera, `@idDocente`) + `usp_consultar_historial_grupos_docente_programa` | HU094 |
+| `GET /api/v1/coordinador/docentes/resumen` | `usp_consultar_resumen_docentes_programa` | HU095 |
 
-Firma de entrada/salida y códigos: `DOCUMENTACION_PROCEDIMIENTOS_PUBLICOS.md` (addendums 2026-10-25, HU010/HU011, HU051, HU053-HU055 y HU008) y el `CONTRACT.md` de cada work item del backend.
+Firma de entrada/salida y códigos: `DOCUMENTACION_PROCEDIMIENTOS_PUBLICOS.md` (addendums 2026-10-25, HU010/HU011, HU051, HU053-HU055, HU008 y HU094/HU095) y el `CONTRACT.md` de cada work item del backend.

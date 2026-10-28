@@ -284,6 +284,17 @@ Work item: `docs/work-items/HU053-HU054-HU055-solicitudes-ingreso-grupo/` (tabla
 
 Permiso aditivo: `schema/security/rol_asistencias_runtime_hu053_hu055.sql`. Semillas: `22_estados_solicitud_ingreso_grupo.sql`, `23_mensajes_solicitud_ingreso_grupo.sql`. Prueba: `test/test_solicitud_ingreso_grupo.sql` (S-01..S-12).
 
+## Addendum HU094/HU095 — ficha del docente y consolidado del directorio docente del coordinador (2026-10-27)
+
+Work item: `docs/work-items/HU094-HU095-directorio-docentes-coordinador/` (contrato HTTP en el work item homónimo del backend). Solo lectura; sin cambios de tablas.
+
+| SP | Caso de uso | Ámbito | Códigos |
+|---|---|---|---|
+| `dbo.usp_consultar_historial_grupos_docente_programa` | Lectura paginada (HU094): grupos del docente en el programa del coordinador, todos los períodos (filtro opcional), con `estadoPeriodo` VIGENTE/FINALIZADO/PROXIMO (fecha local) y columnas `resumen*` de todo el historial + `totalRegistros` | programa del coordinador ejecutor (`usp_resolver_programa_coordinador_interno`); el docente debe tener vínculo (activo o inactivo) con ese programa | `VAL_001`, `KPI_001`, `GEN_001` (THROW) |
+| `dbo.usp_consultar_resumen_docentes_programa` | Lectura (HU095): vínculos activos e inactivos por tipo de vinculación (criterio `uv_docente_programa.estaActivoDocentePrograma`), incluidos los tipos activos sin docentes | programa del coordinador ejecutor | `VAL_001`, `KPI_001` (THROW) |
+
+Permiso aditivo: `schema/security/rol_asistencias_runtime_hu094_hu095.sql`. Pruebas: `test/test_usp_consultar_historial_grupos_docente_programa.sql` (H-01..H-06) y `test/test_usp_consultar_resumen_docentes_programa.sql` (R-01..R-03).
+
 ## Addendum HU008 — oferta de grupos del estudiante y regla de inscripción en el programa (2026-10-27)
 
 Work item: `docs/work-items/HU008-oferta-grupos-estudiante/` (contrato HTTP en el work item homónimo del backend). Sin tablas nuevas.
