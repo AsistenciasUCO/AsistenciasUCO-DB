@@ -28,7 +28,7 @@ BEGIN TRY
     DECLARE @uD1 UNIQUEIDENTIFIER = NEWID(), @uD2 UNIQUEIDENTIFIER = NEWID(), @d1 UNIQUEIDENTIFIER = NEWID(), @d2 UNIQUEIDENTIFIER = NEWID();
     INSERT INTO dbo.Usuario (id, tipoIdIdentificacion, numeroIdentificacion, primerApellido, segundoApellido, primerNombre, segundoNombre, correo, correoConfirmado, estado, password)
     VALUES (@uD1, @tipoCC, 973000001, N'Precarga', N'Uno', N'Pablo', N'Qa', N'qa.precarga.d1@test.local', 1, 1, N'HashBackend_P1'),
-           (@uD2, @tipoCC, 973000002, N'Precarga', N'Dos', N'Paula', N'Qa', N'qa.precarga.d2@test.local', 1, 1, N'HashBackend_P2');
+           (@uD2, @tipoCC, 973000002, N'Precarga', N'Dos', N'Marina', N'Qa', N'qa.precarga.d2@test.local', 1, 1, N'HashBackend_P2');
     INSERT INTO dbo.Docente (id, usuario) VALUES (@d1, @uD1), (@d2, @uD2);
     INSERT INTO dbo.DocentePrograma (id, docente, programa, tipoVinculacion, estado, fechaVinculacionUtc)
     VALUES (NEWID(), @d1, @idProg, @tvCat, 1, SYSUTCDATETIME()), (NEWID(), @d2, @idProg, @tvCat, 1, SYSUTCDATETIME());
