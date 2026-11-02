@@ -12,7 +12,7 @@ generated-by: scripts/generar-catalogo-mensajes.ps1
 
 Uso en SP: `EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = '<CODIGO>', @p_param1 = ...`. Los marcadores `{}` / `{0}` se reemplazan con los parámetros. El mensaje técnico se entrega como `DBCODE=<CODIGO>|<texto>` (ver `docs/contracts/DB_BASELINE_CONTRACT.md`).
 
-Total de códigos: **143**.
+Total de códigos: **144**.
 
 ## ARC
 
@@ -141,6 +141,7 @@ Total de códigos: **143**.
 | `HOR_002` | BUSINESS_ERROR | ALTO | Existe un cruce de horario para el docente: ya tiene el grupo {} en la misma franja ({}). | Colisión horaria del docente con el grupo {} en la franja {}. GrupoID evaluado: {}. | `04_mensaje.sql` |
 | `HOR_003` | BUSINESS_ERROR | MEDIO | Las franjas del horario del grupo no pueden cruzarse: {} se cruza con {}. | Franjas traslapadas en el horario del grupo: {} y {}. | `04_mensaje.sql` |
 | `HOR_004` | BUSINESS_ERROR | MEDIO | El horario del grupo no es válido: {}. | Horario de grupo invalido: {}. | `04_mensaje.sql` |
+| `HOR_005` | BUSINESS_ERROR | MEDIO | El grupo ya tiene un horario definido. Para cambiarlo, solicita la aprobación del coordinador. | El docente ejecutor intento reemplazar un horario ya definido del grupo. | `04_mensaje.sql` |
 
 ## IAM
 

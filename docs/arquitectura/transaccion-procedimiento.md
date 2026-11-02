@@ -11,7 +11,7 @@ Contiene la documentación oficial de:
 2. **55 Vistas (Views)**: Vistas de catálogo, vistas de proyección de identidad y vistas autorizadas por seguridad RBAC dinámicas (`uv_auth_*`).
 3. **15 Funciones (Functions)**: Funciones auxiliares de validación, consulta de parámetros y lectura de `SESSION_CONTEXT`.
 
-> **Inventario vigente (REC5, 2026-10-29):** `schema/` contiene hoy **165 procedimientos** (101 públicos y 64 `_interno`, recontados el 2026-11-01 con NOTIF-002A e IDENT-001; F1 agregó `usp_guardar_horarios_grupo`), **65 vistas** (13 `uv_auth_*`) y **15 funciones**. HU025 descartada eliminó el stub de prerrequisitos, y el 2026-10-29 se eliminaron 15 SP y 3 funciones sin uso (`migrations/08_eliminar_codigo_sin_uso_up.sql`), y el 2026-10-30 `usp_validar_grupo_exista_para_docente_interno` (`migrations/09_eliminar_validar_grupo_docente_up.sql`); sus fichas quedan marcadas como ELIMINADO. Este documento conserva las fichas originales de los 57 SP base. El resto está documentado en:
+> **Inventario vigente (REC5, 2026-10-29):** `schema/` contiene hoy **167 procedimientos** (102 públicos y 65 `_interno`, recontados el 2026-11-01 con NOTIF-002A e IDENT-001; F1 agregó `usp_guardar_horarios_grupo` y su núcleo `usp_guardar_horarios_grupo_interno`; F3 agregó `usp_consultar_oferta_creacion_grupo_docente`), **65 vistas** (13 `uv_auth_*`) y **15 funciones**. HU025 descartada eliminó el stub de prerrequisitos, y el 2026-10-29 se eliminaron 15 SP y 3 funciones sin uso (`migrations/08_eliminar_codigo_sin_uso_up.sql`), y el 2026-10-30 `usp_validar_grupo_exista_para_docente_interno` (`migrations/09_eliminar_validar_grupo_docente_up.sql`); sus fichas quedan marcadas como ELIMINADO. Este documento conserva las fichas originales de los 57 SP base. El resto está documentado en:
 > - `especificacion_sp_endpoints.md`: endpoint y rol de cada SP público (Addendum REC5);
 > - `DOCUMENTACION_PROCEDIMIENTOS_PUBLICOS.md` y `DOCUMENTACION_PROCEDIMIENTOS_INTERNOS.md`: fichas e índices REC5;
 > - los work items de cada HU (`docs/work-items/`).
@@ -169,12 +169,13 @@ Contiene la documentación oficial de:
 - **Propósito de Negocio:** Crea un nuevo grupo académico para una asignatura y período específico.
 - **Entidades del MER Involucradas:** `Grupo`, `Asignatura`, `PeriodoAcademico`, `Docente`.
 - **Flujo Paso a Paso (Paso Reactivo Atómico):**
-  1. Validar ejecutor y RBAC.
+  1. Validar ejecutor y RBAC (`COORDINADOR,DOCENTE`).
   2. Verificar existencia y estado de la asignatura y período académico.
   3. Validar unicidad del código de grupo en el período.
   4. Insertar la nueva tupla en `dbo.Grupo`.
 - **Reglas de Negocio y Validaciones Específicas:**
   * Código único de grupo dentro del mismo período académico y asignatura.
+  * F3: si el ejecutor es DOCENTE (y no coordinador), el grupo debe quedar a su propio nombre (`SEC_002` en otro caso) y su vínculo con el programa de la asignatura debe estar activo (PASO 4B).
 - **Estado Resultante en la BD:** Fila creada en `dbo.Grupo`.
 
 ---

@@ -157,18 +157,63 @@ BEGIN TRY
     SELECT @userMsg = contenido FROM dbo.uv_mensaje_usuario WHERE codigo = 'SEC_002';
     IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 0 AND mensajeUsuarioResultado = @userMsg)
         THROW 53280, 'GROUP_SCHEDULE_SCOPE FAILED: coordinador de otro programa debio retornar SEC_002.', 1;
+    -- F3: el docente titular solo define el horario inicial (HOR_005 si ya existe); un docente ajeno al grupo recibe SEC_002
     TRUNCATE TABLE #r;
     INSERT INTO #r EXEC dbo.usp_guardar_horarios_grupo @idGrupo = @gA,
         @horariosJSON = N'[{"codigoDia":"JU","horaInicio":"08:00","horaFin":"10:00"}]', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
-    SELECT @userMsg = contenido FROM dbo.uv_mensaje_usuario WHERE codigo = 'SEC_001';
+    SELECT @userMsg = contenido FROM dbo.uv_mensaje_usuario WHERE codigo = 'HOR_005';
     IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 0 AND mensajeUsuarioResultado = @userMsg)
-        THROW 53281, 'GROUP_SCHEDULE_SCOPE FAILED: ejecutor docente debio retornar SEC_001.', 1;
+        THROW 53281, 'GROUP_SCHEDULE_SCOPE FAILED: docente titular con horario ya definido debio retornar HOR_005.', 1;
     IF EXISTS (SELECT 1 FROM dbo.uv_horario WHERE idGrupo = @gA AND nombreDia = N'Jueves') THROW 53282, 'GROUP_SCHEDULE_SCOPE FAILED: cambio el horario.', 1;
+    TRUNCATE TABLE #r;
+    INSERT INTO #r EXEC dbo.usp_guardar_horarios_grupo @idGrupo = @gA,
+        @horariosJSON = N'[{"codigoDia":"JU","horaInicio":"08:00","horaFin":"10:00"}]', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD2;
+    SELECT @userMsg = contenido FROM dbo.uv_mensaje_usuario WHERE codigo = 'SEC_002';
+    IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 0 AND mensajeUsuarioResultado = @userMsg)
+        THROW 53283, 'GROUP_SCHEDULE_SCOPE FAILED: docente que no es titular debio retornar SEC_002.', 1;
     PRINT 'TEST_PASS:GROUP_SCHEDULE_SCOPE';
+
+    -- 9. F3: el docente crea grupos a su propio nombre (SEC_002 si asigna a otro docente) y define su horario inicial
+    DECLARE @gD UNIQUEIDENTIFIER = NEWID(), @gE UNIQUEIDENTIFIER = NEWID(), @codD INT = @base + 3, @codE INT = @base + 4;
+    TRUNCATE TABLE #r;
+    INSERT INTO #r EXEC dbo.usp_crear_grupo @idGrupo = @gE, @idAsignatura = @idAsig, @idPeriodoAcademico = @idPeriodo, @codigo = @codE,
+        @nombre = N'Grupo QA Horario E', @idDocente = @d2, @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
+    SELECT @userMsg = contenido FROM dbo.uv_mensaje_usuario WHERE codigo = 'SEC_002';
+    IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 0 AND mensajeUsuarioResultado = @userMsg) OR EXISTS (SELECT 1 FROM dbo.Grupo WHERE id = @gE)
+        THROW 53284, 'TEACHER_CREATES_GROUP FAILED: docente creando un grupo para otro docente debio retornar SEC_002 sin crearlo.', 1;
+    TRUNCATE TABLE #r;
+    INSERT INTO #r EXEC dbo.usp_crear_grupo @idGrupo = @gD, @idAsignatura = @idAsig, @idPeriodoAcademico = @idPeriodo, @codigo = @codD,
+        @nombre = N'Grupo QA Horario D', @idDocente = @d1, @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
+    IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 1) OR NOT EXISTS (SELECT 1 FROM dbo.Grupo WHERE id = @gD AND docente = @d1)
+        THROW 53285, 'TEACHER_CREATES_GROUP FAILED: docente debio crear un grupo a su nombre.', 1;
+    TRUNCATE TABLE #r;
+    INSERT INTO #r EXEC dbo.usp_guardar_horarios_grupo @idGrupo = @gD,
+        @horariosJSON = N'[{"codigoDia":"VI","horaInicio":"14:00","horaFin":"16:00"}]', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
+    IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 1) OR (SELECT COUNT(*) FROM dbo.uv_horario WHERE idGrupo = @gD) <> 1
+        THROW 53286, 'TEACHER_CREATES_GROUP FAILED: docente titular debio definir el horario inicial.', 1;
+    TRUNCATE TABLE #r;
+    INSERT INTO #r EXEC dbo.usp_guardar_horarios_grupo @idGrupo = @gD,
+        @horariosJSON = N'[{"codigoDia":"VI","horaInicio":"15:00","horaFin":"17:00"}]', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
+    SELECT @userMsg = contenido FROM dbo.uv_mensaje_usuario WHERE codigo = 'HOR_005';
+    IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 0 AND mensajeUsuarioResultado = @userMsg)
+       OR NOT EXISTS (SELECT 1 FROM dbo.uv_horario WHERE idGrupo = @gD AND horaInicio = '14:00')
+        THROW 53287, 'TEACHER_CREATES_GROUP FAILED: segundo guardado del docente debio retornar HOR_005 sin cambios.', 1;
+    -- F3: un docente sin vinculo activo con el programa de la asignatura no puede abrir el grupo (SEC_002, sin crearlo)
+    DECLARE @uD3 UNIQUEIDENTIFIER = NEWID(), @d3 UNIQUEIDENTIFIER = NEWID(), @gF UNIQUEIDENTIFIER = NEWID(), @codF INT = @base + 5;
+    INSERT INTO dbo.Usuario (id, tipoIdIdentificacion, numeroIdentificacion, primerApellido, segundoApellido, primerNombre, segundoNombre, correo, correoConfirmado, estado, password)
+    VALUES (@uD3, @tipoCC, 972000004, N'Horario', N'SinVinculo', N'Hilario', N'Qa', N'qa.horario.d3@test.local', 1, 1, N'HashBackend_H4');
+    INSERT INTO dbo.Docente (id, usuario) VALUES (@d3, @uD3);
+    TRUNCATE TABLE #r;
+    INSERT INTO #r EXEC dbo.usp_crear_grupo @idGrupo = @gF, @idAsignatura = @idAsig, @idPeriodoAcademico = @idPeriodo, @codigo = @codF,
+        @nombre = N'Grupo QA Horario F', @idDocente = @d3, @idCorrelacion = @corr, @idUsuarioEjecutor = @uD3;
+    SELECT @userMsg = contenido FROM dbo.uv_mensaje_usuario WHERE codigo = 'SEC_002';
+    IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 0 AND mensajeUsuarioResultado = @userMsg) OR EXISTS (SELECT 1 FROM dbo.Grupo WHERE id = @gF)
+        THROW 53288, 'TEACHER_CREATES_GROUP FAILED: docente sin vinculo con el programa debio retornar SEC_002 sin crear el grupo.', 1;
+    PRINT 'TEST_PASS:TEACHER_CREATES_GROUP';
 
     DROP TABLE #r;
     ROLLBACK TRANSACTION;
-    IF EXISTS (SELECT 1 FROM dbo.Grupo WHERE id IN (@gA, @gB, @gC)) THROW 53290, 'TEST FAILED: quedaron grupos de prueba.', 1;
+    IF EXISTS (SELECT 1 FROM dbo.Grupo WHERE id IN (@gA, @gB, @gC, @gD, @gE)) THROW 53290, 'TEST FAILED: quedaron grupos de prueba.', 1;
     IF @@TRANCOUNT <> 0 THROW 53291, 'TEST FAILED: transaccion abierta.', 1;
     PRINT 'TEST END: test_usp_guardar_horarios_grupo (transaccion externa)';
 END TRY

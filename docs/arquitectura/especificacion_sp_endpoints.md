@@ -402,7 +402,7 @@
 
 | Tabla | Transacción / Acción de Negocio | Procedimiento Almacenado (BD) | Método del Controlador (Backend) | Rol / Permiso Requerido | Descripción del procedimiento |
 |:---|:---|:---|:---|:---|:---|
-| `Grupo` | Crear grupo académico | `usp_crear_grupo` | `POST /api/v1/grupos` | `DOCENTE`, `COORDINADOR` | Valida existencia de asignatura. Resuelve periodo académico. Valida docente activo. Valida unicidad de código de grupo en asignatura/periodo. Inserta `Grupo` con contadores en 0. Invoca: `usp_validar_docente_exista_por_id_interno`. |
+| `Grupo` | Crear grupo académico | `usp_crear_grupo` | `POST /api/v1/grupos` | `DOCENTE`, `COORDINADOR` | El COORDINADOR crea y asigna cualquier docente; el DOCENTE solo crea grupos a su propio nombre (`SEC_002` si asigna a otro; F3). Valida existencia de asignatura. Resuelve periodo académico. Valida docente activo. Valida unicidad de código de grupo en asignatura/periodo. Inserta `Grupo` con contadores en 0. Invoca: `usp_validar_docente_exista_por_id_interno`. |
 | `Grupo` | Actualizar datos operativos del grupo | `usp_actualizar_grupo` | `PUT /api/v1/grupos/{id}` | `DOCENTE` (titular), `COORDINADOR` | Valida existencia del grupo. Valida docente si se modifica y, si cambia el titular, que no tenga otro grupo a la misma hora (HOR_002, HTTP 409). Valida unicidad de código (excluyendo el propio grupo). Actualiza nombre, código y docente de forma granular (solo campos proporcionados). |
 | `Asignatura` | Crear nueva asignatura en plan | `usp_crear_asignatura` | `POST /api/v1/coordinador/planes-estudio/{id}/asignaturas` | `COORDINADOR` (del programa) | Crea una asignatura vinculada a un `SemestrePlanEstudio`, resolviendo `Area` y `Componente` por nombre o ID. |
 | `Asignatura` | Actualizar datos de asignatura | `usp_actualizar_asignatura` | `PUT /api/v1/coordinador/planes-estudio/{planId}/asignaturas/{asigId}` | `COORDINADOR` (del programa) | Exige `@idUsuarioEjecutor` (GEN_002), perfil `COORDINADOR` (SEC_001) y que coordine el programa de la asignatura (SEC_002). Actualiza código, nombre y créditos de una asignatura existente. |
@@ -583,10 +583,18 @@ El backend de `develop` no lo invoca y no tiene `GRANT EXECUTE` al runtime. Se c
 |---|---|---|
 | `usp_registrar_estudiante_en_grupo_autonomo` | `@idGrupo, @numeroIdentificacion, @primerNombre, @segundoNombre, @primerApellido, @segundoApellido, @correo, @password, @idCorrelacion, @idUsuarioEjecutor, @idTipoIdIdentificacion` | Autoinscripción del estudiante a un grupo (registro + matrícula). Reemplazado en el flujo actual por las solicitudes de ingreso (HU053-HU055). |
 
+## Addendum F3 (2026-11-02): el docente crea sus propios grupos
+
+| Tabla / vista | SP | Endpoint | Rol | Parámetros | Propósito |
+|---|---|---|---|---|---|
+| `uv_docente_programa`, `uv_plan_estudio`, `uv_semestre_plan_estudio`, `uv_asignatura` | `usp_consultar_oferta_creacion_grupo_docente` | `GET /api/v1/docente/oferta-creacion-grupos` | `DOCENTE` | `@idUsuarioEjecutor, @idCorrelacion` | Devuelve el `idDocente` del ejecutor y las asignaturas activas de los programas con vínculo activo, para el formulario "Nuevo grupo". `SEC_001` si el ejecutor no es DOCENTE. |
+
+`usp_crear_grupo` acepta también al DOCENTE: solo a su propio nombre y solo para asignaturas de programas con vínculo activo (`SEC_002` en otro caso). `usp_guardar_horarios_grupo` acepta al docente titular solo para el horario inicial (`HOR_005` si ya existe).
+
 ## Addendum F1 (2026-10-30): horario semanal del grupo
 
 | Tabla | SP | Endpoint | Rol | Parámetros | Propósito |
 |---|---|---|---|---|---|
-| `Horario` | `usp_guardar_horarios_grupo` | `POST /api/v1/grupos` y `PUT /api/v1/grupos/{id}` con `franjas` (misma transacción que crear o actualizar el grupo) | COORDINADOR (del programa) | `@idGrupo, @horariosJSON, @idCorrelacion, @idUsuarioEjecutor` | Reemplaza el horario semanal del grupo. HOR_004 (formato), HOR_003 (franjas que se cruzan) y HOR_002 (cruce del docente) responden 400, 400 y 409 |
+| `Horario` | `usp_guardar_horarios_grupo` | `POST /api/v1/grupos` y `PUT /api/v1/grupos/{id}` con `franjas` (misma transacción que crear o actualizar el grupo) | COORDINADOR (del programa); DOCENTE titular solo para el horario inicial (`HOR_005` si ya existe; F3) | `@idGrupo, @horariosJSON, @idCorrelacion, @idUsuarioEjecutor` | Reemplaza el horario semanal del grupo. HOR_004 (formato), HOR_003 (franjas que se cruzan) y HOR_002 (cruce del docente) responden 400, 400 y 409 |
 
 `GET /api/v1/grupos` devuelve además las `franjas` de cada grupo, leídas de `uv_horario`, que ahora expone `codigoDia`; `uv_dia` también expone `codigo`.
