@@ -381,6 +381,22 @@ La auditoría BD 2026-10-28 encontró 48 SP públicos sin ficha aquí; 10 de ell
 
 ---
 
+### `dbo.usp_precargar_sesiones_grupo`
+- **Caso de uso (F2):** alinea las sesiones **futuras** del grupo con su horario: crea las que faltan y retira las generadas que ya no encajan. El backend lo invoca en la misma transacción que crea el grupo y guarda el horario (y al cambiar el horario). No sustituye a `usp_generar_sesiones_grupo` (congelado, solo docente titular, genera desde el inicio del período); no lo modifica ni lo invoca.
+- **Parámetros:** `@idGrupo`, `@idCorrelacion`, `@idUsuarioEjecutor`.
+- **Quién:** el COORDINADOR del programa de la asignatura del grupo, o el DOCENTE titular del grupo (`SEC_002` en otro caso, sin cambios); cualquier otro perfil recibe `SEC_001`.
+- **Reglas:**
+  - el grupo debe tener horario (`usp_validar_horarios_grupo_interno`) y su período, fechas coherentes (`usp_validar_fechas_periodo_academico_interno`);
+  - solo se generan sesiones desde hoy (hora institucional) o desde el inicio del período si aún no empieza, hasta el fin del período; el pasado no se genera ni se toca;
+  - no duplica: una sesión del mismo grupo, inicio y fin ya existente se respeta (idempotente);
+  - se retiran las sesiones futuras con `procedenciaTemporal = UTC_GENERADOR` que ya no encajan en el horario y no tienen asistencia ni clasificación; las creadas a mano (`UTC_V2`) nunca se borran;
+  - una hora local inexistente por cambio de horario de verano aborta antes de escribir (`SES_005`).
+- **Escritura:** la hace `usp_precargar_sesiones_grupo_interno`; este SP controla la transacción (propia, o savepoint si ya hay una abierta) sin `XACT_ABORT ON`. El runtime solo tiene `EXECUTE` sobre el SP público (`rol_asistencias_runtime_f2_precarga_sesiones.sql`).
+- **Resultset:** canónico de 4 columnas (`GEN_005` en éxito; el mensaje técnico trae las sesiones creadas y eliminadas).
+- **Pruebas:** `test/test_usp_precargar_sesiones_grupo.sql`. Work item: `docs/work-items/F2-precarga-sesiones/`.
+
+---
+
 ### `dbo.usp_guardar_horarios_grupo`
 - **Caso de uso:** el COORDINADOR del programa define o reemplaza el horario semanal de un grupo (varias franjas). El backend lo invoca en la misma transacción que `usp_crear_grupo` y `usp_actualizar_grupo` cuando el comando trae `franjas`.
 - **Parámetros:** `@idGrupo`, `@horariosJSON` (arreglo no vacío de `{"codigoDia":"LU","horaInicio":"08:00","horaFin":"10:00"}` con códigos de `dbo.Dia`), `@idCorrelacion`, `@idUsuarioEjecutor`.

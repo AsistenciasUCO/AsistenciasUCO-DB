@@ -69,6 +69,7 @@ PRINT '======================================================================';
 :r /tmp/test/test_cruce_horario_docente.sql
 :r /tmp/test/test_usp_guardar_horarios_grupo.sql
 :r /tmp/test/test_usp_consultar_oferta_creacion_grupo_docente.sql
+:r /tmp/test/test_usp_precargar_sesiones_grupo.sql
 :r /tmp/test/test_golden_path_immutability.sql
 :r /tmp/test/test_utc_d06_readonly_contract.sql
 :r /tmp/test/test_utc_d06_procedencia_temporal.sql
