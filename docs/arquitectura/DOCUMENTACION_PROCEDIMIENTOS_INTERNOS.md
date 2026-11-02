@@ -172,6 +172,16 @@ Esta documentación especifica la arquitectura, reglas de negocio, contrato de f
 
 ---
 
+### 8.3. `dbo.usp_validar_gestion_grupo_coordinador_o_titular_interno`
+- **Propósito**: Validación compartida de quién puede gestionar el horario y las sesiones de un grupo (skill `procedimientos-externos-condiciones`, REC4 #5). Se extrajo el 2026-11-02 porque el bloque estaba repetido en dos SP y SonarCloud lo marcaba como duplicación.
+- **Parámetros de Entrada**: `@idGrupo UNIQUEIDENTIFIER`, `@idUsuarioEjecutor UNIQUEIDENTIFIER`, `@idCorrelacion UNIQUEIDENTIFIER`.
+- **Parámetros de Salida**: `@ejecutorEsCoordinador BIT`, `@idDocenteTitular UNIQUEIDENTIFIER`, `@mensajeUsuarioResultado`, `@mensajeTecnicoResultado`, `@estadoResultado`.
+- **Códigos de Catálogo Consumidos**: `GEN_002`, `SEC_001` (vía `usp_validar_permiso_rbac_usuario_interno`), `VAL_002`, `SEC_002`, `SYS_001`.
+- **Flujo de Ejecución**: PASO 1 exige ejecutor con perfil COORDINADOR o DOCENTE; PASO 2 valida que el grupo exista; PASO 3 decide el ámbito: el coordinador debe coordinar el programa de la asignatura del grupo y el docente debe ser su titular.
+- **Callers**: `usp_guardar_horarios_grupo` (que además aplica `HOR_005` al docente) y `usp_precargar_sesiones_grupo`.
+
+---
+
 ### 9. `dbo.usp_validar_cruce_horario_estudiante_interno`
 - **Propósito**: Detecta traslapes de horario para un estudiante en los grupos matriculados.
 - **Parámetros de Entrada**: `@idEstudiante UNIQUEIDENTIFIER`, `@idGrupo UNIQUEIDENTIFIER`, `@idCorrelacion UNIQUEIDENTIFIER`.
