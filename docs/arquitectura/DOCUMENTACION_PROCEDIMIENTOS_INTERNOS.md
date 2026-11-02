@@ -162,6 +162,16 @@ Esta documentación especifica la arquitectura, reglas de negocio, contrato de f
 
 ---
 
+### 8.2. `dbo.usp_precargar_sesiones_grupo_interno`
+- **Propósito**: Núcleo atómico de F2. Crea las sesiones futuras que faltan según el horario del grupo y retira las futuras generadas que ya no encajan.
+- **Parámetros de Entrada**: `@idGrupo UNIQUEIDENTIFIER`, `@idCorrelacion UNIQUEIDENTIFIER`.
+- **Parámetros de Salida**: `@sesionesCreadas INT`, `@sesionesEliminadas INT`, `@mensajeUsuarioResultado`, `@mensajeTecnicoResultado`, `@estadoResultado`.
+- **Códigos de Catálogo Consumidos**: `GEN_001` (zona horaria sin configurar), `SES_005` (hora local inexistente), `SYS_001`.
+- **Flujo de Ejecución**: PASO 1 valida la correlación; PASO 2 valida la zona horaria institucional; PASO 3 arma las franjas desde hoy (o el inicio del período) hasta el fin del período y las convierte a UTC; PASO 4 elimina las sesiones futuras generadas (`UTC_GENERADOR`) que no encajan, sin asistencia ni clasificación; PASO 5 inserta las que faltan con correlativo protegido (`UPDLOCK, HOLDLOCK`). No abre transacción: la controla el caller.
+- **Caller**: `usp_precargar_sesiones_grupo`. El runtime no puede ejecutarlo directo (`DENY EXECUTE` en `rol_asistencias_runtime_f2_precarga_sesiones.sql`).
+
+---
+
 ### 9. `dbo.usp_validar_cruce_horario_estudiante_interno`
 - **Propósito**: Detecta traslapes de horario para un estudiante en los grupos matriculados.
 - **Parámetros de Entrada**: `@idEstudiante UNIQUEIDENTIFIER`, `@idGrupo UNIQUEIDENTIFIER`, `@idCorrelacion UNIQUEIDENTIFIER`.

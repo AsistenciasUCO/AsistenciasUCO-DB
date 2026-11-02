@@ -583,6 +583,12 @@ El backend de `develop` no lo invoca y no tiene `GRANT EXECUTE` al runtime. Se c
 |---|---|---|
 | `usp_registrar_estudiante_en_grupo_autonomo` | `@idGrupo, @numeroIdentificacion, @primerNombre, @segundoNombre, @primerApellido, @segundoApellido, @correo, @password, @idCorrelacion, @idUsuarioEjecutor, @idTipoIdIdentificacion` | Autoinscripción del estudiante a un grupo (registro + matrícula). Reemplazado en el flujo actual por las solicitudes de ingreso (HU053-HU055). |
 
+## Addendum F2 (2026-11-02): precarga de sesiones del grupo
+
+| Tabla | SP | Endpoint | Rol | Parámetros | Propósito |
+|---|---|---|---|---|---|
+| `Sesion` | `usp_precargar_sesiones_grupo` | `POST /api/v1/grupos` y `PUT /api/v1/grupos/{id}` (misma transacción que crear o actualizar el grupo y guardar su horario) | COORDINADOR (del programa) o DOCENTE titular | `@idGrupo, @idCorrelacion, @idUsuarioEjecutor` | Crea las sesiones futuras que faltan desde el horario y retira las futuras generadas que ya no encajan. Solo desde hoy; sin duplicar; no toca sesiones pasadas ni las creadas a mano. `SEC_002` si el ejecutor no es el titular o el coordinador del programa |
+
 ## Addendum F3 (2026-11-02): el docente crea sus propios grupos
 
 | Tabla / vista | SP | Endpoint | Rol | Parámetros | Propósito |
