@@ -73,6 +73,7 @@ USING (VALUES
     ('ERR_CRUCE_HORARIO_DOCENTE', 'BUSINESS_ERROR', 'ALTO', 'Existe un cruce de horario para el docente en la misma franja horaria.'),
     ('HOR_003', 'BUSINESS_ERROR', 'MEDIO', 'Las franjas del horario del grupo no pueden cruzarse: {} se cruza con {}.'),
     ('HOR_004', 'BUSINESS_ERROR', 'MEDIO', 'El horario del grupo no es válido: {}.'),
+    ('HOR_005', 'BUSINESS_ERROR', 'MEDIO', 'El grupo ya tiene un horario definido. Para cambiarlo, solicita la aprobación del coordinador.'),
 
     ('SES_001', 'BUSINESS_ERROR', 'MEDIO', 'La sesión de clase especificada no existe o no se encuentra activa.'),
     ('ERR_SESION_NO_EXISTE', 'BUSINESS_ERROR', 'MEDIO', 'La sesion de clase no existe o no esta abierta.'),
@@ -194,6 +195,7 @@ USING (VALUES
     ('ERR_CRUCE_HORARIO_DOCENTE', 'BUSINESS_ERROR', 'ALTO', 'Cruce detectado en uv_horario para Docente con GrupoID: {}.'),
     ('HOR_003', 'BUSINESS_ERROR', 'MEDIO', 'Franjas traslapadas en el horario del grupo: {} y {}.'),
     ('HOR_004', 'BUSINESS_ERROR', 'MEDIO', 'Horario de grupo invalido: {}.'),
+    ('HOR_005', 'BUSINESS_ERROR', 'MEDIO', 'El docente ejecutor intento reemplazar un horario ya definido del grupo.'),
 
     ('SES_001', 'BUSINESS_ERROR', 'MEDIO', 'Error de búsqueda: Sesión no encontrada o cerrada en uv_sesion: {}.'),
     ('ERR_SESION_NO_EXISTE', 'BUSINESS_ERROR', 'MEDIO', 'Error: No se encontro una sesion activa para el ID especificado: {}.'),
