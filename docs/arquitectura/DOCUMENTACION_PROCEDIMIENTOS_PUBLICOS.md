@@ -384,7 +384,7 @@ La auditoría BD 2026-10-28 encontró 48 SP públicos sin ficha aquí; 10 de ell
 ### `dbo.usp_precargar_sesiones_grupo`
 - **Caso de uso (F2):** alinea las sesiones **futuras** del grupo con su horario: crea las que faltan y retira las generadas que ya no encajan. El backend lo invoca en la misma transacción que crea el grupo y guarda el horario (y al cambiar el horario). No sustituye a `usp_generar_sesiones_grupo` (congelado, solo docente titular, genera desde el inicio del período); no lo modifica ni lo invoca.
 - **Parámetros:** `@idGrupo`, `@idCorrelacion`, `@idUsuarioEjecutor`.
-- **Quién:** el COORDINADOR del programa de la asignatura del grupo, o el DOCENTE titular del grupo (`SEC_002` en otro caso, sin cambios); cualquier otro perfil recibe `SEC_001`.
+- **Quién:** el COORDINADOR del programa de la asignatura del grupo, o el DOCENTE titular del grupo (`SEC_002` en otro caso, sin cambios); cualquier otro perfil recibe `SEC_001`. Lo valida `usp_validar_gestion_grupo_coordinador_o_titular_interno`, compartido con `usp_guardar_horarios_grupo`.
 - **Reglas:**
   - el grupo debe tener horario (`usp_validar_horarios_grupo_interno`) y su período, fechas coherentes (`usp_validar_fechas_periodo_academico_interno`);
   - solo se generan sesiones desde hoy (hora institucional) o desde el inicio del período si aún no empieza, hasta el fin del período; el pasado no se genera ni se toca;

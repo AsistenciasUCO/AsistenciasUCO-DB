@@ -20,11 +20,7 @@ CREATE OR ALTER PROCEDURE [dbo].[usp_guardar_horarios_grupo]
 AS
     DECLARE @idCorrelacionDefecto     UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idCorrelacion, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
     DECLARE @idGrupoDefecto           UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idGrupo, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
-    DECLARE @idUsuarioEjecutorDefecto UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idUsuarioEjecutor, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
-    DECLARE @idAsignatura             UNIQUEIDENTIFIER;
     DECLARE @idDocente                UNIQUEIDENTIFIER;
-    DECLARE @idPrograma               UNIQUEIDENTIFIER;
-    DECLARE @idDocenteEjecutor        UNIQUEIDENTIFIER;
     DECLARE @ejecutorEsCoordinador    BIT = 0;
     DECLARE @motivoInvalido           NVARCHAR(200);
     DECLARE @franjaA                  NVARCHAR(100);
@@ -59,98 +55,30 @@ BEGIN
             @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
             @estadoResultado = @estadoResultado OUTPUT;
 
-        -- PASO 2: Ejecutor obligatorio (GEN_002) y perfil COORDINADOR
-        IF @estadoResultado = 1 AND @idUsuarioEjecutor IS NULL
+        -- PASO 2: Ejecutor, grupo y ambito (coordinador del programa o docente titular), validacion compartida
+        IF @estadoResultado = 1
+        BEGIN
+            EXEC dbo.usp_validar_gestion_grupo_coordinador_o_titular_interno
+                @idGrupo = @idGrupoDefecto,
+                @idUsuarioEjecutor = @idUsuarioEjecutor,
+                @idCorrelacion = @idCorrelacionDefecto,
+                @ejecutorEsCoordinador = @ejecutorEsCoordinador OUTPUT,
+                @idDocenteTitular = @idDocente OUTPUT,
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+                @estadoResultado = @estadoResultado OUTPUT;
+        END
+
+        -- PASO 3 (F3): el DOCENTE titular solo define el horario inicial (HOR_005); los cambios van por el coordinador
+        IF @estadoResultado = 1 AND @ejecutorEsCoordinador = 0
+           AND EXISTS (SELECT 1 FROM dbo.uv_horario h WHERE h.idGrupo = @idGrupoDefecto)
         BEGIN
             EXEC dbo.usp_obtener_mensaje_catalogo
-                @p_codigo = 'GEN_002', @p_param1 = 'idUsuarioEjecutor',
+                @p_codigo = 'HOR_005',
                 @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                 @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
             SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
             SET @estadoResultado = 0;
-        END
-
-        IF @estadoResultado = 1
-        BEGIN
-            EXEC dbo.usp_validar_permiso_rbac_usuario_interno
-                @idUsuario = @idUsuarioEjecutorDefecto,
-                @codigoPerfilRequerido = 'COORDINADOR,DOCENTE',
-                @idCorrelacion = @idCorrelacionDefecto,
-                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
-                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
-                @estadoResultado = @estadoResultado OUTPUT;
-        END
-
-        -- PASO 3: El grupo existe (VAL_002) y pertenece al programa que coordina el ejecutor (SEC_002)
-        IF @estadoResultado = 1
-        BEGIN
-            SELECT @idAsignatura = g.idAsignatura, @idDocente = g.idDocente
-            FROM dbo.uv_grupo g
-            WHERE g.id = @idGrupoDefecto;
-
-            IF @idAsignatura IS NULL
-            BEGIN
-                EXEC dbo.usp_obtener_mensaje_catalogo
-                    @p_codigo = 'VAL_002', @p_param1 = 'Grupo',
-                    @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
-                    @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
-                SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
-                SET @estadoResultado = 0;
-            END
-        END
-
-        IF @estadoResultado = 1
-        BEGIN
-            IF EXISTS (SELECT 1 FROM dbo.uv_coordinador_identidad ci WHERE ci.idUsuario = @idUsuarioEjecutorDefecto)
-            BEGIN
-                SET @ejecutorEsCoordinador = 1;
-            END
-
-            SELECT @idDocenteEjecutor = di.id
-            FROM dbo.uv_docente_identidad di
-            WHERE di.idUsuario = @idUsuarioEjecutorDefecto;
-        END
-
-        -- COORDINADOR: titular del programa de la asignatura del grupo
-        IF @estadoResultado = 1 AND @ejecutorEsCoordinador = 1
-        BEGIN
-            SELECT TOP 1 @idPrograma = pe.idPrograma
-            FROM dbo.uv_asignatura a
-            INNER JOIN dbo.uv_semestre_plan_estudio spe ON a.idSemestrePlanEstudio = spe.id
-            INNER JOIN dbo.uv_plan_estudio pe ON spe.idPlanEstudio = pe.id
-            WHERE a.id = @idAsignatura;
-
-            EXEC dbo.usp_validar_titularidad_jerarquica_interno
-                @idUsuario = @idUsuarioEjecutorDefecto,
-                @idEntidadPadre = @idPrograma,
-                @tipoEntidadPadre = 'PROGRAMA',
-                @idCorrelacion = @idCorrelacionDefecto,
-                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
-                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
-                @estadoResultado = @estadoResultado OUTPUT;
-        END
-
-        -- F3 DOCENTE: solo el titular del grupo, y solo para definir el horario inicial (HOR_005); los cambios van por el coordinador
-        IF @estadoResultado = 1 AND @ejecutorEsCoordinador = 0
-        BEGIN
-            IF @idDocenteEjecutor IS NULL OR @idDocenteEjecutor <> @idDocente
-            BEGIN
-                EXEC dbo.usp_obtener_mensaje_catalogo
-                    @p_codigo = 'SEC_002',
-                    @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
-                    @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
-                SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
-                SET @estadoResultado = 0;
-            END
-            ELSE IF EXISTS (SELECT 1 FROM dbo.uv_horario h WHERE h.idGrupo = @idGrupoDefecto)
-            BEGIN
-                EXEC dbo.usp_obtener_mensaje_catalogo
-                    @p_codigo = 'HOR_005',
-                    @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
-                    @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
-                SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
-                SET @estadoResultado = 0;
-            END
         END
 
         -- PASO 4: Formato del horario (HOR_004): arreglo no vacio, solo las 3 claves, dia existente y horaFin > horaInicio
