@@ -34,6 +34,7 @@ PRINT '======================================================================';
 :r /tmp/test/test_usp_periodo_academico_gestion.sql
 :r /tmp/test/test_consultas_coordinador_programa.sql
 :r /tmp/test/test_consultas_decano_facultad.sql
+:r /tmp/test/test_consultas_transversales_hu112_hu157.sql
 :r /tmp/test/test_consultas_reclamos_estudiante.sql
 :r /tmp/test/test_usp_retirar_estudiante_grupo.sql
 :r /tmp/test/test_solicitud_ingreso_grupo.sql

@@ -245,10 +245,15 @@ Work items: `docs/work-items/HU081-HU082-HU083-plan-estudio-estado-semestres/`, 
 | `dbo.usp_consultar_estudiante_facultad_detalle` | HU105 ficha (matrículas) del estudiante | facultad del decano | `VAL_001` |
 | `dbo.usp_consultar_estructura_facultad` | HU109/HU119 Facultad → Programa → Plan | facultad del decano (`uv_auth_facultad`, `uv_auth_programa`) | `VAL_001` |
 | `dbo.usp_consultar_sesiones_facultad_paginado` | HU145 cronograma de sesiones por rango | facultad del decano (`uv_auth_sesion`, `uv_auth_grupo`) | `VAL_001`, `PAG_001` |
+| `dbo.usp_consultar_programas_creditos_facultad_paginado` | HU112 tabla unificada de programas y créditos (una fila por programa y plan con semestres, asignaturas y suma de créditos) | DECANO, su facultad (`uv_auth_programa` + `uv_decano`) | `VAL_001`, `SEC_001`, `PAG_001` |
+| `dbo.usp_consultar_docentes_facultad_paginado` | HU128 directorio de docentes de la facultad filtrable por programa (vínculo `DocentePrograma` activo) | DECANO, su facultad (`uv_auth_docente_programa` + `uv_decano`) | `VAL_001`, `SEC_001`, `PAG_001` |
+| `dbo.usp_buscar_asignaturas_paginado` | HU143 búsqueda transversal de asignaturas por código o nombre | ADMINISTRADOR: todas las facultades de su institución; DECANO: solo su facultad (`uv_auth_programa` + `uv_administrador`/`uv_decano`) | `VAL_001`, `SEC_001`, `PAG_001` |
+| `dbo.usp_buscar_estudiantes_institucion_paginado` | HU157 buscador de estudiantes del administrador | ADMINISTRADOR, su institución (`uv_auth_estudiante` + `uv_administrador`) | `VAL_001`, `SEC_001`, `PAG_001` |
+| `dbo.usp_consultar_historial_estudiante` | HU157 ficha unificada: datos, programas, grupos por período y resumen de asistencia | ADMINISTRADOR (institución) o DECANO (su facultad) vía `uv_auth_estudiante` | `VAL_001`, `SEC_001` |
 
 HU064/HU060/HU061 consumen los SP existentes `usp_consultar_grupos_paginado`, `usp_consultar_sesiones_grupo_paginado` y `usp_consultar_asistencias_sesion_paginado` (sin cambios; ámbito por programa vía `uv_auth_grupo`/`uv_auth_sesion`).
 
-Permisos aditivos: `schema/security/rol_asistencias_runtime_hu081_hu083.sql`, `_hu096_hu098.sql`, `_hu060_hu064.sql` y `_hu104_hu145.sql`. Pruebas: `test/test_usp_plan_estudio_estado_semestres.sql`, `test/test_usp_periodo_academico_gestion.sql`, `test/test_consultas_coordinador_programa.sql` y `test/test_consultas_decano_facultad.sql`, registradas en `test_suite.sql`.
+Permisos aditivos: `schema/security/rol_asistencias_runtime_hu081_hu083.sql`, `_hu096_hu098.sql`, `_hu060_hu064.sql`, `_hu104_hu145.sql` y `_hu112_hu157.sql`. Pruebas: `test/test_usp_plan_estudio_estado_semestres.sql`, `test/test_usp_periodo_academico_gestion.sql`, `test/test_consultas_coordinador_programa.sql` `test/test_consultas_decano_facultad.sql` y `test/test_consultas_transversales_hu112_hu157.sql`, registradas en `test_suite.sql`. Las consultas paginadas de HU112/HU128/HU143/HU157 validan correlación, ejecutor, perfil (RBAC) y paginación con `usp_validar_consulta_paginada_interno`, que también fija el `SESSION_CONTEXT`.
 
 ## Addendum HU010/HU011 — consulta de solicitudes de revisión del estudiante (2026-10-26)
 
