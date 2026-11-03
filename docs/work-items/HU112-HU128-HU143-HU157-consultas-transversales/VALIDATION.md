@@ -13,7 +13,7 @@ last-reviewed: 2026-11-03
 | `test/test_consultas_transversales_hu112_hu157.sql` sobre el SQL Server local (2026-11-02) | 8/8 `TEST_PASS` (T-112-01, T-128-01, T-143-01, T-157-01, T-157-02, T-SEC-03, T-PAG-02, T-INT-01) |
 | `scripts/freeze-manifest.ps1 -Mode Verify` | exit 0 |
 | `deploy_schema.ps1` + `test/prepare_lb004d_fixture.ps1` + `test_summary.ps1` sobre un contenedor SQL Server 2022 limpio (réplica del job `DB Quality Gate CI/CD`), 2026-11-03 | `TOTAL_EXECUTED=396`, `PASSED=395`, `FAILED=0`, `SKIPPED=1`, `CRITICAL_MISSING=0`, `DB GATE PASS`, exit 0 |
-| GitHub Actions `DB Quality Gate CI/CD` y SonarCloud | PENDIENTE: se ejecutan en el PR |
+| GitHub Actions `DB Quality Gate CI/CD` y SonarCloud | success en el PR #79 (2026-11-03; Database Deployment & Quality Gate, SonarCloud), mergeado en `develop` |
 
 Notas:
 
