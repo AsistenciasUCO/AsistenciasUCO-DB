@@ -245,6 +245,9 @@ Total de códigos: **144**.
 | `SES_004` | BUSINESS_ERROR | MEDIO | La fecha y hora de fin de sesión debe ser posterior a la fecha y hora de inicio. | Validación temporal fallida: fechaHoraFin [{}] debe ser posterior a fechaHoraInicio [{}]. | `04_mensaje.sql` |
 | `SES_005` | BUSINESS_ERROR | MEDIO | El horario institucional incluye una hora local inexistente por cambio de horario; no se generaron sesiones. | Validación temporal fallida: la zona [{}] no contiene la hora local [{}] (salto DST); generación abortada sin escrituras. | `04_mensaje.sql` |
 | `SES_006` | BUSINESS_ERROR | ALTO | La sesión no coincide con el manifiesto de clasificación aprobado; no se modificó. | Clasificación UTC_OWNER rechazada: la sesión [{}] no coincide con el manifiesto [{}] (procedencia no NULL u horas distintas). | `04_mensaje.sql` |
+| `SES_007` | BUSINESS_ERROR | MEDIO | La sesión de clase aún no ha iniciado; la asistencia solo se registra durante la sesión. | SES-01 ventana de registro: la sesión [{}] no ha iniciado (SYSUTCDATETIME() < fechaHoraInicio); lote rechazado sin escrituras. | `04_mensaje.sql` |
+| `SES_008` | BUSINESS_ERROR | MEDIO | La sesión de clase ya finalizó; la asistencia solo puede modificarse mediante un reclamo. | SES-01 ventana de registro: la sesión [{}] está cerrada (SYSUTCDATETIME() >= fechaHoraFin); lote rechazado sin escrituras. | `04_mensaje.sql` |
+| `SES_009` | BUSINESS_ERROR | MEDIO | El horario de la sesión no está confirmado; no es posible registrar asistencia. | SES-01 ventana de registro: la sesión [{}] tiene procedencia temporal INDETERMINADA (procedenciaTemporal NULL); lote rechazado sin escrituras. | `04_mensaje.sql` |
 
 ## SIG
 

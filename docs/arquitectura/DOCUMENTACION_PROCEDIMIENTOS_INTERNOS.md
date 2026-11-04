@@ -400,3 +400,14 @@ Todos los procedimientos listados en esta documentación han sido compilados y p
 | `usp_validar_programa_en_facultad_interno` | `@idFacultad, @idPrograma` | Procedimiento: [dbo].[usp_validar_programa_en_facultad_interno] HU144 (CA-05): GEN_001 «Programa» si el programa no existe o pertenece a otra facultad (no se revela cual de los dos). |
 | `usp_validar_sesion_operacion_interno` | `@idCorrelacion, @idUsuarioEjecutor, @procedenciaTemporal, @fechaHoraInicio, @fechaHoraFin, @mensajeUsuarioResultado, @mensajeTecnicoResultado, @estadoResultado, @faseValidacion` | Validacion compartida por los nucleos de creacion y actualizacion de sesion. Mantiene en un unico punto las reglas de procedencia, correlacion y seguridad; no abre ni modifica transacciones y deja la gestion transaccional al llamador. |
 | `usp_vincular_docente_programa_interno` | `@idDocente, @idPrograma, @idTipoVinculacion, @idCorrelacion, @mensajeUsuarioResultado, @mensajeTecnicoResultado, @estadoResultado` | HU091: operacion atomica de vinculo (docente, programa). La fachada publica aporta RBAC, titularidad, resolucion de modo y transaccion; aqui solo se valida el tipo, la unicidad y se inserta. |
+
+## Addendum SES-01 (2026-11-03, pendiente de aprobación del owner DB)
+
+### `dbo.usp_validar_sesion_ventana_registro_interno`
+- **Propósito**: Valida la ventana de registro ordinario de asistencia: `fechaHoraInicio <= SYSUTCDATETIME() < fechaHoraFin` con procedencia temporal confirmada (`UTC_V2`, `UTC_GENERADOR`, `UTC_OWNER`). Sin tolerancia posterior al cierre; `NULL` (INDETERMINADA) nunca se interpreta con una zona supuesta.
+- **Concurrencia**: lee la fila de `dbo.Sesion` con `UPDLOCK, HOLDLOCK`. Debe invocarse **dentro** de la transacción (propia o savepoint) del procedimiento público que escribe: el bloqueo se conserva hasta su `COMMIT`/`ROLLBACK`, el horario no cambia entre validación y escritura, y los lotes concurrentes de la misma sesión se serializan y leen el reloj después de obtener el bloqueo.
+- **Parámetros de Entrada**: `@idSesion UNIQUEIDENTIFIER`, `@idCorrelacion UNIQUEIDENTIFIER`.
+- **Parámetros de Salida**: `@mensajeUsuarioResultado`, `@mensajeTecnicoResultado`, `@estadoResultado`.
+- **Códigos de Catálogo Consumidos**: `SES_001`, `SES_007` (no iniciada), `SES_008` (cerrada), `SES_009` (indeterminada), `SYS_001`.
+- **Consumidores**: `usp_registrar_asistencias_sesion` (antes de escribir y antes de confirmar) y `usp_registrar_asistencia_estudiante_autonomo`. No lo usa `usp_resolver_solicitud_revision_asistencia`: la rectificación posterior al cierre es el flujo formal de reclamos (SES-04).
+- **Work item**: `docs/work-items/SES-01-cierre-estricto-asistencia/PLAN.md`.
