@@ -198,6 +198,9 @@ BEGIN TRY
     EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = 'SES_008', @p_param1 = @sAutoClosed,
         @mensajeUsuarioResultado = @userMsg OUTPUT, @mensajeTecnicoResultado = @techMsg OUTPUT;
     PRINT CONCAT('TEST_EXPECTED_USER:SES01_AUTO_CLOSED|', @userMsg);
+    -- El mensaje de usuario (con tildes) se parte en varias lineas en la salida de sqlcmd; a veces quedan bytes sueltos
+    -- al inicio de la linea siguiente. Esta linea vacia los absorbe y deja limpio el marcador TECH (gate local 2026-11-04).
+    PRINT '';
     PRINT CONCAT('TEST_EXPECTED_TECH:SES01_AUTO_CLOSED|', @techMsg, ' Correlacion: ', @corr);
     PRINT 'TEST_RESULT_BEGIN:SES01_AUTO_CLOSED';
     EXEC dbo.usp_registrar_asistencia_estudiante_autonomo
