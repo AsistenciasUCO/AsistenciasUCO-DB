@@ -110,6 +110,11 @@ IF (SELECT COUNT(*) FROM @result) <> 1 OR EXISTS (SELECT 1 FROM @result WHERE es
     THROW 53481, 'PRELOAD_CONCURRENT_IDEMPOTENT FAILED: concurrent preload returned a failure.', 1;
 "@
     Set-Content -Path $workerPath -Value $workerSql -Encoding utf8
+    $workerRemotePath = "${remotePrefix}_worker.sql"
+    $copyOutput = @(& docker cp $workerPath "${ContainerName}:$workerRemotePath" 2>&1)
+    if ($LASTEXITCODE -ne 0) { throw "could not copy SQL worker fixture: $($copyOutput -join '; ')" }
+    $null = & docker exec -u 0 $ContainerName chmod a+r $workerRemotePath 2>&1
+    if ($LASTEXITCODE -ne 0) { throw 'could not set SQL worker fixture read permissions.' }
     $validationSql = @"
 SET NOCOUNT ON;
 DECLARE @zonaHoraria SYSNAME = (SELECT TOP (1) valor FROM dbo.uv_parametro WHERE grupo = 'TIEMPO' AND clave = 'ZONA_HORARIA_SQLSERVER' AND estaActivo = 1);
@@ -131,7 +136,6 @@ FROM dbo.uv_sesion_v2 WHERE idGrupo = '$groupId';
 "@
     Set-Content -Path $validationPath -Value $validationSql -Encoding utf8
 
-    $workerRemotePath = "${remotePrefix}_worker.sql"
     $jobScript = {
         param ($container, $password, $path)
         $workerOutput = @(& docker exec $container /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $password -C -b -h -1 -W -t 60 -i $path 2>&1)

@@ -68,6 +68,7 @@ BEGIN TRY
     DECLARE @gA UNIQUEIDENTIFIER = NEWID(), @gB UNIQUEIDENTIFIER = NEWID(), @gC UNIQUEIDENTIFIER = NEWID();
     DECLARE @gV8 UNIQUEIDENTIFIER = NEWID(), @gV12 UNIQUEIDENTIFIER = NEWID(), @gV16 UNIQUEIDENTIFIER = NEWID(), @gV18 UNIQUEIDENTIFIER = NEWID();
     DECLARE @codA INT = @base, @codB INT = @base + 1, @codC INT = @base + 2;
+    DECLARE @codV8 INT = @base + 3, @codV12 INT = @base + 4, @codV16 INT = @base + 5, @codV18 INT = @base + 6;
 
     INSERT INTO #r EXEC dbo.usp_crear_grupo @idGrupo = @gA, @idAsignatura = @idAsig, @idPeriodoAcademico = @idFuturo, @codigo = @codA,
         @nombre = N'Grupo QA Precarga A', @idDocente = @d1, @idCorrelacion = @corr, @idUsuarioEjecutor = @uCoord;
@@ -75,13 +76,13 @@ BEGIN TRY
         @nombre = N'Grupo QA Precarga B', @idDocente = @d1, @idCorrelacion = @corr, @idUsuarioEjecutor = @uCoord;
     INSERT INTO #r EXEC dbo.usp_crear_grupo @idGrupo = @gC, @idAsignatura = @idAsig, @idPeriodoAcademico = @idPasado, @codigo = @codC,
         @nombre = N'Grupo QA Precarga C', @idDocente = @d1, @idCorrelacion = @corr, @idUsuarioEjecutor = @uCoord;
-    INSERT INTO #r EXEC dbo.usp_crear_grupo @idGrupo = @gV8, @idAsignatura = @idAsig, @idPeriodoAcademico = @idPeriodo8, @codigo = @base + 3,
+    INSERT INTO #r EXEC dbo.usp_crear_grupo @idGrupo = @gV8, @idAsignatura = @idAsig, @idPeriodoAcademico = @idPeriodo8, @codigo = @codV8,
         @nombre = N'Grupo QA Precarga 8 semanas', @idDocente = @d1, @idCorrelacion = @corr, @idUsuarioEjecutor = @uCoord;
-    INSERT INTO #r EXEC dbo.usp_crear_grupo @idGrupo = @gV12, @idAsignatura = @idAsig, @idPeriodoAcademico = @idPeriodo12, @codigo = @base + 4,
+    INSERT INTO #r EXEC dbo.usp_crear_grupo @idGrupo = @gV12, @idAsignatura = @idAsig, @idPeriodoAcademico = @idPeriodo12, @codigo = @codV12,
         @nombre = N'Grupo QA Precarga 12 semanas', @idDocente = @d1, @idCorrelacion = @corr, @idUsuarioEjecutor = @uCoord;
-    INSERT INTO #r EXEC dbo.usp_crear_grupo @idGrupo = @gV16, @idAsignatura = @idAsig, @idPeriodoAcademico = @idPeriodo16, @codigo = @base + 5,
+    INSERT INTO #r EXEC dbo.usp_crear_grupo @idGrupo = @gV16, @idAsignatura = @idAsig, @idPeriodoAcademico = @idPeriodo16, @codigo = @codV16,
         @nombre = N'Grupo QA Precarga 16 semanas', @idDocente = @d1, @idCorrelacion = @corr, @idUsuarioEjecutor = @uCoord;
-    INSERT INTO #r EXEC dbo.usp_crear_grupo @idGrupo = @gV18, @idAsignatura = @idAsig, @idPeriodoAcademico = @idPeriodo18, @codigo = @base + 6,
+    INSERT INTO #r EXEC dbo.usp_crear_grupo @idGrupo = @gV18, @idAsignatura = @idAsig, @idPeriodoAcademico = @idPeriodo18, @codigo = @codV18,
         @nombre = N'Grupo QA Precarga 18 semanas', @idDocente = @d1, @idCorrelacion = @corr, @idUsuarioEjecutor = @uCoord;
     IF (SELECT COUNT(*) FROM #r WHERE estadoResultado = 1) <> 7 OR @@TRANCOUNT <> 1
         THROW 53401, 'TEST FAILED: los grupos de prueba debieron crearse dentro de la transaccion externa.', 1;
