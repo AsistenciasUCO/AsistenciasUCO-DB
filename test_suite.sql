@@ -54,6 +54,7 @@ PRINT '======================================================================';
 :r /tmp/test/test_titularidad_jerarquica.sql
 :r /tmp/test/test_attendance_commands.sql
 :r /tmp/test/test_attendance_review.sql
+:r /tmp/test/test_ses04_reclamo_justificada.sql
 :r /tmp/test/test_rec3_falla_intermedia_transaccion.sql
 :r /tmp/test/test_lb004d_support_binding.sql
 :r /tmp/test/test_usp_crear_coordinador.sql
