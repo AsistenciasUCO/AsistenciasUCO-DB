@@ -13,18 +13,19 @@ PRINT 'TEST START: test_runtime_grants_backend_inventory';
 
 DECLARE @requeridos TABLE (nombre SYSNAME PRIMARY KEY);
 INSERT INTO @requeridos (nombre) VALUES
- (N'usp_actualizar_area'), (N'usp_actualizar_coordinador'), (N'usp_actualizar_docente_programa'), (N'usp_actualizar_facultad'),
- (N'usp_actualizar_programa_academico'), (N'usp_actualizar_tipo_programa'), (N'usp_cambiar_estado_area'),
- (N'usp_cambiar_estado_coordinador'), (N'usp_cambiar_estado_docente_programa'), (N'usp_cambiar_estado_facultad'),
- (N'usp_cambiar_estado_programa_academico'), (N'usp_cambiar_estado_tipo_programa'), (N'usp_consultar_aforo_grupos_facultad'),
+ (N'usp_actualizar_coordinador'), (N'usp_actualizar_docente_programa'), (N'usp_actualizar_facultad'),
+ (N'usp_actualizar_programa_academico'), (N'usp_cambiar_estado_coordinador'),
+ (N'usp_cambiar_estado_docente_programa'), (N'usp_cambiar_estado_facultad'),
+ (N'usp_cambiar_estado_programa_academico'), (N'usp_consultar_aforo_grupos_facultad'),
  (N'usp_consultar_alerta_temprana_programa'), (N'usp_consultar_bitacora_estudiante_programa'),
  (N'usp_consultar_candidatos_docente_programa'), (N'usp_consultar_comparativa_facultades'),
  (N'usp_consultar_comparativa_programas_facultad'), (N'usp_consultar_detalle_solicitud_revision_docente'),
- (N'usp_consultar_docentes_programa'), (N'usp_consultar_ficha_estudiante_programa'), (N'usp_consultar_kpis_coordinador'),
- (N'usp_consultar_kpis_decano'), (N'usp_consultar_kpis_institucion'), (N'usp_consultar_programas_academicos'),
- (N'usp_consultar_resumen_asistencia_estudiante_programa'), (N'usp_consultar_resumen_docentes_programa'),
- (N'usp_consultar_historial_grupos_docente_programa'), (N'usp_consultar_tendencia_ausentismo'), (N'usp_crear_area'),
- (N'usp_crear_facultad'), (N'usp_crear_programa_academico'), (N'usp_crear_tipo_programa'), (N'usp_vincular_docente_programa');
+ (N'usp_consultar_docentes_programa'), (N'usp_consultar_ficha_estudiante_programa'),
+ (N'usp_consultar_kpis_coordinador'), (N'usp_consultar_kpis_decano'), (N'usp_consultar_kpis_institucion'),
+ (N'usp_consultar_programas_academicos'), (N'usp_consultar_resumen_asistencia_estudiante_programa'),
+ (N'usp_consultar_resumen_docentes_programa'), (N'usp_consultar_historial_grupos_docente_programa'),
+ (N'usp_consultar_tendencia_ausentismo'), (N'usp_crear_facultad'), (N'usp_crear_programa_academico'),
+ (N'usp_vincular_docente_programa');
 
 DECLARE @sinConcesion NVARCHAR(MAX) = (
     SELECT STRING_AGG(r.nombre, ', ')

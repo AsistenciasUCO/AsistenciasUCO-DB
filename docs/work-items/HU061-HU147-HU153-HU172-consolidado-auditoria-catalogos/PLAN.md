@@ -8,6 +8,8 @@ last-reviewed: 2026-11-04
 
 # PLAN — HU061-HU147-HU153-HU172-consolidado-auditoria-catalogos
 
+> **Actualización (2026-11-04):** por la regla de John de catálogos base de solo consulta, la escritura de HU153 se retiró en CAT-01 (`docs/work-items/CAT-01-catalogos-solo-consulta/`). El resto de este work item sigue vigente.
+
 ## Identidad y objetivo
 
 - **HU061:** consolidado de asistencia por cohorte, materia y docente. Decisión de John (2026-11-04): la cohorte es el **período académico** del grupo, porque el modelo no tiene cohorte de ingreso.

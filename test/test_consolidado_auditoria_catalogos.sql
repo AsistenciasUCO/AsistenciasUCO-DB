@@ -131,38 +131,17 @@ BEGIN TRY
         THROW 56211, 'TEST FAILED T-147-01: un estudiante no fue rechazado con SEC_001.', 1;
     PRINT 'TEST_PASS:T-147-01';
 
-    PRINT '-> T-153-01: tipos de documento (crear y editar nombre; solo administrador)';
-    DECLARE @codigoTipo NVARCHAR(5) = CONCAT(N'Q', CHAR(65 + ABS(CHECKSUM(NEWID())) % 26), CHAR(65 + ABS(CHECKSUM(NEWID())) % 26), N'X');
-    DECLARE @nombreTipo NVARCHAR(50) = CONCAT(N'QA Documento ', @codigoTipo);
-    INSERT INTO #canonico EXEC dbo.usp_guardar_tipo_identificacion @codigo = @codigoTipo, @nombre = @nombreTipo, @idCorrelacion = @c, @idUsuarioEjecutor = @uAdmin;
-    DECLARE @idTipo UNIQUEIDENTIFIER = (SELECT id FROM dbo.uv_tipo_identificacion WHERE tipoIdentificacion = @codigoTipo);
-    IF (SELECT estadoResultado FROM #canonico) <> 1 OR @idTipo IS NULL
-        THROW 56212, 'TEST FAILED T-153-01: el administrador no pudo crear el tipo de documento.', 1;
-    TRUNCATE TABLE #canonico;
-    INSERT INTO #canonico EXEC dbo.usp_guardar_tipo_identificacion @codigo = @codigoTipo, @nombre = N'QA Otro nombre', @idCorrelacion = @c, @idUsuarioEjecutor = @uAdmin;
-    IF NOT EXISTS (SELECT 1 FROM #canonico WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE 'DBCODE=GEN_003|%')
-        THROW 56213, 'TEST FAILED T-153-01: el codigo duplicado no fue rechazado con GEN_003.', 1;
-    TRUNCATE TABLE #canonico;
-    INSERT INTO #canonico EXEC dbo.usp_guardar_tipo_identificacion @codigo = N'Q1', @nombre = N'QA Codigo invalido', @idCorrelacion = @c, @idUsuarioEjecutor = @uAdmin;
-    IF NOT EXISTS (SELECT 1 FROM #canonico WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE 'DBCODE=GEN_002|%')
-        THROW 56214, 'TEST FAILED T-153-01: un codigo con numeros no fue rechazado con GEN_002.', 1;
-    TRUNCATE TABLE #canonico;
-    INSERT INTO #canonico EXEC dbo.usp_guardar_tipo_identificacion @idTipoIdentificacion = @idTipo, @codigo = N'ZZ', @nombre = N'QA Nombre editado', @idCorrelacion = @c, @idUsuarioEjecutor = @uAdmin;
-    IF (SELECT estadoResultado FROM #canonico) <> 1
-       OR NOT EXISTS (SELECT 1 FROM dbo.uv_tipo_identificacion WHERE id = @idTipo AND nombre = N'QA Nombre editado' AND tipoIdentificacion = @codigoTipo)
-        THROW 56215, 'TEST FAILED T-153-01: la edicion debe cambiar solo el nombre y conservar el codigo.', 1;
-    TRUNCATE TABLE #canonico;
-    INSERT INTO #canonico EXEC dbo.usp_guardar_tipo_identificacion @idTipoIdentificacion = @idTipo, @nombre = N'Cedula de ciudadania', @idCorrelacion = @c, @idUsuarioEjecutor = @uAdmin;
-    IF NOT EXISTS (SELECT 1 FROM #canonico WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE 'DBCODE=GEN_003|%')
-        THROW 56216, 'TEST FAILED T-153-01: el nombre repetido de otro tipo no fue rechazado con GEN_003.', 1;
-    TRUNCATE TABLE #canonico;
-    INSERT INTO #canonico EXEC dbo.usp_guardar_tipo_identificacion @idTipoIdentificacion = @c, @nombre = N'QA No existe', @idCorrelacion = @c, @idUsuarioEjecutor = @uAdmin;
-    IF NOT EXISTS (SELECT 1 FROM #canonico WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE 'DBCODE=GEN_001|%')
-        THROW 56217, 'TEST FAILED T-153-01: un tipo inexistente no fue rechazado con GEN_001.', 1;
-    TRUNCATE TABLE #canonico;
-    INSERT INTO #canonico EXEC dbo.usp_guardar_tipo_identificacion @codigo = N'QZZ', @nombre = N'QA Coordinador', @idCorrelacion = @c, @idUsuarioEjecutor = @uCoord;
-    IF NOT EXISTS (SELECT 1 FROM #canonico WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE 'DBCODE=SEC_001|%')
-        THROW 56218, 'TEST FAILED T-153-01: un coordinador no fue rechazado con SEC_001.', 1;
+    PRINT '-> T-153-01: catalogos base de solo consulta (regla de John 2026-11-04)';
+    -- TipoIdentificacion, TipoPrograma y Area (con Perfil, Semestre, Componente, EstadoEstudianteGrupo, RazonCausa,
+    -- Estado y Dia) son de solo consulta: no existen SP de escritura y las vistas listan el seed.
+    IF EXISTS (SELECT 1 FROM (VALUES (N'usp_guardar_tipo_identificacion'), (N'usp_guardar_tipo_identificacion_interno'),
+                   (N'usp_crear_tipo_programa'), (N'usp_actualizar_tipo_programa'), (N'usp_cambiar_estado_tipo_programa'),
+                   (N'usp_crear_area'), (N'usp_actualizar_area'), (N'usp_cambiar_estado_area')) AS sp (nombre)
+               WHERE OBJECT_ID(N'dbo.' + sp.nombre, N'P') IS NOT NULL)
+        THROW 56212, 'TEST FAILED T-153-01: no deben existir SP de escritura de catalogos base.', 1;
+    IF NOT EXISTS (SELECT 1 FROM dbo.uv_tipo_identificacion WHERE tipoIdentificacion = N'CC')
+       OR NOT EXISTS (SELECT 1 FROM dbo.uv_tipo_programa) OR NOT EXISTS (SELECT 1 FROM dbo.uv_area)
+        THROW 56213, 'TEST FAILED T-153-01: las vistas de los catalogos base no listan el seed.', 1;
     PRINT 'TEST_PASS:T-153-01';
 
     PRINT '-> T-P5-01: asignaturas solo con area, componente y semestre existentes';
