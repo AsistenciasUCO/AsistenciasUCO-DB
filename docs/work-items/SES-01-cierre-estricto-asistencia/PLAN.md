@@ -8,7 +8,7 @@ last-reviewed: 2026-11-03
 
 # PLAN — SES-01: cierre estricto de la ventana de registro de asistencia
 
-**Estado: PENDIENTE DE APROBACIÓN DEL OWNER DB (John Duque).** Modifica un SP congelado (`usp_registrar_asistencias_sesion`, DEVELOP_FREEZE / Golden Path). No se aplica a ninguna base compartida hasta esa aprobación.
+**Estado: excepción de freeze AUTORIZADA por el responsable funcional del proyecto (2026-11-03).** Modifica un SP congelado (`usp_registrar_asistencias_sesion`, DEVELOP_FREEZE / Golden Path). La revisión formal del owner DB (John Duque) se solicita en el PR; no se aplica a bases compartidas fuera del mecanismo oficial de despliegue.
 
 ## Requisito (decisión funcional 2026-11-02)
 

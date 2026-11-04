@@ -41,7 +41,7 @@ $postFreezeSuperseded = @(
     'schema/stored-procedures/usp_crear_sesion.sql',
     'schema/stored-procedures/usp_actualizar_sesion.sql',
     'schema/stored-procedures/usp_generar_sesiones_grupo.sql',
-    # SES-01 (pendiente de aprobacion del owner DB): ventana estricta de registro; misma firma y resultset.
+    # SES-01 (excepcion autorizada por el responsable del proyecto, 2026-11-03): ventana estricta de registro; misma firma y resultset.
     'schema/stored-procedures/usp_registrar_asistencias_sesion.sql'
 )
 $postFreezeNew = @( # added or extended (Sesion.sql gains the provenance column outside the frozen list)
