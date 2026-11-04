@@ -19,7 +19,9 @@ DECLARE @codigoDiaHoy NVARCHAR(2) = CASE DATEDIFF(DAY, '19000101', @fechaHoyLoca
     WHEN 0 THEN N'LU' WHEN 1 THEN N'MA' WHEN 2 THEN N'MI' WHEN 3 THEN N'JU'
     WHEN 4 THEN N'VI' WHEN 5 THEN N'SA' ELSE N'DO' END;
 DECLARE @idAsig UNIQUEIDENTIFIER, @idProg UNIQUEIDENTIFIER, @uCoord UNIQUEIDENTIFIER, @idInstitucion UNIQUEIDENTIFIER;
-SELECT TOP 1 @idAsig = a.id, @idProg = pe.idPrograma, @uCoord = ci.idUsuario, @idInstitucion = pr.idInstitucion
+DECLARE @idFacultad UNIQUEIDENTIFIER, @idTipoPrograma UNIQUEIDENTIFIER;
+SELECT TOP 1 @idAsig = a.id, @idProg = pe.idPrograma, @uCoord = ci.idUsuario, @idInstitucion = pr.idInstitucion,
+       @idFacultad = pr.idFacultad, @idTipoPrograma = pr.idTipoPrograma
 FROM dbo.uv_asignatura a
 INNER JOIN dbo.uv_semestre_plan_estudio spe ON a.idSemestrePlanEstudio = spe.id
 INNER JOIN dbo.uv_plan_estudio pe ON spe.idPlanEstudio = pe.id
@@ -29,20 +31,27 @@ WHERE pr.estaActivoPrograma = 1 AND ci.estaActivoUsuario = 1 AND ci.estaActivoRo
 ORDER BY a.id;
 DECLARE @idPeriodoBase UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_periodo_academico WHERE idInstitucion = @idInstitucion ORDER BY anio DESC);
 DECLARE @tvCat UNIQUEIDENTIFIER = (SELECT id FROM dbo.uv_tipo_vinculacion WHERE codigo = 'CAT');
-IF @tipoCC IS NULL OR @idAsig IS NULL OR @uCoord IS NULL OR @idInstitucion IS NULL OR @idPeriodoBase IS NULL OR @tvCat IS NULL OR @zonaHorariaSqlServer IS NULL
+IF @tipoCC IS NULL OR @idAsig IS NULL OR @uCoord IS NULL OR @idInstitucion IS NULL OR @idFacultad IS NULL OR @idTipoPrograma IS NULL
+   OR @idPeriodoBase IS NULL OR @tvCat IS NULL OR @zonaHorariaSqlServer IS NULL
     THROW 53400, 'TEST FAILED: faltan fixtures del seed (asignatura, coordinador, periodo o vinculacion).', 1;
 
 BEGIN TRANSACTION;
 BEGIN TRY
-    DECLARE @uD1 UNIQUEIDENTIFIER = NEWID(), @uD2 UNIQUEIDENTIFIER = NEWID(), @uE UNIQUEIDENTIFIER = NEWID();
+    DECLARE @uD1 UNIQUEIDENTIFIER = NEWID(), @uD2 UNIQUEIDENTIFIER = NEWID(), @uE UNIQUEIDENTIFIER = NEWID(), @uCoordOtro UNIQUEIDENTIFIER = NEWID();
     DECLARE @d1 UNIQUEIDENTIFIER = NEWID(), @d2 UNIQUEIDENTIFIER = NEWID(), @e UNIQUEIDENTIFIER = NEWID();
+    DECLARE @cOtro UNIQUEIDENTIFIER = NEWID(), @pOtro UNIQUEIDENTIFIER = NEWID();
     INSERT INTO dbo.Usuario (id, tipoIdIdentificacion, numeroIdentificacion, primerApellido, segundoApellido, primerNombre, segundoNombre, correo, correoConfirmado, estado, password)
     VALUES (@uD1, @tipoCC, 973000001, N'Precarga', N'Uno', N'Pablo', N'Qa', N'qa.precarga.d1@test.local', 1, 1, N'HashBackend_P1'),
            (@uD2, @tipoCC, 973000002, N'Precarga', N'Dos', N'Marina', N'Qa', N'qa.precarga.d2@test.local', 1, 1, N'HashBackend_P2'),
            (@uE, @tipoCC, 974000000 + ABS(CHECKSUM(NEWID()) % 99999999), N'Precarga', N'Estudiante', N'Sara', N'Qa',
-            CONCAT(N'qa.precarga.estudiante.', REPLACE(CONVERT(NVARCHAR(36), @uE), N'-', N''), N'@test.local'), 1, 1, N'HashBackend_PE');
+            CONCAT(N'qa.precarga.estudiante.', REPLACE(CONVERT(NVARCHAR(36), @uE), N'-', N''), N'@test.local'), 1, 1, N'HashBackend_PE'),
+           (@uCoordOtro, @tipoCC, 975000000 + ABS(CHECKSUM(NEWID()) % 99999999), N'Precarga', N'Coordinador', N'Oscar', N'Qa',
+            CONCAT(N'qa.precarga.coordinador.', REPLACE(CONVERT(NVARCHAR(36), @uCoordOtro), N'-', N''), N'@test.local'), 1, 1, N'HashBackend_PC');
     INSERT INTO dbo.Docente (id, usuario) VALUES (@d1, @uD1), (@d2, @uD2);
     INSERT INTO dbo.Estudiante (id, usuario) VALUES (@e, @uE);
+    INSERT INTO dbo.Coordinador (id, usuario) VALUES (@cOtro, @uCoordOtro);
+    INSERT INTO dbo.Programa (id, facultad, tipoDePrograma, nombre, coordinador, estado)
+    VALUES (@pOtro, @idFacultad, @idTipoPrograma, CONCAT(N'Programa QA ', LEFT(CONVERT(NVARCHAR(36), @pOtro), 10)), @cOtro, 1);
     INSERT INTO dbo.DocentePrograma (id, docente, programa, tipoVinculacion, estado, fechaVinculacionUtc)
     VALUES (NEWID(), @d1, @idProg, @tvCat, 1, SYSUTCDATETIME()), (NEWID(), @d2, @idProg, @tvCat, 1, SYSUTCDATETIME());
 
@@ -86,19 +95,6 @@ BEGIN TRY
         @nombre = N'Grupo QA Precarga 18 semanas', @idDocente = @d1, @idCorrelacion = @corr, @idUsuarioEjecutor = @uCoord;
     IF (SELECT COUNT(*) FROM #r WHERE estadoResultado = 1) <> 7 OR @@TRANCOUNT <> 1
         THROW 53401, 'TEST FAILED: los grupos de prueba debieron crearse dentro de la transaccion externa.', 1;
-
-    DECLARE @idAsigOtro UNIQUEIDENTIFIER;
-    SELECT TOP 1 @idAsigOtro = a.id
-    FROM dbo.uv_asignatura a
-    INNER JOIN dbo.uv_semestre_plan_estudio spe ON a.idSemestrePlanEstudio = spe.id
-    INNER JOIN dbo.uv_plan_estudio pe ON spe.idPlanEstudio = pe.id
-    INNER JOIN dbo.uv_programa pr ON pr.id = pe.idPrograma
-    WHERE pe.idPrograma <> @idProg;
-    IF @idAsigOtro IS NULL THROW 53404, 'TEST FAILED: se requiere una asignatura de otro programa para probar el ambito.', 1;
-    DECLARE @gOtro UNIQUEIDENTIFIER = NEWID();
-    INSERT INTO dbo.Grupo (id, asignatura, periodoAcademico, codigo, nombre, cantidadEstudiantes, cantidadEstudiantesFinalizaron,
-        cantidadEstudiantesCancelaronVoluntadPropia, cantidadEstudiantesCancelaronAutomaticamente, docente)
-    VALUES (@gOtro, @idAsigOtro, @idFuturo, @base + 7, N'Grupo QA Precarga Otro Programa', 20, 0, 0, 0, @d1);
 
     DECLARE @idEstadoActivo UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_estado_estudiante_grupo WHERE codigo = 'A');
     DECLARE @idRazonAN UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.uv_razon_causa WHERE codigo = 'AN');
@@ -230,11 +226,11 @@ BEGIN TRY
     DECLARE @cantidadAntesNoAutorizado INT = (SELECT COUNT(*) FROM dbo.uv_sesion_v2 WHERE idGrupo = @gA);
     SELECT @userMsg = contenido FROM dbo.uv_mensaje_usuario WHERE codigo = 'SEC_002';
     TRUNCATE TABLE #r;
-    INSERT INTO #r EXEC dbo.usp_precargar_sesiones_grupo @idGrupo = @gOtro, @idCorrelacion = @corr, @idUsuarioEjecutor = @uCoord;
+    INSERT INTO #r EXEC dbo.usp_precargar_sesiones_grupo @idGrupo = @gA, @idCorrelacion = @corr, @idUsuarioEjecutor = @uCoordOtro;
     IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 0 AND mensajeUsuarioResultado = @userMsg AND mensajeTecnicoResultado LIKE 'DBCODE=SEC_002|%')
-       OR EXISTS (SELECT 1 FROM dbo.uv_sesion_v2 WHERE idGrupo = @gOtro)
+       OR (SELECT COUNT(*) FROM dbo.uv_sesion_v2 WHERE idGrupo = @gA) <> @cantidadAntesNoAutorizado
        OR @@TRANCOUNT <> 1
-        THROW 53443, 'PRELOAD_CROSS_PROGRAM_DENIED FAILED: el coordinador de otro programa no recibio SEC_002 o hubo escrituras.', 1;
+        THROW 53443, 'PRELOAD_CROSS_PROGRAM_DENIED FAILED: el coordinador ajeno no recibio SEC_002 o hubo escrituras.', 1;
     PRINT 'TEST_PASS:PRELOAD_CROSS_PROGRAM_DENIED';
 
     SELECT @userMsg = contenido FROM dbo.uv_mensaje_usuario WHERE codigo = 'SEC_001';
@@ -324,7 +320,7 @@ BEGIN TRY
 
     DROP TABLE #r;
     ROLLBACK TRANSACTION;
-    IF EXISTS (SELECT 1 FROM dbo.uv_grupo WHERE id IN (@gA, @gB, @gC, @gV8, @gV12, @gV16, @gV18, @gOtro)) THROW 53490, 'TEST FAILED: quedaron grupos de prueba.', 1;
+    IF EXISTS (SELECT 1 FROM dbo.uv_grupo WHERE id IN (@gA, @gB, @gC, @gV8, @gV12, @gV16, @gV18)) THROW 53490, 'TEST FAILED: quedaron grupos de prueba.', 1;
     IF @@TRANCOUNT <> 0 THROW 53491, 'TEST FAILED: transaccion abierta.', 1;
     PRINT 'TEST END: test_usp_precargar_sesiones_grupo';
 END TRY
