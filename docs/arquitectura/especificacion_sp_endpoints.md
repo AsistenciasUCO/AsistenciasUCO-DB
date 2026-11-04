@@ -521,6 +521,8 @@
 | `GET /api/v1/coordinador/componentes-formacion` | `usp_consultar_componentes_formacion` | HU147 |
 | ~~`POST /api/v1/admin/tipos-identificacion`, `PUT /api/v1/admin/tipos-identificacion/{id}`~~ | ~~`usp_guardar_tipo_identificacion`~~ eliminado el 2026-11-04 (catálogo de solo consulta; la consulta sigue en `GET /api/v1/tipos-identificacion`) | HU153 |
 | `POST`/`PUT /api/v1/coordinador/planes-estudio/{id}/asignaturas…` (sin cambio de ruta) | `usp_crear_asignatura`, `usp_actualizar_asignatura` (P5: área y componente deben existir, `GEN_001`; semestre del plan, `PLA_004`; créditos > 0, `ASI_001`; plan del programa del coordinador, `SEC_002`) | P5 |
+| `GET /api/v1/admin/estados` | Lectura directa de `uv_estado` y `uv_estado_estudiante_grupo` (catálogos de solo consulta, sin SP) | HU155/HU167 |
+| `GET /api/v1/docente/asignaturas` (aditivo) | `uv_docente` + `uv_programa` (tipo de programa del grupo) | HU058 |
 | `GET /api/v1/estudiante/reclamos` | `usp_consultar_solicitudes_revision_estudiante` | HU010/HU011 (consulta) |
 | `POST /api/v1/docente/grupos/{grupoId}/estudiantes/{estudianteId}/retiro` | `usp_retirar_estudiante_grupo` + `usp_consultar_destinatarios_retiro_estudiante_grupo` | HU051 |
 | `GET /api/v1/estudiante/oferta-academica` | `usp_consultar_oferta_grupos_estudiante` | HU008 |

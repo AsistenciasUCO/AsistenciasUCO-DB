@@ -144,6 +144,15 @@ BEGIN TRY
         THROW 56213, 'TEST FAILED T-153-01: las vistas de los catalogos base no listan el seed.', 1;
     PRINT 'TEST_PASS:T-153-01';
 
+    PRINT '-> T-155-01: estados del sistema de solo consulta (Estado y EstadoEstudianteGrupo con codigo)';
+    IF (SELECT COUNT(*) FROM dbo.uv_estado WHERE codigo IN ('P', 'A', 'R', 'E', 'X')) <> 5
+       OR EXISTS (SELECT 1 FROM dbo.uv_estado WHERE codigo IS NULL OR nombre IS NULL)
+        THROW 56240, 'TEST FAILED T-155-01: uv_estado debe exponer codigo y nombre de los 5 estados de solicitud del seed.', 1;
+    IF NOT EXISTS (SELECT 1 FROM dbo.uv_estado_estudiante_grupo WHERE codigo = N'A')
+       OR NOT EXISTS (SELECT 1 FROM dbo.uv_estado_estudiante_grupo WHERE codigo = N'CI')
+        THROW 56241, 'TEST FAILED T-155-01: uv_estado_estudiante_grupo debe listar los estados del estudiante en el grupo.', 1;
+    PRINT 'TEST_PASS:T-155-01';
+
     PRINT '-> T-P5-01: asignaturas solo con area, componente y semestre existentes';
     DECLARE @asig UNIQUEIDENTIFIER = NEWID();
     DECLARE @codAsig NVARCHAR(50) = CONCAT(N'QP5', LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8));
