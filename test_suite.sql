@@ -12,13 +12,7 @@ PRINT '======================================================================';
 :r /tmp/test/test_usp_crear_facultad.sql
 :r /tmp/test/test_usp_actualizar_facultad.sql
 :r /tmp/test/test_usp_cambiar_estado_facultad.sql
-:r /tmp/test/test_usp_crear_tipo_programa.sql
-:r /tmp/test/test_usp_actualizar_tipo_programa.sql
-:r /tmp/test/test_usp_cambiar_estado_tipo_programa.sql
 :r /tmp/test/test_uv_tipo_programa_contrato.sql
-:r /tmp/test/test_usp_crear_area.sql
-:r /tmp/test/test_usp_actualizar_area.sql
-:r /tmp/test/test_usp_cambiar_estado_area.sql
 :r /tmp/test/test_uv_area_contrato.sql
 :r /tmp/test/test_user_dean_close.sql
 :r /tmp/test/test_subject_catalog.sql
