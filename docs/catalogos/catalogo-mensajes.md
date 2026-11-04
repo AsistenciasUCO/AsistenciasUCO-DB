@@ -37,6 +37,11 @@ Total de códigos: **144**.
 | `ATT_001` | BUSINESS_ERROR | MEDIO | El payload JSON de asistencia no cumple el contrato requerido. | Payload JSON inválido: se requiere un arreglo no nulo de objetos con exactamente idEstudiante y estado. | `04_mensaje.sql` |
 | `ATT_002` | BUSINESS_ERROR | MEDIO | El lote de asistencia no puede estar vacío. | Payload JSON válido pero vacío: no hay operación de negocio que ejecutar. | `04_mensaje.sql` |
 | `ATT_003` | BUSINESS_ERROR | MEDIO | El estudiante {} aparece más de una vez en el lote de asistencia. | Duplicidad en payload JSON: idEstudiante [{}] aparece más de una vez. | `04_mensaje.sql` |
+| `REV_001` | BUSINESS_ERROR | MEDIO | La acción sobre el reclamo no es válida; use APROBADA o RECHAZADA. | SES-04 resolución de reclamo: acción [{}] fuera del contrato (APROBADA | RECHAZADA); sin escrituras. | `04_mensaje.sql` |
+| `REV_002` | BUSINESS_ERROR | MEDIO | El reclamo ya fue resuelto con una decisión distinta. | SES-04 resolución de reclamo: la solicitud [{}] ya está resuelta con otra decisión; sin escrituras. | `04_mensaje.sql` |
+| `REV_003` | BUSINESS_ERROR | MEDIO | La asistencia del reclamo no es una inasistencia justificable. | SES-04 resolución de reclamo: la solicitud [{}] apunta a una asistencia presente (AN / asistio = 1); sin escrituras. | `04_mensaje.sql` |
+| `REV_004` | BUSINESS_ERROR | MEDIO | El reclamo no tiene un registro de asistencia que se pueda justificar. | SES-04 resolución de reclamo: la solicitud [{}] no tiene DetalleAsistencia; no se simula la justificación. | `04_mensaje.sql` |
+| `REV_005` | BUSINESS_ERROR | MEDIO | El reclamo indicado no existe. | SES-04 resolución de reclamo: la solicitud [{}] no existe o no tiene asistencia, sesión y grupo válidos. | `04_mensaje.sql` |
 
 ## COO
 

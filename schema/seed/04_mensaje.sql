@@ -95,6 +95,11 @@ USING (VALUES
     ('ATT_001', 'BUSINESS_ERROR', 'MEDIO', 'El payload JSON de asistencia no cumple el contrato requerido.'),
     ('ATT_002', 'BUSINESS_ERROR', 'MEDIO', 'El lote de asistencia no puede estar vacío.'),
     ('ATT_003', 'BUSINESS_ERROR', 'MEDIO', 'El estudiante {} aparece más de una vez en el lote de asistencia.'),
+    ('REV_001', 'BUSINESS_ERROR', 'MEDIO', 'La acción sobre el reclamo no es válida; use APROBADA o RECHAZADA.'),
+    ('REV_002', 'BUSINESS_ERROR', 'MEDIO', 'El reclamo ya fue resuelto con una decisión distinta.'),
+    ('REV_003', 'BUSINESS_ERROR', 'MEDIO', 'La asistencia del reclamo no es una inasistencia justificable.'),
+    ('REV_004', 'BUSINESS_ERROR', 'MEDIO', 'El reclamo no tiene un registro de asistencia que se pueda justificar.'),
+    ('REV_005', 'BUSINESS_ERROR', 'MEDIO', 'El reclamo indicado no existe.'),
     ('SEC_001', 'BUSINESS_ERROR', 'ALTO', 'No tiene permisos suficientes para realizar esta operación.'),
     ('SEC_002', 'BUSINESS_ERROR', 'ALTO', 'No tiene autorización sobre el recurso solicitado.'),
 
@@ -220,6 +225,11 @@ USING (VALUES
     ('ATT_001', 'BUSINESS_ERROR', 'MEDIO', 'Payload JSON inválido: se requiere un arreglo no nulo de objetos con exactamente idEstudiante y estado.'),
     ('ATT_002', 'BUSINESS_ERROR', 'MEDIO', 'Payload JSON válido pero vacío: no hay operación de negocio que ejecutar.'),
     ('ATT_003', 'BUSINESS_ERROR', 'MEDIO', 'Duplicidad en payload JSON: idEstudiante [{}] aparece más de una vez.'),
+    ('REV_001', 'BUSINESS_ERROR', 'MEDIO', 'SES-04 resolución de reclamo: acción [{}] fuera del contrato (APROBADA | RECHAZADA); sin escrituras.'),
+    ('REV_002', 'BUSINESS_ERROR', 'MEDIO', 'SES-04 resolución de reclamo: la solicitud [{}] ya está resuelta con otra decisión; sin escrituras.'),
+    ('REV_003', 'BUSINESS_ERROR', 'MEDIO', 'SES-04 resolución de reclamo: la solicitud [{}] apunta a una asistencia presente (AN / asistio = 1); sin escrituras.'),
+    ('REV_004', 'BUSINESS_ERROR', 'MEDIO', 'SES-04 resolución de reclamo: la solicitud [{}] no tiene DetalleAsistencia; no se simula la justificación.'),
+    ('REV_005', 'BUSINESS_ERROR', 'MEDIO', 'SES-04 resolución de reclamo: la solicitud [{}] no existe o no tiene asistencia, sesión y grupo válidos.'),
     ('SEC_001', 'BUSINESS_ERROR', 'ALTO', 'RBAC denegado: el usuario no posee perfil activo requerido o no existe/está inactivo.'),
     ('SEC_002', 'BUSINESS_ERROR', 'ALTO', 'Titularidad denegada: el usuario no está autorizado sobre el recurso solicitado.'),
 
