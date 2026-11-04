@@ -82,6 +82,9 @@ USING (VALUES
     ('SES_004', 'BUSINESS_ERROR', 'MEDIO', 'La fecha y hora de fin de sesión debe ser posterior a la fecha y hora de inicio.'),
     ('SES_005', 'BUSINESS_ERROR', 'MEDIO', 'El horario institucional incluye una hora local inexistente por cambio de horario; no se generaron sesiones.'),
     ('SES_006', 'BUSINESS_ERROR', 'ALTO', 'La sesión no coincide con el manifiesto de clasificación aprobado; no se modificó.'),
+    ('SES_007', 'BUSINESS_ERROR', 'MEDIO', 'La sesión de clase aún no ha iniciado; la asistencia solo se registra durante la sesión.'),
+    ('SES_008', 'BUSINESS_ERROR', 'MEDIO', 'La sesión de clase ya finalizó; la asistencia solo puede modificarse mediante un reclamo.'),
+    ('SES_009', 'BUSINESS_ERROR', 'MEDIO', 'El horario de la sesión no está confirmado; no es posible registrar asistencia.'),
     ('ERR_TOKEN_VERIFICACION_INVALIDO', 'BUSINESS_ERROR', 'MEDIO', 'El codigo de verificacion de asistencia es incorrecto o ha expirado.'),
 
     ('INST_001', 'BUSINESS_ERROR', 'CRITICO', 'El estudiante, programa y facultad deben pertenecer a la misma institución.'),
@@ -204,6 +207,9 @@ USING (VALUES
     ('SES_004', 'BUSINESS_ERROR', 'MEDIO', 'Validación temporal fallida: fechaHoraFin [{}] debe ser posterior a fechaHoraInicio [{}].'),
     ('SES_005', 'BUSINESS_ERROR', 'MEDIO', 'Validación temporal fallida: la zona [{}] no contiene la hora local [{}] (salto DST); generación abortada sin escrituras.'),
     ('SES_006', 'BUSINESS_ERROR', 'ALTO', 'Clasificación UTC_OWNER rechazada: la sesión [{}] no coincide con el manifiesto [{}] (procedencia no NULL u horas distintas).'),
+    ('SES_007', 'BUSINESS_ERROR', 'MEDIO', 'SES-01 ventana de registro: la sesión [{}] no ha iniciado (SYSUTCDATETIME() < fechaHoraInicio); lote rechazado sin escrituras.'),
+    ('SES_008', 'BUSINESS_ERROR', 'MEDIO', 'SES-01 ventana de registro: la sesión [{}] está cerrada (SYSUTCDATETIME() >= fechaHoraFin); lote rechazado sin escrituras.'),
+    ('SES_009', 'BUSINESS_ERROR', 'MEDIO', 'SES-01 ventana de registro: la sesión [{}] tiene procedencia temporal INDETERMINADA (procedenciaTemporal NULL); lote rechazado sin escrituras.'),
     ('ERR_TOKEN_VERIFICACION_INVALIDO', 'BUSINESS_ERROR', 'MEDIO', 'Fallo: Codigo de verificacion incorrecto o expirado para Sesion: {}.'),
 
     ('INST_001', 'BUSINESS_ERROR', 'CRITICO', 'Inconsistencia institucional: Los identificadores de institución no coinciden entre la facultad, programa y estudiante: {}.'),
