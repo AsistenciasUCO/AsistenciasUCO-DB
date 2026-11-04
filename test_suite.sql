@@ -53,6 +53,7 @@ PRINT '======================================================================';
 :r /tmp/test/test_group_capacity_decoupling.sql
 :r /tmp/test/test_titularidad_jerarquica.sql
 :r /tmp/test/test_attendance_commands.sql
+:r /tmp/test/test_ses01_ventana_asistencia.sql
 :r /tmp/test/test_attendance_review.sql
 :r /tmp/test/test_rec3_falla_intermedia_transaccion.sql
 :r /tmp/test/test_lb004d_support_binding.sql

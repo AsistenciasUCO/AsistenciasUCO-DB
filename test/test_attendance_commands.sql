@@ -73,21 +73,24 @@ BEGIN TRY
         SET @nonOwner = @usuarioDocenteTemporal;
     END
 
-    INSERT dbo.Sesion (id, nombre, numero, codigo, numeroSemana, grupo, fechaHoraInicio, fechaHoraFin)
+    -- SES-01: el registro ordinario exige la sesion activa con procedencia UTC confirmada; los casos de este
+    -- archivo prueban contenido del lote, por eso todas sus sesiones estan abiertas ahora (UTC_V2).
+    DECLARE @ventanaInicio DATETIME2 = DATEADD(HOUR, -1, SYSUTCDATETIME()), @ventanaFin DATETIME2 = DATEADD(HOUR, 1, SYSUTCDATETIME());
+    INSERT dbo.Sesion (id, nombre, numero, codigo, numeroSemana, grupo, fechaHoraInicio, fechaHoraFin, procedenciaTemporal)
     VALUES
-        (@sessionBulk,     N'QA Bulk AN',    @firstNumber,     LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, DATEADD(HOUR, 1, GETDATE()),  DATEADD(HOUR, 2, GETDATE())),
-        (@sessionAuto,     N'QA Auto',       @firstNumber + 1, @codeAuto,                                                1, @group, DATEADD(HOUR, 3, GETDATE()),  DATEADD(HOUR, 4, GETDATE())),
-        (@sessionSingle,   N'QA Single',     @firstNumber + 2, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, DATEADD(HOUR, 5, GETDATE()),  DATEADD(HOUR, 6, GETDATE())),
-        (@sessionSjc,      N'QA Bulk SJC',   @firstNumber + 3, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, DATEADD(HOUR, 7, GETDATE()),  DATEADD(HOUR, 8, GETDATE())),
-        (@sessionEx,       N'QA Bulk EX',    @firstNumber + 4, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, DATEADD(HOUR, 9, GETDATE()),  DATEADD(HOUR, 10, GETDATE())),
-        (@sessionInvalid,  N'QA Invalid',    @firstNumber + 5, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, DATEADD(HOUR, 11, GETDATE()), DATEADD(HOUR, 12, GETDATE())),
-        (@sessionNoExec,   N'QA NoExec',     @firstNumber + 6, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, DATEADD(HOUR, 13, GETDATE()), DATEADD(HOUR, 14, GETDATE())),
-        (@sessionNonOwner, N'QA NonOwner',   @firstNumber + 7, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, DATEADD(HOUR, 15, GETDATE()), DATEADD(HOUR, 16, GETDATE())),
-        (@sessionAtomic,   N'QA Atomic',     @firstNumber + 8, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, DATEADD(HOUR, 17, GETDATE()), DATEADD(HOUR, 18, GETDATE())),
-        (@sessionPartial,  N'QA Partial',    @firstNumber + 9, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, DATEADD(HOUR, 19, GETDATE()), DATEADD(HOUR, 20, GETDATE())),
-        (@sessionOmitted,  N'QA Omitted',    @firstNumber + 10, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, DATEADD(HOUR, 21, GETDATE()), DATEADD(HOUR, 22, GETDATE())),
-        (@sessionIdempotent, N'QA Idempotent', @firstNumber + 11, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, DATEADD(HOUR, 23, GETDATE()), DATEADD(HOUR, 24, GETDATE())),
-        (@sessionUpdate,   N'QA Update',     @firstNumber + 12, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, DATEADD(HOUR, 25, GETDATE()), DATEADD(HOUR, 26, GETDATE()));
+        (@sessionBulk,     N'QA Bulk AN',    @firstNumber,     LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, @ventanaInicio, @ventanaFin, N'UTC_V2'),
+        (@sessionAuto,     N'QA Auto',       @firstNumber + 1, @codeAuto,                                                1, @group, @ventanaInicio, @ventanaFin, N'UTC_V2'),
+        (@sessionSingle,   N'QA Single',     @firstNumber + 2, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, @ventanaInicio, @ventanaFin, N'UTC_V2'),
+        (@sessionSjc,      N'QA Bulk SJC',   @firstNumber + 3, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, @ventanaInicio, @ventanaFin, N'UTC_V2'),
+        (@sessionEx,       N'QA Bulk EX',    @firstNumber + 4, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, @ventanaInicio, @ventanaFin, N'UTC_V2'),
+        (@sessionInvalid,  N'QA Invalid',    @firstNumber + 5, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, @ventanaInicio, @ventanaFin, N'UTC_V2'),
+        (@sessionNoExec,   N'QA NoExec',     @firstNumber + 6, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, @ventanaInicio, @ventanaFin, N'UTC_V2'),
+        (@sessionNonOwner, N'QA NonOwner',   @firstNumber + 7, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, @ventanaInicio, @ventanaFin, N'UTC_V2'),
+        (@sessionAtomic,   N'QA Atomic',     @firstNumber + 8, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, @ventanaInicio, @ventanaFin, N'UTC_V2'),
+        (@sessionPartial,  N'QA Partial',    @firstNumber + 9, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, @ventanaInicio, @ventanaFin, N'UTC_V2'),
+        (@sessionOmitted,  N'QA Omitted',    @firstNumber + 10, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, @ventanaInicio, @ventanaFin, N'UTC_V2'),
+        (@sessionIdempotent, N'QA Idempotent', @firstNumber + 11, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, @ventanaInicio, @ventanaFin, N'UTC_V2'),
+        (@sessionUpdate,   N'QA Update',     @firstNumber + 12, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, @ventanaInicio, @ventanaFin, N'UTC_V2');
 
     -- A. AN SUCCESS (owner = Usuario.id del docente titular)
     DECLARE @json NVARCHAR(MAX) = CONCAT(N'[{"idEstudiante":"', CONVERT(NVARCHAR(36), @student), N'","estado":"AN"}]');
@@ -431,7 +434,7 @@ BEGIN TRY
     IF (SELECT COUNT(*) FROM dbo.RazonCausa) <> @rcCountBefore
         THROW 51856, 'TEST FAILED: ATTENDANCE_HELPER_CLOSED_CATALOG altero dbo.RazonCausa.', 1;
 
-    -- Comandos individuales / autonomo (contrato sin cambios)
+    -- Comandos individuales / autonomo (contrato sin cambios; sesion activa por SES-01)
     TRUNCATE TABLE #attendanceResult;
     SET @corr = NEWID();
     EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = 'GEN_004', @p_param1 = 'AsistenciaEstudianteAutonomo',

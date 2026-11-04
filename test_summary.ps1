@@ -63,7 +63,10 @@ $resultIds = @('STUDENT_DUPLICATE', 'STUDENT_GROUP_NOT_FOUND', 'STUDENT_GROUP_DI
     'PLAN_PUBLIC_DUPLICATE_BUSINESS_KEY', 'PLAN_PUBLIC_UPDATE_TO_TAKEN_INP', 'PLAN_PUBLIC_FOREIGN_PLAN',
     'PLAN_PUBLIC_ROLLBACK_SAVEPOINT', 'PLAN_PUBLIC_ROLLBACK_OWN_TRANSACTION',
     # F1: rechazo de usp_guardar_horarios_grupo despues de escribir (rollback a savepoint y transaccion propia)
-    'GROUP_SCHEDULE_TEACHER_CONFLICT_SAVEPOINT', 'GROUP_SCHEDULE_TEACHER_CONFLICT_OWN_TRANSACTION')
+    'GROUP_SCHEDULE_TEACHER_CONFLICT_SAVEPOINT', 'GROUP_SCHEDULE_TEACHER_CONFLICT_OWN_TRANSACTION',
+    # SES-01: rechazos por ventana de registro (el SP revierte su savepoint/transaccion)
+    'SES01_BULK_BEFORE_START', 'SES01_BULK_EXACT_END', 'SES01_BULK_TWO_HOURS_AFTER', 'SES01_BULK_INDETERMINATE',
+    'SES01_BULK_CLOSED_HISTORY_PRESERVED', 'SES01_AUTO_CLOSED', 'SES01_AUTO_BEFORE_START', 'SES01_AUTO_INDETERMINATE')
 $resultFailures = @()
 $clientPassed = @()
 foreach ($id in $resultIds) {
@@ -151,8 +154,9 @@ BEGIN
 END;
 DECLARE @session UNIQUEIDENTIFIER = NEWID();
 DECLARE @number INT = 1 + (SELECT ISNULL(MAX(numero), 0) FROM dbo.Sesion WHERE grupo = @group);
-INSERT dbo.Sesion (id, nombre, numero, codigo, numeroSemana, grupo, fechaHoraInicio, fechaHoraFin)
-VALUES (@session, N'QA Concurrent Upsert', @number, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, DATEADD(HOUR, 30, SYSUTCDATETIME()), DATEADD(HOUR, 31, SYSUTCDATETIME()));
+-- SES-01: el upsert concurrente solo puede escribir con la sesion activa y procedencia UTC confirmada.
+INSERT dbo.Sesion (id, nombre, numero, codigo, numeroSemana, grupo, fechaHoraInicio, fechaHoraFin, procedenciaTemporal)
+VALUES (@session, N'QA Concurrent Upsert', @number, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, DATEADD(HOUR, -1, SYSUTCDATETIME()), DATEADD(HOUR, 1, SYSUTCDATETIME()), N'UTC_V2');
 SELECT CONCAT(CONVERT(VARCHAR(36), @session), '|', CONVERT(VARCHAR(36), @student), '|', CONVERT(VARCHAR(36), @owner));
 "@
     $setup = @(docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $Password -C -b -h -1 -W -Q $setupSql 2>&1 |
@@ -542,6 +546,10 @@ $criticalIds = @(
     'ATTENDANCE_HELPER_CLOSED_CATALOG', 'ATTENDANCE_NO_LEGACY_PUBLIC_STATE',
     'ATTENDANCE_BULK_STUDENT_NOT_IN_GROUP', 'ATTENDANCE_BULK_ATOMIC',
     'ATTENDANCE_AUTO_SUCCESS', 'ATTENDANCE_AUTO_INVALID',
+    # SES-01 (test/test_ses01_ventana_asistencia.sql): ventana [inicio, fin) con reloj del motor y procedencia confirmada
+    'SES01_WINDOW_LOCK_HELD', 'SES01_BULK_EXACT_START', 'SES01_BULK_DURING', 'SES01_BULK_JUST_BEFORE_END',
+    'SES01_BULK_BEFORE_START', 'SES01_BULK_EXACT_END', 'SES01_BULK_TWO_HOURS_AFTER', 'SES01_BULK_INDETERMINATE',
+    'SES01_BULK_CLOSED_HISTORY_PRESERVED', 'SES01_AUTO_CLOSED', 'SES01_AUTO_BEFORE_START', 'SES01_AUTO_INDETERMINATE',
     'COORDINATOR_SUCCESS', 'COORDINATOR_PROGRAM_MISSING', 'COORDINATOR_FACULTY_MISSING', 'COORDINATOR_SCOPE_MISMATCH',
     'SUITE_TRANCOUNT_ZERO',
     'USP_CONSULTAR_GRUPOS_PAGINADO_SUCCESS', 'USP_CONSULTAR_GRUPOS_PAGINADO_FILTER_AND_PAGINATION',
