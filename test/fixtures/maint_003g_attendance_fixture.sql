@@ -18,6 +18,10 @@ DECLARE @session UNIQUEIDENTIFIER;
 DECLARE @attendanceJson NVARCHAR(MAX);
 DECLARE @correlation UNIQUEIDENTIFIER = NEWID();
 DECLARE @attendanceCorrelation UNIQUEIDENTIFIER = NEWID();
+-- SES-01: el registro ordinario solo se acepta con la sesion activa y procedencia UTC confirmada, por eso la
+-- sesion del fixture se crea con el contrato v2 (UTC_V2) abierta en el instante de preparacion.
+DECLARE @sessionStartUtc DATETIME2 = DATEADD(MINUTE, -30, SYSUTCDATETIME());
+DECLARE @sessionEndUtc DATETIME2 = DATEADD(HOUR, 2, SYSUTCDATETIME());
 DECLARE @result TABLE (
     idCorrelacion UNIQUEIDENTIFIER,
     mensajeUsuarioResultado NVARCHAR(4000),
@@ -61,11 +65,11 @@ IF @group IS NULL OR @teacherUser IS NULL
     THROW 52201, 'MAINT-003G fixture requires one teacher-owned group with two active students.', 1;
 
 INSERT INTO @result
-EXEC dbo.usp_crear_sesion
+EXEC dbo.usp_crear_sesion_v2
     @idGrupo = @group,
     @nombre = @fixtureName,
-    @fechaHoraInicio = '2040-01-15T08:00:00',
-    @fechaHoraFin = '2040-01-15T10:00:00',
+    @fechaHoraInicio = @sessionStartUtc,
+    @fechaHoraFin = @sessionEndUtc,
     @idCorrelacion = @correlation,
     @idUsuarioEjecutor = @teacherUser;
 
