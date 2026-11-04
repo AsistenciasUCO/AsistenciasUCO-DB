@@ -82,6 +82,11 @@ USING (VALUES
     ('SES_004', 'BUSINESS_ERROR', 'MEDIO', 'La fecha y hora de fin de sesión debe ser posterior a la fecha y hora de inicio.'),
     ('SES_005', 'BUSINESS_ERROR', 'MEDIO', 'El horario institucional incluye una hora local inexistente por cambio de horario; no se generaron sesiones.'),
     ('SES_006', 'BUSINESS_ERROR', 'ALTO', 'La sesión no coincide con el manifiesto de clasificación aprobado; no se modificó.'),
+    ('REV_001', 'BUSINESS_ERROR', 'MEDIO', 'La acción sobre el reclamo no es válida; use APROBADA o RECHAZADA.'),
+    ('REV_002', 'BUSINESS_ERROR', 'MEDIO', 'El reclamo ya fue resuelto con una decisión distinta.'),
+    ('REV_003', 'BUSINESS_ERROR', 'MEDIO', 'La asistencia del reclamo no es una inasistencia justificable.'),
+    ('REV_004', 'BUSINESS_ERROR', 'MEDIO', 'El reclamo no tiene un registro de asistencia que se pueda justificar.'),
+    ('REV_005', 'BUSINESS_ERROR', 'MEDIO', 'El reclamo indicado no existe.'),
     ('ERR_TOKEN_VERIFICACION_INVALIDO', 'BUSINESS_ERROR', 'MEDIO', 'El codigo de verificacion de asistencia es incorrecto o ha expirado.'),
 
     ('INST_001', 'BUSINESS_ERROR', 'CRITICO', 'El estudiante, programa y facultad deben pertenecer a la misma institución.'),
@@ -204,6 +209,11 @@ USING (VALUES
     ('SES_004', 'BUSINESS_ERROR', 'MEDIO', 'Validación temporal fallida: fechaHoraFin [{}] debe ser posterior a fechaHoraInicio [{}].'),
     ('SES_005', 'BUSINESS_ERROR', 'MEDIO', 'Validación temporal fallida: la zona [{}] no contiene la hora local [{}] (salto DST); generación abortada sin escrituras.'),
     ('SES_006', 'BUSINESS_ERROR', 'ALTO', 'Clasificación UTC_OWNER rechazada: la sesión [{}] no coincide con el manifiesto [{}] (procedencia no NULL u horas distintas).'),
+    ('REV_001', 'BUSINESS_ERROR', 'MEDIO', 'SES-04 resolución de reclamo: acción [{}] fuera del contrato (APROBADA | RECHAZADA); sin escrituras.'),
+    ('REV_002', 'BUSINESS_ERROR', 'MEDIO', 'SES-04 resolución de reclamo: la solicitud [{}] ya está resuelta con otra decisión; sin escrituras.'),
+    ('REV_003', 'BUSINESS_ERROR', 'MEDIO', 'SES-04 resolución de reclamo: la solicitud [{}] apunta a una asistencia presente (AN / asistio = 1); sin escrituras.'),
+    ('REV_004', 'BUSINESS_ERROR', 'MEDIO', 'SES-04 resolución de reclamo: la solicitud [{}] no tiene DetalleAsistencia; no se simula la justificación.'),
+    ('REV_005', 'BUSINESS_ERROR', 'MEDIO', 'SES-04 resolución de reclamo: la solicitud [{}] no existe o no tiene asistencia, sesión y grupo válidos.'),
     ('ERR_TOKEN_VERIFICACION_INVALIDO', 'BUSINESS_ERROR', 'MEDIO', 'Fallo: Codigo de verificacion incorrecto o expirado para Sesion: {}.'),
 
     ('INST_001', 'BUSINESS_ERROR', 'CRITICO', 'Inconsistencia institucional: Los identificadores de institución no coinciden entre la facultad, programa y estudiante: {}.'),

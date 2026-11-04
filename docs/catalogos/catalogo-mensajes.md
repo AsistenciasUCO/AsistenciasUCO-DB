@@ -245,6 +245,11 @@ Total de códigos: **144**.
 | `SES_004` | BUSINESS_ERROR | MEDIO | La fecha y hora de fin de sesión debe ser posterior a la fecha y hora de inicio. | Validación temporal fallida: fechaHoraFin [{}] debe ser posterior a fechaHoraInicio [{}]. | `04_mensaje.sql` |
 | `SES_005` | BUSINESS_ERROR | MEDIO | El horario institucional incluye una hora local inexistente por cambio de horario; no se generaron sesiones. | Validación temporal fallida: la zona [{}] no contiene la hora local [{}] (salto DST); generación abortada sin escrituras. | `04_mensaje.sql` |
 | `SES_006` | BUSINESS_ERROR | ALTO | La sesión no coincide con el manifiesto de clasificación aprobado; no se modificó. | Clasificación UTC_OWNER rechazada: la sesión [{}] no coincide con el manifiesto [{}] (procedencia no NULL u horas distintas). | `04_mensaje.sql` |
+| `REV_001` | BUSINESS_ERROR | MEDIO | La acción sobre el reclamo no es válida; use APROBADA o RECHAZADA. | SES-04 resolución de reclamo: acción [{}] fuera del contrato (APROBADA | RECHAZADA); sin escrituras. | `04_mensaje.sql` |
+| `REV_002` | BUSINESS_ERROR | MEDIO | El reclamo ya fue resuelto con una decisión distinta. | SES-04 resolución de reclamo: la solicitud [{}] ya está resuelta con otra decisión; sin escrituras. | `04_mensaje.sql` |
+| `REV_003` | BUSINESS_ERROR | MEDIO | La asistencia del reclamo no es una inasistencia justificable. | SES-04 resolución de reclamo: la solicitud [{}] apunta a una asistencia presente (AN / asistio = 1); sin escrituras. | `04_mensaje.sql` |
+| `REV_004` | BUSINESS_ERROR | MEDIO | El reclamo no tiene un registro de asistencia que se pueda justificar. | SES-04 resolución de reclamo: la solicitud [{}] no tiene DetalleAsistencia; no se simula la justificación. | `04_mensaje.sql` |
+| `REV_005` | BUSINESS_ERROR | MEDIO | El reclamo indicado no existe. | SES-04 resolución de reclamo: la solicitud [{}] no existe o no tiene asistencia, sesión y grupo válidos. | `04_mensaje.sql` |
 
 ## SIG
 
