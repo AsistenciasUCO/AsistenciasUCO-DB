@@ -182,13 +182,28 @@ Esta documentación especifica la arquitectura, reglas de negocio, contrato de f
 
 ---
 
+### 8.5. `dbo.usp_resolver_area_componente_asignatura_interno`
+- **Propósito**: P5 (2026-11-04). Resuelve el área y el componente de una asignatura por coincidencia exacta (sin distinguir mayúsculas ni espacios extremos) con el código o el nombre de `uv_area` y `uv_componente`. Nunca asigna uno "cualquiera" (antes `usp_crear_asignatura` tomaba `TOP 1` sin orden).
+- **Parámetros de Entrada**: `@area NVARCHAR(100)`, `@componente NVARCHAR(100)`, `@obligatorios BIT` (1 en crear; 0 en actualizar, donde un valor vacío conserva el actual), `@idCorrelacion`.
+- **Parámetros de Salida**: `@idArea`, `@idComponente` y el triplete estándar.
+- **Códigos**: `GEN_001` (área de conocimiento o componente de formación inexistente) y `SYS_001`.
+- **Callers**: `usp_crear_asignatura` y `usp_actualizar_asignatura`.
+
+### 8.6. `dbo.usp_guardar_tipo_identificacion_interno`
+- **Propósito**: HU153. Núcleo de escritura del catálogo de tipos de documento: inserta (id nulo) o cambia solo el nombre (con id). Transacción propia o savepoint, sin `XACT_ABORT` (REC4 #4).
+- **Parámetros de Entrada**: `@idTipoIdentificacion`, `@codigo NVARCHAR(5)`, `@nombre NVARCHAR(50)`, `@idCorrelacion`; **Salida**: triplete estándar.
+- **Códigos**: `GEN_004` / `GEN_005` y `SYS_001`.
+- **Caller**: `usp_guardar_tipo_identificacion` (valida perfil, formato, existencia y unicidad).
+
+---
+
 ### 8.4. `dbo.usp_validar_consulta_paginada_interno`
 - **Propósito**: Validación compartida de las consultas paginadas de solo lectura (skill `procedimientos-internos-condiciones`, REC4 #2). Se creó el 2026-11-02 con HU112/HU128/HU143/HU157 para no repetir en cada SP nuevo el bloque de correlación, ejecutor y paginación (SonarCloud falla con más de 3 % de duplicación en código nuevo).
 - **Parámetros de Entrada**: `@idUsuarioEjecutor UNIQUEIDENTIFIER`, `@idCorrelacion UNIQUEIDENTIFIER`, `@codigoPerfilRequerido NVARCHAR(50)` (lista separada por comas), `@numeroPagina INT`, `@tamanoPagina INT`.
 - **Parámetros de Salida**: `@idUsuarioValidado UNIQUEIDENTIFIER` (ejecutor normalizado), `@offset INT` (desplazamiento de la página) y el triplete `@mensajeUsuarioResultado`, `@mensajeTecnicoResultado`, `@estadoResultado`.
 - **Códigos de Catálogo Consumidos**: los de `usp_validar_id_correlacion_esta_presente_interno`, `VAL_001` (ejecutor ausente), `SEC_001` (vía `usp_validar_permiso_rbac_usuario_interno`), `PAG_001` (página < 1, tamaño < 1 o mayor que `PAGINACION.TAMANO_MAXIMO`) y `SYS_001` en el CATCH. El mensaje técnico lleva la correlación.
 - **Flujo de Ejecución**: PASO 1 correlación presente; PASO 2 ejecutor obligatorio; PASO 3 perfil exigido; PASO 4 paginación válida; PASO 5 calcula el desplazamiento y fija el `SESSION_CONTEXT` del ejecutor (el caller captura el previo y lo restaura). Ante una falla devuelve `@estadoResultado = 0` y el caller hace `THROW 51000` con el mensaje técnico (lleva `DBCODE=`). Sin transacción ni `XACT_ABORT` (solo lectura). No recibe `GRANT` del runtime.
-- **Callers**: `usp_consultar_programas_creditos_facultad_paginado`, `usp_consultar_docentes_facultad_paginado`, `usp_buscar_asignaturas_paginado` y `usp_buscar_estudiantes_institucion_paginado`.
+- **Callers**: `usp_consultar_programas_creditos_facultad_paginado`, `usp_consultar_docentes_facultad_paginado`, `usp_buscar_asignaturas_paginado`, `usp_buscar_estudiantes_institucion_paginado`, `usp_consultar_consolidado_asistencia_grupos_paginado` (HU061) y `usp_consultar_auditoria_eventos_paginado` (HU172).
 
 ---
 

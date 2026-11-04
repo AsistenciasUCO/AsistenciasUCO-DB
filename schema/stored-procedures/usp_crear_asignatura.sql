@@ -5,6 +5,16 @@ GO
 SET QUOTED_IDENTIFIER ON;
 GO
 
+-- ============================================================================
+-- usp_crear_asignatura
+-- Reglas de negocio (decisiones de John, 2026-11-04):
+--   * P5: el area y el componente deben existir en sus tablas (GEN_001); nunca se asigna uno "cualquiera".
+--   * Creditos obligatorios y mayores que cero (ASI_001); no hay valor por defecto.
+--   * El semestre debe existir en el plan de estudios (PLA_004); la malla del plan no se amplia desde aqui.
+--   * El coordinador solo crea asignaturas en planes de su propio programa (PLA_002 si el plan no existe,
+--     SEC_002 por usp_validar_titularidad_jerarquica_interno si el programa no es suyo).
+-- Salida canonica: (idCorrelacion, mensajeUsuarioResultado, mensajeTecnicoResultado, estadoResultado).
+-- ============================================================================
 CREATE OR ALTER PROCEDURE [dbo].[usp_crear_asignatura]
 (
     @idAsignatura       UNIQUEIDENTIFIER,
@@ -30,8 +40,8 @@ AS
 
     DECLARE @idAreaResolved       UNIQUEIDENTIFIER;
     DECLARE @idComponenteResolved UNIQUEIDENTIFIER;
-    DECLARE @idSemestreResolved   UNIQUEIDENTIFIER;
     DECLARE @idSpeResolved        UNIQUEIDENTIFIER;
+    DECLARE @idProgramaPlan       UNIQUEIDENTIFIER;
 
     -- Variables locales de respuesta
     DECLARE @mensajeUsuarioResultado NVARCHAR(4000) = dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA');
@@ -84,6 +94,47 @@ BEGIN
             SET @estadoResultado = 0;
         END
 
+        -- PASO 2.1: Creditos obligatorios y mayores que cero (ASI_001), sin valor por defecto
+        IF @estadoResultado = 1 AND (@creditos IS NULL OR @creditos <= 0)
+        BEGIN
+            EXEC dbo.usp_obtener_mensaje_catalogo
+                @p_codigo = 'ASI_001',
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
+
+            SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+            SET @estadoResultado = 0;
+        END
+
+        -- PASO 2.2: El plan existe (PLA_002) y pertenece al programa del coordinador (SEC_002)
+        IF @estadoResultado = 1
+        BEGIN
+            SELECT @idProgramaPlan = idPrograma FROM [dbo].[uv_plan_estudio] WHERE id = @idPlanEstudioDefecto;
+
+            IF @idProgramaPlan IS NULL
+            BEGIN
+                EXEC dbo.usp_obtener_mensaje_catalogo
+                    @p_codigo = 'PLA_002',
+                    @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                    @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
+
+                SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+                SET @estadoResultado = 0;
+            END
+        END
+
+        IF @estadoResultado = 1
+        BEGIN
+            EXEC dbo.usp_validar_titularidad_jerarquica_interno
+                @idUsuario = @idUsuarioEjecutorDefecto,
+                @idEntidadPadre = @idProgramaPlan,
+                @tipoEntidadPadre = 'PROGRAMA',
+                @idCorrelacion = @idCorrelacionDefecto,
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+                @estadoResultado = @estadoResultado OUTPUT;
+        END
+
         -- PASO 3: Validación de unicidad de código consultando uv_asignatura
         IF @estadoResultado = 1
         BEGIN
@@ -100,45 +151,37 @@ BEGIN
             END
         END
 
-        -- PASO 4: Resolución reactiva de Área, Componente y SemestrePlanEstudio desde vistas
+        -- PASO 4: Resolución de Área y Componente desde las tablas (P5, 2026-11-04): coincidencia exacta con su código
+        -- o nombre; si no existen se rechaza con GEN_001. Nunca se asigna uno "cualquiera".
         IF @estadoResultado = 1
         BEGIN
-            -- Resolver Área
-            IF @nombreAreaDefecto IS NOT NULL AND @nombreAreaDefecto <> ''
-            BEGIN
-                SELECT TOP 1 @idAreaResolved = id FROM [dbo].[uv_area] WHERE LOWER(nombre) LIKE '%' + LOWER(@nombreAreaDefecto) + '%';
-            END
-            IF @idAreaResolved IS NULL
-            BEGIN
-                SELECT TOP 1 @idAreaResolved = id FROM [dbo].[uv_area];
-            END
+            EXEC dbo.usp_resolver_area_componente_asignatura_interno
+                @area = @nombreAreaDefecto,
+                @componente = @nombreCompDefecto,
+                @obligatorios = 1,
+                @idCorrelacion = @idCorrelacionDefecto,
+                @idArea = @idAreaResolved OUTPUT,
+                @idComponente = @idComponenteResolved OUTPUT,
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+                @estadoResultado = @estadoResultado OUTPUT;
+        END
 
-            -- Resolver Componente
-            IF @nombreCompDefecto IS NOT NULL AND @nombreCompDefecto <> ''
-            BEGIN
-                SELECT TOP 1 @idComponenteResolved = id FROM [dbo].[uv_componente] WHERE LOWER(nombre) LIKE '%' + LOWER(@nombreCompDefecto) + '%';
-            END
-            IF @idComponenteResolved IS NULL
-            BEGIN
-                SELECT TOP 1 @idComponenteResolved = id FROM [dbo].[uv_componente];
-            END
-
-            -- Resolver Semestre y SemestrePlanEstudio
-            SELECT TOP 1 @idSemestreResolved = id FROM [dbo].[uv_semestre] WHERE numero = @semestreNumero;
-            IF @idSemestreResolved IS NULL
-            BEGIN
-                SELECT TOP 1 @idSemestreResolved = id FROM [dbo].[uv_semestre];
-            END
-
-            SELECT TOP 1 @idSpeResolved = id 
-            FROM [dbo].[uv_semestre_plan_estudio] 
-            WHERE idPlanEstudio = @idPlanEstudioDefecto AND idSemestre = @idSemestreResolved;
+        -- PASO 4.1: El semestre debe existir en el plan de estudios (PLA_004); no se crea desde aqui
+        IF @estadoResultado = 1
+        BEGIN
+            SELECT @idSpeResolved = id
+            FROM [dbo].[uv_semestre_plan_estudio]
+            WHERE idPlanEstudio = @idPlanEstudioDefecto AND numeroSemestre = @semestreNumero;
 
             IF @idSpeResolved IS NULL
             BEGIN
-                SET @idSpeResolved = NEWID();
-                INSERT INTO dbo.SemestrePlanEstudio (id, planEstudio, semestre) 
-                VALUES (@idSpeResolved, @idPlanEstudioDefecto, @idSemestreResolved);
+                EXEC dbo.usp_obtener_mensaje_catalogo
+                    @p_codigo = 'PLA_004',
+                    @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                    @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
+                SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+                SET @estadoResultado = 0;
             END
         END
 
@@ -152,7 +195,7 @@ BEGIN
                 @idAsignaturaDefecto,
                 @codigoDefecto,
                 @nombreDefecto,
-                CASE WHEN @creditos IS NOT NULL AND @creditos > 0 THEN @creditos ELSE 3 END,
+                @creditos,
                 @idAreaResolved,
                 @idComponenteResolved,
                 @idSpeResolved,

@@ -72,6 +72,25 @@ BEGIN TRY
         THROW 53406, 'TEST FAILED: RA-03 la asignatura cambio con un coordinador ajeno.', 1;
     PRINT 'TEST_PASS:REC2_RA03_OTRO_PROGRAMA_SEC_002';
 
+    -- RA-05 (decision de John 2026-11-04): crear asignatura en el plan de OTRO programa => SEC_002, sin insertar
+    DECLARE @a5 UNIQUEIDENTIFIER = NEWID();
+    DECLARE @areaCodigo NVARCHAR(10) = (SELECT codigo FROM dbo.uv_area WHERE id = @idArea);
+    DECLARE @numSemestre INT = (SELECT numero FROM dbo.Semestre WHERE id = @idSemestre);
+    TRUNCATE TABLE #r;
+    INSERT INTO #r EXEC dbo.usp_crear_asignatura @idAsignatura = @a5, @codigo = N'QAREC2C5', @nombre = N'QA REC2 Crear', @creditos = 3,
+        @idPlanEstudio = @pl1, @semestreNumero = @numSemestre, @nombreArea = @areaCodigo, @nombreComponente = N'ESP',
+        @idCorrelacion = @corr, @idUsuarioEjecutor = @uC2;
+    IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE 'DBCODE=SEC_002|%')
+       OR EXISTS (SELECT 1 FROM dbo.Asignatura WHERE id = @a5)
+        THROW 53480, 'TEST FAILED: RA-05 crear en el plan de otro programa debio retornar SEC_002 sin insertar.', 1;
+    TRUNCATE TABLE #r;
+    INSERT INTO #r EXEC dbo.usp_crear_asignatura @idAsignatura = @a5, @codigo = N'QAREC2C5', @nombre = N'QA REC2 Crear', @creditos = 3,
+        @idPlanEstudio = @pl1, @semestreNumero = @numSemestre, @nombreArea = @areaCodigo, @nombreComponente = N'ESP',
+        @idCorrelacion = @corr, @idUsuarioEjecutor = @uC1;
+    IF NOT EXISTS (SELECT 1 FROM #r WHERE estadoResultado = 1) OR NOT EXISTS (SELECT 1 FROM dbo.Asignatura WHERE id = @a5)
+        THROW 53481, 'TEST FAILED: RA-05 el coordinador titular no pudo crear en su plan.', 1;
+    PRINT 'TEST_PASS:REC2_RA05_CREAR_OTRO_PROGRAMA_SEC_002';
+
     -- RA-04: coordinador titular => exito en ambos SP
     TRUNCATE TABLE #r;
     INSERT INTO #r EXEC dbo.usp_actualizar_asignatura @idAsignatura = @a1, @codigo = NULL, @nombre = N'QA Cambio', @creditos = 4,

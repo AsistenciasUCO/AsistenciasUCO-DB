@@ -11,7 +11,10 @@ INNER JOIN dbo.uv_programa p ON p.id = sp.idPrograma
 INNER JOIN dbo.uv_coordinador_identidad ci ON ci.id = p.idCoordinador
 WHERE ci.estaActivoUsuario = 1
 ORDER BY sp.idPlanEstudio;
-DECLARE @semester INT = (SELECT TOP 1 numero FROM dbo.uv_semestre);
+-- 2026-11-04: crear asignatura exige un semestre que ya exista en el plan (PLA_004); se toma uno del plan.
+DECLARE @semester INT = (SELECT TOP 1 numeroSemestre FROM dbo.uv_semestre_plan_estudio WHERE idPlanEstudio = @plan ORDER BY numeroSemestre);
+-- P5 (2026-11-04): crear asignatura exige un area y un componente que existan (antes se tomaba uno cualquiera).
+DECLARE @areaCodigo NVARCHAR(10) = (SELECT TOP 1 codigo FROM dbo.uv_area ORDER BY codigo);
 DECLARE @subject UNIQUEIDENTIFIER = NEWID();
 DECLARE @code NVARCHAR(50) = CONCAT(N'QA', LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 10));
 DECLARE @reactiveCode NVARCHAR(50) = CONCAT(N'QR', LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 10));
@@ -30,7 +33,7 @@ BEGIN TRY
     INSERT INTO #subjectResult
     EXEC dbo.usp_crear_asignatura @idAsignatura = @subject, @codigo = @code,
         @nombre = N'QA Materia', @creditos = 4, @idPlanEstudio = @plan,
-        @semestreNumero = @semester, @nombreArea = NULL, @nombreComponente = NULL,
+        @semestreNumero = @semester, @nombreArea = @areaCodigo, @nombreComponente = N'ESP',
         @idCorrelacion = @corr, @idUsuarioEjecutor = @coordinatorUser;
     IF (SELECT COUNT(*) FROM #subjectResult WHERE idCorrelacion = @corr AND estadoResultado = 1
         AND mensajeUsuarioResultado = @userMsg
@@ -79,7 +82,7 @@ BEGIN TRY
     INSERT INTO #subjectResult
     EXEC dbo.usp_crear_asignatura @idAsignatura = @reactiveRequestedId, @codigo = @reactiveCode,
         @nombre = N'QA Reactiva', @creditos = 3, @idPlanEstudio = @plan,
-        @semestreNumero = @semester, @nombreArea = NULL, @nombreComponente = NULL,
+        @semestreNumero = @semester, @nombreArea = @areaCodigo, @nombreComponente = N'ESP',
         @idCorrelacion = @corr, @idUsuarioEjecutor = @coordinatorUser;
     IF (SELECT COUNT(*) FROM #subjectResult WHERE idCorrelacion = @corr AND estadoResultado = 1
         AND mensajeUsuarioResultado = @userMsg
