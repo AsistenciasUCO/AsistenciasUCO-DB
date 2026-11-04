@@ -12,7 +12,7 @@ generated-by: scripts/generar-catalogo-mensajes.ps1
 
 Uso en SP: `EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = '<CODIGO>', @p_param1 = ...`. Los marcadores `{}` / `{0}` se reemplazan con los parámetros. El mensaje técnico se entrega como `DBCODE=<CODIGO>|<texto>` (ver `docs/contracts/DB_BASELINE_CONTRACT.md`).
 
-Total de códigos: **144**.
+Total de códigos: **153**.
 
 ## ARC
 
@@ -30,6 +30,12 @@ Total de códigos: **144**.
 | `ARE_001` | BUSINESS_ERROR | MEDIO | El área de conocimiento especificada no existe en el sistema. | Error de búsqueda: No se encontró el área de conocimiento en uv_area: {}. | `04_mensaje.sql` |
 | `ARE_002` | BUSINESS_ERROR | ALTO | Ya existe un área de conocimiento con el mismo código o nombre. | Error de unicidad: código o nombre duplicado en área de conocimiento. | `04_mensaje.sql` |
 
+## ASI
+
+| Código | Tipo | Severidad | Mensaje usuario | Mensaje técnico | Seed |
+|---|---|---|---|---|---|
+| `ASI_001` | BUSINESS_ERROR | MEDIO | Los créditos de la asignatura son obligatorios y deben ser mayores que cero. | Validacion: @creditos nulo o menor o igual a cero; no se asigna un valor por defecto. | `29_mensajes_asignatura.sql` |
+
 ## ATT
 
 | Código | Tipo | Severidad | Mensaje usuario | Mensaje técnico | Seed |
@@ -37,11 +43,6 @@ Total de códigos: **144**.
 | `ATT_001` | BUSINESS_ERROR | MEDIO | El payload JSON de asistencia no cumple el contrato requerido. | Payload JSON inválido: se requiere un arreglo no nulo de objetos con exactamente idEstudiante y estado. | `04_mensaje.sql` |
 | `ATT_002` | BUSINESS_ERROR | MEDIO | El lote de asistencia no puede estar vacío. | Payload JSON válido pero vacío: no hay operación de negocio que ejecutar. | `04_mensaje.sql` |
 | `ATT_003` | BUSINESS_ERROR | MEDIO | El estudiante {} aparece más de una vez en el lote de asistencia. | Duplicidad en payload JSON: idEstudiante [{}] aparece más de una vez. | `04_mensaje.sql` |
-| `REV_001` | BUSINESS_ERROR | MEDIO | La acción sobre el reclamo no es válida; use APROBADA o RECHAZADA. | SES-04 resolución de reclamo: acción [{}] fuera del contrato (APROBADA | RECHAZADA); sin escrituras. | `04_mensaje.sql` |
-| `REV_002` | BUSINESS_ERROR | MEDIO | El reclamo ya fue resuelto con una decisión distinta. | SES-04 resolución de reclamo: la solicitud [{}] ya está resuelta con otra decisión; sin escrituras. | `04_mensaje.sql` |
-| `REV_003` | BUSINESS_ERROR | MEDIO | La asistencia del reclamo no es una inasistencia justificable. | SES-04 resolución de reclamo: la solicitud [{}] apunta a una asistencia presente (AN / asistio = 1); sin escrituras. | `04_mensaje.sql` |
-| `REV_004` | BUSINESS_ERROR | MEDIO | El reclamo no tiene un registro de asistencia que se pueda justificar. | SES-04 resolución de reclamo: la solicitud [{}] no tiene DetalleAsistencia; no se simula la justificación. | `04_mensaje.sql` |
-| `REV_005` | BUSINESS_ERROR | MEDIO | El reclamo indicado no existe. | SES-04 resolución de reclamo: la solicitud [{}] no existe o no tiene asistencia, sesión y grupo válidos. | `04_mensaje.sql` |
 
 ## COO
 
@@ -232,6 +233,16 @@ Total de códigos: **144**.
 | `RET_003` | BUSINESS_ERROR | MEDIO | El período académico del grupo ya terminó; no se puede retirar al estudiante. | Regla: PeriodoAcademico.fechaFin es anterior a la fecha local (TIEMPO.ZONA_HORARIA_SQLSERVER). | `21_mensajes_retiro_estudiante_grupo.sql` |
 | `RET_004` | BUSINESS_ERROR | MEDIO | El motivo del retiro es obligatorio y no puede superar 500 caracteres. | Validacion: @motivo nulo, vacio o de mas de 500 caracteres. | `21_mensajes_retiro_estudiante_grupo.sql` |
 | `RET_005` | SUCCESS | BAJO | El estudiante fue retirado del grupo. | Actualizacion: dbo.EstudianteGrupo pasa a estado I (inactivo) y se registra dbo.AuditoriaEvento. | `21_mensajes_retiro_estudiante_grupo.sql` |
+
+## REV
+
+| Código | Tipo | Severidad | Mensaje usuario | Mensaje técnico | Seed |
+|---|---|---|---|---|---|
+| `REV_001` | BUSINESS_ERROR | MEDIO | La acción sobre el reclamo no es válida; use APROBADA o RECHAZADA. | SES-04 resolución de reclamo: acción [{}] fuera del contrato (APROBADA \| RECHAZADA); sin escrituras. | `04_mensaje.sql` |
+| `REV_002` | BUSINESS_ERROR | MEDIO | El reclamo ya fue resuelto con una decisión distinta. | SES-04 resolución de reclamo: la solicitud [{}] ya está resuelta con otra decisión; sin escrituras. | `04_mensaje.sql` |
+| `REV_003` | BUSINESS_ERROR | MEDIO | La asistencia del reclamo no es una inasistencia justificable. | SES-04 resolución de reclamo: la solicitud [{}] apunta a una asistencia presente (AN / asistio = 1); sin escrituras. | `04_mensaje.sql` |
+| `REV_004` | BUSINESS_ERROR | MEDIO | El reclamo no tiene un registro de asistencia que se pueda justificar. | SES-04 resolución de reclamo: la solicitud [{}] no tiene DetalleAsistencia; no se simula la justificación. | `04_mensaje.sql` |
+| `REV_005` | BUSINESS_ERROR | MEDIO | El reclamo indicado no existe. | SES-04 resolución de reclamo: la solicitud [{}] no existe o no tiene asistencia, sesión y grupo válidos. | `04_mensaje.sql` |
 
 ## SEC
 
