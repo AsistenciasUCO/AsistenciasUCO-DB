@@ -280,6 +280,24 @@ Work item: `docs/work-items/HU051-retirar-estudiante-grupo/` (contrato HTTP en e
 
 Permiso aditivo: `schema/security/rol_asistencias_runtime_hu051.sql`. Mensajes: `schema/seed/21_mensajes_retiro_estudiante_grupo.sql`. Prueba: `test/test_usp_retirar_estudiante_grupo.sql` (R-01..R-09). Sin cambios de tablas ni de objetos congelados.
 
+## Addendum HU159 — corrección de identidad de usuarios por jerarquía (2026-11-05)
+
+Work item: `docs/work-items/HU159-correccion-identidad-usuarios/` (contrato HTTP en el work item homónimo del backend). Decisión de John (2026-11-05): cada nivel corrige al de abajo los nombres, apellidos y el tipo y número de documento. El administrador corrige al decano, el decano al coordinador (HU121), el coordinador al docente vinculado a su programa (HU092) y al estudiante de su programa. El administrador no se corrige por la app y no gestiona estudiantes (`HOJA_DE_RUTA_JERARQUIA_ROLES.md` del repositorio Infra; HU160 descartada).
+
+| SP | Caso de uso | Ámbito | Códigos |
+|---|---|---|---|
+| `dbo.usp_corregir_identidad_usuario` | Comando (resultset canónico + `idUsuario`, `correo`, `numeroIdentificacion`). `@tipoUsuario` = `ESTUDIANTE` o `DECANO`. Corrige nombres, apellidos y documento; no toca correo, contraseña ni estado; motivo obligatorio siempre; auditoría `CORREGIR_IDENTIDAD_ESTUDIANTE` / `CORREGIR_IDENTIDAD_DECANO` | ESTUDIANTE: COORDINADOR de un programa del estudiante (`EstudiantePrograma → Programa.coordinador`). DECANO: ADMINISTRADOR de la institución de sus facultades. Fuera del ámbito = `GEN_001` (no revela la existencia) | `GEN_002`, `GEN_001`, `SEC_001`, `IDE_001` motivo 1..500, `VAL_001`/`VAL_003`/`VAL_004`, `ERR_UNICIDAD_DOCUMENTO`, `IDE_003` documento apagado, `IDE_002` éxito |
+| `dbo.usp_actualizar_coordinador` (HU121, aditivo) | Acepta `@idTipoIdIdentificacion`, `@numeroIdentificacion` y `@motivo` opcionales (NULL = el documento no cambia). Si cambia: motivo obligatorio y auditoría `CORREGIR_DOCUMENTO_COORDINADOR` | Igual que antes (DECANO titular de la facultad) | `IDE_001`, `IDE_003`, `ERR_UNICIDAD_DOCUMENTO` además de los existentes |
+| `dbo.usp_actualizar_docente_programa` (HU092, aditivo) | Igual que HU121; auditoría `CORREGIR_DOCUMENTO_DOCENTE`. El documento cuenta como "campo a actualizar" | Igual que antes (COORDINADOR titular del programa) | `IDE_001`, `IDE_003`, `ERR_UNICIDAD_DOCUMENTO` además de los existentes |
+
+Internos (sin permisos; encadenamiento de propietario):
+
+- `usp_corregir_documento_usuario_interno`: único punto que cambia el documento. Lee `IDENTIDAD.PERMITIR_CORREGIR_DOCUMENTO` (1 por defecto; distinto de 1 ⇒ `IDE_003`), exige motivo si el documento cambia, valida tipo, número y unicidad excluyendo al propio usuario. Con `@soloValidar = 1` valida sin escribir: las fachadas lo llaman antes de cualquier escritura, así un rechazo no necesita `ROLLBACK`. Aislado para poder apagarlo por parámetro o retirarlo sin tocar la corrección de nombres.
+- `usp_corregir_identidad_usuario_interno`: núcleo de estudiante y decano (valida el documento, actualiza nombres con `usp_actualizar_datos_usuario_interno` conservando el correo, aplica el documento y audita).
+- `usp_registrar_auditoria_identidad_interno`: fila de `AuditoriaEvento` con `metadata` = `{ idUsuario, motivo, anterior, nuevo }` (instantáneas de `ufn_obtener_identidad_usuario_json`).
+
+Permiso aditivo: `schema/security/rol_asistencias_runtime_hu159.sql`. Mensajes: `schema/seed/31_mensajes_correccion_identidad.sql` (`IDE_001`..`IDE_003`). Parámetro: `schema/seed/32_parametros_identidad.sql`. Prueba: `test/test_usp_corregir_identidad_usuario.sql` (9 marcadores críticos, incluidos el parámetro en 0 y en 1). Sin cambios de tablas ni de objetos congelados.
+
 ## Addendum HU053/HU054/HU055 — solicitudes de ingreso a un grupo (2026-10-27)
 
 Work item: `docs/work-items/HU053-HU054-HU055-solicitudes-ingreso-grupo/` (tabla nueva `SolicitudIngresoGrupo` aprobada por John; análisis de impacto en el PLAN).
@@ -340,7 +358,7 @@ La auditoría BD 2026-10-28 encontró 48 SP públicos sin ficha aquí; 10 de ell
 
 | SP | Parámetros | Propósito |
 |---|---|---|
-| `usp_actualizar_coordinador` | `@idCoordinador, @primerNombre, @segundoNombre, @primerApellido, @segundoApellido, @correo, @idFacultad, @idCorrelacion, @idUsuarioEjecutor` | HU121: edita nombres, apellidos y correo de un coordinador de la facultad del decano ejecutor. Fachada transaccional: valida RBAC y titularidad, y delega la escritura en usp_actualizar_datos_usuario_interno. El documento no se edita. Devuelve idUsuario para qu… |
+| `usp_actualizar_coordinador` | `@idCoordinador, @primerNombre, @segundoNombre, @primerApellido, @segundoApellido, @correo, @idFacultad, @idCorrelacion, @idUsuarioEjecutor, @idTipoIdIdentificacion = NULL, @numeroIdentificacion = NULL, @motivo = NULL` | HU121: edita nombres, apellidos y correo de un coordinador de la facultad del decano ejecutor. Fachada transaccional: valida RBAC y titularidad, y delega la escritura en usp_actualizar_datos_usuario_interno. HU159 (2026-11-05): también corrige el tipo y el número de documento con `usp_corregir_documento_usuario_interno` (opcional; si cambia, motivo obligatorio y auditoría `CORREGIR_DOCUMENTO_COORDINADOR`). Devuelve idUsuario para que el backend sincronice la cuenta (y el username) |
 | `usp_actualizar_docente_programa` | `@idDocente, @idPrograma, @idTipoVinculacion, @primerNombre, @segundoNombre, @primerApellido, @segundoApellido, @idCorrelacion, @idUsuarioEjecutor` | HU092: edita (a) el tipo de vinculacion del vinculo docente-programa y (b) los nombres/apellidos de la persona. Solo se actualizan los parametros no nulos (''/vacio en un segundo nombre o apellido lo limpia). Correo y documento NO se editan aqui (el correo exi… |
 | `usp_actualizar_facultad` | `@id, @nombre, @idDecano, @idCorrelacion, @idUsuarioEjecutor` | Procedimiento: [dbo].[usp_actualizar_facultad] Historias de Usuario: HU110 (modificar denominacion) y HU117 (reasignar decano) Ambito: Administrador Institucional (Nivel 1 de custodia jerarquica) Semantica: un parametro NULL no se modifica. Al menos uno es obl… |
 | `usp_actualizar_programa_academico` | `@idPrograma, @nombre, @idTipoPrograma, @idCoordinador, @idModalidad, @idJornada, @idCorrelacion, @idUsuarioEjecutor` | Procedimiento: [dbo].[usp_actualizar_programa_academico] Historia de Usuario: HU077 Ambito: Decano de Facultad. Edicion de nombre, tipo, modalidad, jornada y coordinador de un programa de la facultad del decano. Salida Canonica: (idCorrelacion, mensajeUsuarioR… |

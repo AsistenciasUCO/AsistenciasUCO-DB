@@ -55,6 +55,7 @@ PRINT '======================================================================';
 :r /tmp/test/test_lb004d_support_binding.sql
 :r /tmp/test/test_usp_crear_coordinador.sql
 :r /tmp/test/test_usp_actualizar_coordinador.sql
+:r /tmp/test/test_usp_corregir_identidad_usuario.sql
 :r /tmp/test/test_usp_cambiar_estado_coordinador.sql
 :r /tmp/test/test_hu121_hu122_esquema_coordinador.sql
 :r /tmp/test/test_sec_baseline_identidad_externa.sql

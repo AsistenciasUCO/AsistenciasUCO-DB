@@ -6,8 +6,10 @@ SET QUOTED_IDENTIFIER ON;
 GO
 
 -- HU092: edita (a) el tipo de vinculacion del vinculo docente-programa y (b) los nombres/apellidos de la persona.
--- Solo se actualizan los parametros no nulos (''/vacio en un segundo nombre o apellido lo limpia). Correo y documento
--- NO se editan aqui (el correo exige sincronizar Keycloak: IAM-001). Los nombres afectan a la persona en todos sus
+-- Solo se actualizan los parametros no nulos (''/vacio en un segundo nombre o apellido lo limpia). El correo NO se
+-- edita aqui (exige sincronizar Keycloak: IAM-001). HU159 (decision de John 2026-11-05): (c) el tipo y el numero de
+-- documento, opcionales, con usp_corregir_documento_usuario_interno; si cambia, el motivo es obligatorio y se audita
+-- CORREGIR_DOCUMENTO_DOCENTE con los valores anteriores y nuevos. Los nombres afectan a la persona en todos sus
 -- programas. RBAC COORDINADOR + titularidad PROGRAMA + existencia del vinculo se validan DENTRO del SP, y las
 -- validaciones de lectura ocurren antes de abrir la transaccion.
 CREATE OR ALTER PROCEDURE [dbo].[usp_actualizar_docente_programa]
@@ -20,7 +22,10 @@ CREATE OR ALTER PROCEDURE [dbo].[usp_actualizar_docente_programa]
     @primerApellido     NVARCHAR(50)     = NULL,
     @segundoApellido    NVARCHAR(50)     = NULL,
     @idCorrelacion      UNIQUEIDENTIFIER,
-    @idUsuarioEjecutor  UNIQUEIDENTIFIER = NULL
+    @idUsuarioEjecutor  UNIQUEIDENTIFIER = NULL,
+    @idTipoIdIdentificacion UNIQUEIDENTIFIER = NULL,
+    @numeroIdentificacion   INT = NULL,
+    @motivo                 NVARCHAR(500) = NULL
 )
 AS
     DECLARE @idCorrelacionDefecto     UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idCorrelacion, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
@@ -37,6 +42,8 @@ AS
     DECLARE @pa  NVARCHAR(50) = TRIM(@primerApellido);
     DECLARE @sa  NVARCHAR(50) = TRIM(@segundoApellido);
     DECLARE @idUsuarioDocente UNIQUEIDENTIFIER;
+    DECLARE @identidadAnterior NVARCHAR(MAX);
+    DECLARE @documentoCambiado BIT = 0;
 
     DECLARE @conteoTransaccionesInicial INT = 0;
     DECLARE @transaccionPropia          BIT = 0;
@@ -84,6 +91,7 @@ BEGIN
 
         -- PASO 5: Al menos un campo a actualizar
         IF @estadoResultado = 1 AND @idTipoVinculacion IS NULL AND @pn IS NULL AND @sn IS NULL AND @pa IS NULL AND @sa IS NULL
+           AND @idTipoIdIdentificacion IS NULL AND @numeroIdentificacion IS NULL
         BEGIN
             EXEC dbo.usp_obtener_mensaje_catalogo
                 @p_codigo = 'GEN_002', @p_param1 = 'campo a actualizar',
@@ -143,6 +151,23 @@ BEGIN
             SET @estadoResultado = 0;
         END
 
+        -- PASO 9b: Documento (HU159): se valida antes de abrir la transaccion
+        IF @estadoResultado = 1
+        BEGIN
+            SET @identidadAnterior = dbo.ufn_obtener_identidad_usuario_json(@idUsuarioDocente);
+            EXEC dbo.usp_corregir_documento_usuario_interno
+                @idUsuario = @idUsuarioDocente,
+                @idTipoIdIdentificacion = @idTipoIdIdentificacion,
+                @numeroIdentificacion = @numeroIdentificacion,
+                @motivo = @motivo,
+                @idCorrelacion = @idCorrelacionDefecto,
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+                @estadoResultado = @estadoResultado OUTPUT,
+                @documentoCambiado = @documentoCambiado OUTPUT,
+                @soloValidar = 1;
+        END
+
         -- PASO 10: Escrituras en una sola transaccion con ownership
         IF @estadoResultado = 1
         BEGIN
@@ -166,6 +191,31 @@ BEGIN
                 EXEC dbo.usp_actualizar_nombres_usuario_interno
                     @idUsuario = @idUsuarioDocente, @primerNombre = @pn, @segundoNombre = @sn,
                     @primerApellido = @pa, @segundoApellido = @sa;
+
+            IF @documentoCambiado = 1
+            BEGIN
+                EXEC dbo.usp_corregir_documento_usuario_interno
+                    @idUsuario = @idUsuarioDocente,
+                    @idTipoIdIdentificacion = @idTipoIdIdentificacion,
+                    @numeroIdentificacion = @numeroIdentificacion,
+                    @motivo = @motivo,
+                    @idCorrelacion = @idCorrelacionDefecto,
+                    @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                    @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+                    @estadoResultado = @estadoResultado OUTPUT,
+                    @documentoCambiado = @documentoCambiado OUTPUT;
+
+                EXEC dbo.usp_registrar_auditoria_identidad_interno
+                    @idUsuario = @idUsuarioDocente,
+                    @identidadAnterior = @identidadAnterior,
+                    @motivo = @motivo,
+                    @accion = 'CORREGIR_DOCUMENTO_DOCENTE',
+                    @tipoRecurso = 'Docente',
+                    @idRecurso = @idDocenteDefecto,
+                    @ruta = N'/api/v1/coordinador/docentes/{idDocente}',
+                    @idUsuarioEjecutor = @idUsuarioEjecutorDefecto,
+                    @idCorrelacion = @idCorrelacionDefecto;
+            END
 
             EXEC dbo.usp_obtener_mensaje_catalogo
                 @p_codigo = 'GEN_005', @p_param1 = 'Docente',

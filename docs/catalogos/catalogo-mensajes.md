@@ -12,7 +12,7 @@ generated-by: scripts/generar-catalogo-mensajes.ps1
 
 Uso en SP: `EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = '<CODIGO>', @p_param1 = ...`. Los marcadores `{}` / `{0}` se reemplazan con los parámetros. El mensaje técnico se entrega como `DBCODE=<CODIGO>|<texto>` (ver `docs/contracts/DB_BASELINE_CONTRACT.md`).
 
-Total de códigos: **153**.
+Total de códigos: **156**.
 
 ## ARC
 
@@ -154,6 +154,14 @@ Total de códigos: **153**.
 | Código | Tipo | Severidad | Mensaje usuario | Mensaje técnico | Seed |
 |---|---|---|---|---|---|
 | `IAM_001` | SYSTEM_ERROR | ALTO | El registro se guardó, pero la cuenta de acceso no pudo crearse en este momento. Intente de nuevo. | Aprovisionamiento IAM falló después del commit en DB (TD-015): reintentar crearCuenta de forma idempotente. | `17_mensaje_docente_programa.sql` |
+
+## IDE
+
+| Código | Tipo | Severidad | Mensaje usuario | Mensaje técnico | Seed |
+|---|---|---|---|---|---|
+| `IDE_001` | BUSINESS_ERROR | MEDIO | El motivo de la corrección es obligatorio y no puede superar 500 caracteres. | Validacion: @motivo nulo, vacio o de mas de 500 caracteres. | `31_mensajes_correccion_identidad.sql` |
+| `IDE_002` | SUCCESS | BAJO | Los datos de identidad fueron corregidos. | Actualizacion: dbo.Usuario (documento, nombres y apellidos) y registro en dbo.AuditoriaEvento. | `31_mensajes_correccion_identidad.sql` |
+| `IDE_003` | BUSINESS_ERROR | MEDIO | La corrección del tipo o número de documento no está habilitada. | Regla de negocio: IDENTIDAD.PERMITIR_CORREGIR_DOCUMENTO distinto de 1; el documento no se modifica. | `31_mensajes_correccion_identidad.sql` |
 
 ## INST
 
