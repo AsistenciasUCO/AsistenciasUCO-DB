@@ -40,10 +40,10 @@ Propuesta para José Alejandro, dueño de LB-004D. **No está implementada.** Es
 - El valor se podrá cambiar desde el futuro componente de parámetros (decisión de John: HU168 lo espera).
 - Si más adelante se cambia a días hábiles, hará falta un calendario de festivos. Queda fuera de este alcance.
 
-### 3. Soporte obligatorio por categoría (propuesta)
+### 3. Soporte obligatorio por categoría (mapeo aprobado por John, 2026-11-05)
 
 - Columna nueva `CategoriaJustificacion.requiereSoporte BIT NOT NULL DEFAULT 0`, cargada por seed.
-- Mapeo propuesto (pendiente de que John lo confirme):
+- Mapeo aprobado por John (2026-11-05):
 
 | Código | Categoría | Exige soporte |
 |---|---|---|
