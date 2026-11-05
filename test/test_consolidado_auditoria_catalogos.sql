@@ -153,6 +153,21 @@ BEGIN TRY
         THROW 56241, 'TEST FAILED T-155-01: uv_estado_estudiante_grupo debe listar los estados del estudiante en el grupo.', 1;
     PRINT 'TEST_PASS:T-155-01';
 
+    PRINT '-> T-005-01: categorias de justificacion de solo consulta (HU005/HU016)';
+    IF (SELECT COUNT(*) FROM dbo.uv_categoria_justificacion WHERE codigo IN ('MED', 'CAL', 'ACA', 'FMA', 'LAB', 'OTR')) <> 6
+       OR EXISTS (SELECT 1 FROM dbo.uv_categoria_justificacion WHERE NULLIF(TRIM(nombre), N'') IS NULL OR NULLIF(TRIM(descripcion), N'') IS NULL)
+        THROW 56242, 'TEST FAILED T-005-01: uv_categoria_justificacion debe listar las 6 categorias del seed con nombre y descripcion.', 1;
+    -- El formulario de reclamo envia el nombre en @categoria: debe seguir siendo el texto que ya se radica hoy.
+    IF NOT EXISTS (SELECT 1 FROM dbo.uv_categoria_justificacion WHERE codigo = N'MED' AND nombre = N'M' + NCHAR(233) + N'dico / Salud')
+        THROW 56243, 'TEST FAILED T-005-01: el nombre de la categoria MED cambio respecto al que envia el formulario.', 1;
+    IF EXISTS (SELECT 1 FROM sys.procedures WHERE name LIKE N'usp[_]%categoria[_]justificacion%')
+       OR NOT EXISTS (
+            SELECT 1 FROM sys.database_permissions dp
+            WHERE dp.major_id = OBJECT_ID(N'dbo.uv_categoria_justificacion') AND dp.permission_name = N'SELECT'
+              AND dp.state = 'G' AND dp.grantee_principal_id = DATABASE_PRINCIPAL_ID(N'rol_asistencias_runtime'))
+        THROW 56244, 'TEST FAILED T-005-01: el catalogo no debe tener SP de escritura y el runtime debe leer su vista.', 1;
+    PRINT 'TEST_PASS:T-005-01';
+
     PRINT '-> T-P5-01: asignaturas solo con area, componente y semestre existentes';
     DECLARE @asig UNIQUEIDENTIFIER = NEWID();
     DECLARE @codAsig NVARCHAR(50) = CONCAT(N'QP5', LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8));
