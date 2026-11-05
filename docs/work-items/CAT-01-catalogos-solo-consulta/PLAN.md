@@ -39,6 +39,10 @@ Perfil, TipoIdentificacion, TipoPrograma, Semestre, Componente, Area, EstadoEstu
 - La columna `estado` de `Area` y `TipoPrograma`, sin DDL: la fija el seed y el filtro "solo activos" sigue funcionando.
 - Los mensajes `ARE_*` y `TPR_*` del catálogo: son datos de seed.
 
+## Ampliación 2026-11-05: Institución
+
+Decisión de John: `Institucion` también es un catálogo de solo consulta. Se carga por seed y la consulta HU163 sigue igual. HU161, HU162 y HU164 (crear, editar y activar instituciones) quedan DESCARTADAS. En la BD nunca existieron SP de escritura de `Institucion`. El backend retira los endpoints que respondían 501 (work item `HU136-docentes-institucion`).
+
 ## Rollback
 
 Ejecutar `migrations/11_catalogos_solo_consulta_down.sql` y revertir el commit.
