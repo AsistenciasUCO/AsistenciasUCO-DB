@@ -56,3 +56,20 @@ WHEN NOT MATCHED THEN
     INSERT (id, estado, estudiante, grupo)
     VALUES (TRY_CAST(Source.id AS UNIQUEIDENTIFIER), Source.estado, TRY_CAST(Source.estudiante AS UNIQUEIDENTIFIER), TRY_CAST(Source.grupo AS UNIQUEIDENTIFIER));
 GO
+
+-- 4. Sembrado Idempotente: EstudiantePrograma de los estudiantes inscritos arriba (certificación Fase 3, 2026-11-06).
+-- Misma regla que usp_registrar_estudiante_en_grupo_interno (HU008, regla de John 2026-10-27): solo un grupo de una
+-- asignatura ESPECIFICA (componente ESP) inscribe al estudiante en el programa. Sin esta fila, el perfil (HU006) no
+-- mostraba el vínculo y la oferta (HU008) quedaba vacía para los estudiantes sembrados.
+INSERT INTO [dbo].[EstudiantePrograma] (id, estudiante, programa)
+SELECT NEWID(), eg.estudiante, pe.programa
+FROM (SELECT DISTINCT eg0.estudiante, eg0.grupo
+      FROM [dbo].[EstudianteGrupo] eg0
+      WHERE eg0.id IN ('B1A2C3D4-0000-0000-0000-000000000001', 'B1A2C3D4-0000-0000-0000-000000000002')) eg
+INNER JOIN [dbo].[Grupo] g ON g.id = eg.grupo
+INNER JOIN [dbo].[Asignatura] a ON a.id = g.asignatura
+INNER JOIN [dbo].[Componente] comp ON comp.id = a.componente AND comp.codigo = 'ESP'
+INNER JOIN [dbo].[SemestrePlanEstudio] sp ON sp.id = a.semestrePlanEstudio
+INNER JOIN [dbo].[PlanEstudio] pe ON pe.id = sp.planEstudio
+WHERE NOT EXISTS (SELECT 1 FROM [dbo].[EstudiantePrograma] ep WHERE ep.estudiante = eg.estudiante AND ep.programa = pe.programa);
+GO

@@ -12,6 +12,9 @@ GO
 -- sin programas y los programas sin plan aparecen con las columnas hijas en NULL (LEFT JOIN), para que el
 -- arbol muestre todos los niveles.
 -- clave: identificador unico de la fila (facultad|programa|plan) para el consumidor.
+-- totalSemestres: mayor numero de semestre del plan (la malla va del semestre 1 a ese numero), la misma regla de
+-- HU082/HU083 que usa el coordinador; 0 si el plan no tiene semestres. Antes contaba los semestres creados
+-- (certificacion F3, 2026-11-06, decision de John).
 --
 -- Resultset: READ_QUERY_RESULTSET (filas), NO el resultset canonico de 4 columnas de los comandos.
 -- Las fallas se propagan con THROW (VAL_001).
@@ -90,7 +93,7 @@ BEGIN TRY
         LEFT JOIN dbo.uv_auth_programa p ON p.idFacultad = f.id
         LEFT JOIN dbo.uv_plan_estudio pe ON pe.idPrograma = p.id
         OUTER APPLY (
-            SELECT COUNT(*) AS totalSemestres
+            SELECT ISNULL(MAX(spe.numeroSemestre), 0) AS totalSemestres
             FROM dbo.uv_semestre_plan_estudio spe
             WHERE spe.idPlanEstudio = pe.id
         ) sem

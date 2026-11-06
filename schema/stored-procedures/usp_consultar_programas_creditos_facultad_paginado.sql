@@ -12,6 +12,8 @@ GO
 -- asignaturas y la suma de creditos (Asignatura.credito) del plan. Los programas sin plan salen con una fila
 -- de plan vacio (totales en 0). @busqueda compara contra el nombre del programa y el INP del plan.
 -- Los totales cuentan todas las asignaturas del plan (activas o no), igual que la malla de /decano/planes-estudio.
+-- totalSemestres: mayor numero de semestre del plan (regla HU082/HU083 del coordinador); antes contaba los semestres
+-- creados (certificacion F3, 2026-11-06, decision de John).
 --
 -- Resultset: READ_QUERY_RESULTSET (filas + totalRegistros), NO el resultset canonico de 4 columnas
 -- de los comandos. Las fallas de validacion se propagan con THROW (VAL_001 / SEC_001 / PAG_001).
@@ -60,7 +62,7 @@ BEGIN
         -- PASO 2: Consulta y retorno de resultados
         WITH totalesPlan AS (
             SELECT  sp.idPlanEstudio,
-                    totalSemestres = COUNT(DISTINCT sp.id),
+                    totalSemestres = ISNULL(MAX(sp.numeroSemestre), 0),
                     totalAsignaturas = COUNT(a.id),
                     totalCreditos = SUM(a.credito)
             FROM    dbo.uv_semestre_plan_estudio sp
