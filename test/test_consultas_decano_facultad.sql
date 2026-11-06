@@ -109,6 +109,13 @@ BEGIN TRY
         THROW 52958, 'TEST FAILED T-119-01: la estructura no incluyo el programa y su plan.', 1;
     IF EXISTS (SELECT 1 FROM #estructura WHERE idFacultad <> @idFacultad)
         THROW 52959, 'TEST FAILED T-119-01: aparecieron facultades ajenas.', 1;
+    -- Certificacion F3: totalSemestres es el mayor numero de semestre del plan (regla HU082/HU083 del coordinador).
+    IF EXISTS (
+        SELECT 1 FROM #estructura e
+        WHERE e.idPlanEstudio IS NOT NULL
+          AND e.totalSemestres <> ISNULL((SELECT MAX(spe.numeroSemestre) FROM dbo.uv_semestre_plan_estudio spe
+                                          WHERE spe.idPlanEstudio = e.idPlanEstudio), 0))
+        THROW 52968, 'TEST FAILED T-119-01: totalSemestres no es el mayor numero de semestre del plan.', 1;
     TRUNCATE TABLE #estructura;
     INSERT INTO #estructura EXEC dbo.usp_consultar_estructura_facultad @idUsuarioEjecutor = @uDecAjeno, @idCorrelacion = @c;
     IF (SELECT COUNT(*) FROM #estructura) <> 1 OR EXISTS (SELECT 1 FROM #estructura WHERE idFacultad <> @fAjena OR idPrograma IS NOT NULL)

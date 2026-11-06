@@ -90,6 +90,13 @@ BEGIN TRY
         THROW 56111, 'TEST FAILED T-112-01: el plan del programa no trajo la suma real de creditos y asignaturas.', 1;
     IF EXISTS (SELECT 1 FROM #programas p WHERE NOT EXISTS (SELECT 1 FROM dbo.Programa pr WHERE pr.id = p.idPrograma AND pr.facultad = @idFacultad))
         THROW 56112, 'TEST FAILED T-112-01: aparecieron programas de otra facultad.', 1;
+    -- Certificacion F3: totalSemestres es el mayor numero de semestre del plan (misma regla que el coordinador).
+    IF EXISTS (
+        SELECT 1 FROM #programas p
+        WHERE p.idPlanEstudio IS NOT NULL
+          AND p.totalSemestres <> ISNULL((SELECT MAX(spe.numeroSemestre) FROM dbo.uv_semestre_plan_estudio spe
+                                          WHERE spe.idPlanEstudio = p.idPlanEstudio), 0))
+        THROW 56178, 'TEST FAILED T-112-01: totalSemestres no es el mayor numero de semestre del plan.', 1;
     TRUNCATE TABLE #programas;
     INSERT INTO #programas EXEC dbo.usp_consultar_programas_creditos_facultad_paginado
         @idUsuarioEjecutor = @uDecAjeno, @idCorrelacion = @c, @numeroPagina = 1, @tamanoPagina = 100;
