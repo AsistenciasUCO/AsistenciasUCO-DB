@@ -514,6 +514,7 @@
 | `GET /api/v1/decano/sesiones` | `usp_consultar_sesiones_facultad_paginado` | HU145 |
 | `GET /api/v1/decano/programas-creditos` | `usp_consultar_programas_creditos_facultad_paginado` | HU112 |
 | `GET /api/v1/decano/docentes` | `usp_consultar_docentes_facultad_paginado` | HU128 |
+| `GET /api/v1/admin/docentes` (`busqueda`, `idFacultad`, `idPrograma`, `estaActivo`, `estadoVinculo`, `pagina`, `tamano`) | `usp_consultar_docentes_facultad_paginado` (ámbito del administrador: su institución) | HU136 |
 | `GET /api/v1/decano/asignaturas` y `GET /api/v1/admin/asignaturas` | `usp_buscar_asignaturas_paginado` | HU143 |
 | `GET /api/v1/admin/estudiantes` | `usp_buscar_estudiantes_institucion_paginado` | HU157 |
 | `GET /api/v1/admin/estudiantes/{id}/historial` y `GET /api/v1/decano/estudiantes/{id}/historial` | `usp_consultar_historial_estudiante` | HU157 |

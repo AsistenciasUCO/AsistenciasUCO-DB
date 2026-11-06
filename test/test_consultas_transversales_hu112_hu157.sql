@@ -34,7 +34,8 @@ CREATE TABLE #programas (
     estaActivoPlanEstudio BIT, totalSemestres INT, totalAsignaturas INT, totalCreditos INT, totalRegistros INT);
 CREATE TABLE #docentes (
     idDocente UNIQUEIDENTIFIER, idUsuario UNIQUEIDENTIFIER, numeroIdentificacion BIGINT, nombreCompleto NVARCHAR(250),
-    correo NVARCHAR(255), estaActivoUsuario BIT, programas NVARCHAR(MAX), totalProgramas INT, totalGrupos INT, totalRegistros INT);
+    correo NVARCHAR(255), estaActivoUsuario BIT, programas NVARCHAR(MAX), totalProgramas INT, totalGrupos INT, totalRegistros INT,
+    tieneVinculoActivo BIT);
 CREATE TABLE #asignaturas (
     idAsignatura UNIQUEIDENTIFIER, codigo NVARCHAR(50), nombre NVARCHAR(50), credito INT, nombreArea NVARCHAR(100),
     nombreComponente NVARCHAR(100), codigoSemestre NVARCHAR(50), idPlanEstudio UNIQUEIDENTIFIER, inpPlanEstudio INT,
@@ -112,6 +113,57 @@ BEGIN TRY
     IF EXISTS (SELECT 1 FROM #docentes)
         THROW 56117, 'TEST FAILED T-128-01: un decano ajeno vio docentes de otra facultad.', 1;
     PRINT 'TEST_PASS:T-128-01';
+
+    PRINT '-> T-136-01: el administrador ve los docentes de su institucion y filtra por facultad';
+    TRUNCATE TABLE #docentes;
+    INSERT INTO #docentes EXEC dbo.usp_consultar_docentes_facultad_paginado
+        @idUsuarioEjecutor = @uAdmin, @idCorrelacion = @c, @numeroPagina = 1, @tamanoPagina = 100;
+    IF NOT EXISTS (SELECT 1 FROM #docentes WHERE idDocente = @idDocente)
+        THROW 56170, 'TEST FAILED T-136-01: el administrador no vio al docente vinculado en su institucion.', 1;
+    IF EXISTS (SELECT 1 FROM #docentes d WHERE NOT EXISTS (
+            SELECT 1 FROM dbo.uv_docente_programa v WHERE v.idDocente = d.idDocente AND v.idInstitucion = @idInstitucion))
+        THROW 56171, 'TEST FAILED T-136-01: el administrador vio docentes de otra institucion.', 1;
+    TRUNCATE TABLE #docentes;
+    INSERT INTO #docentes EXEC dbo.usp_consultar_docentes_facultad_paginado
+        @idUsuarioEjecutor = @uAdmin, @idCorrelacion = @c, @numeroPagina = 1, @tamanoPagina = 100, @idFacultad = @idFacultad;
+    IF NOT EXISTS (SELECT 1 FROM #docentes WHERE idDocente = @idDocente)
+       OR EXISTS (SELECT 1 FROM #docentes d WHERE NOT EXISTS (
+            SELECT 1 FROM dbo.uv_docente_programa v WHERE v.idDocente = d.idDocente AND v.idFacultad = @idFacultad AND v.estaActivoVinculacion = 1))
+        THROW 56172, 'TEST FAILED T-136-01: el filtro por facultad del administrador no funciono.', 1;
+    TRUNCATE TABLE #docentes;
+    INSERT INTO #docentes EXEC dbo.usp_consultar_docentes_facultad_paginado
+        @idUsuarioEjecutor = @uDecAjeno, @idCorrelacion = @c, @numeroPagina = 1, @tamanoPagina = 100, @idFacultad = @idFacultad;
+    IF EXISTS (SELECT 1 FROM #docentes)
+        THROW 56173, 'TEST FAILED T-136-01: un decano ajeno vio docentes filtrando por otra facultad.', 1;
+    -- Ajuste HU136: docentes sin vinculo activo (retirados de todos sus programas) solo para el administrador
+    DECLARE @dSinVinculo UNIQUEIDENTIFIER = NEWID(), @uSinVinculo UNIQUEIDENTIFIER = NEWID();
+    INSERT INTO dbo.Usuario (id, tipoIdIdentificacion, numeroIdentificacion, primerApellido, segundoApellido, primerNombre, segundoNombre, correo, correoConfirmado, estado, password)
+    VALUES (@uSinVinculo, @tipoId, 913600001, N'Retirado', N'Qa', N'Docente', N'', N'retirado.hu136@test.local', 1, 1, N'HashBackend_Hu136');
+    INSERT INTO dbo.Docente (id, usuario) VALUES (@dSinVinculo, @uSinVinculo);
+    INSERT INTO dbo.DocentePrograma (id, docente, programa, tipoVinculacion, estado, fechaVinculacionUtc)
+    VALUES (NEWID(), @dSinVinculo, @idProgramaDocente, (SELECT TOP 1 id FROM dbo.TipoVinculacion ORDER BY codigo), 0, SYSUTCDATETIME());
+    TRUNCATE TABLE #docentes;
+    INSERT INTO #docentes EXEC dbo.usp_consultar_docentes_facultad_paginado
+        @idUsuarioEjecutor = @uAdmin, @idCorrelacion = @c, @numeroPagina = 1, @tamanoPagina = 100;
+    IF EXISTS (SELECT 1 FROM #docentes WHERE idDocente = @dSinVinculo) OR EXISTS (SELECT 1 FROM #docentes WHERE tieneVinculoActivo = 0)
+        THROW 56174, 'TEST FAILED T-136-02: por defecto el administrador vio docentes sin vinculo activo.', 1;
+    TRUNCATE TABLE #docentes;
+    INSERT INTO #docentes EXEC dbo.usp_consultar_docentes_facultad_paginado
+        @idUsuarioEjecutor = @uAdmin, @idCorrelacion = @c, @numeroPagina = 1, @tamanoPagina = 100, @estadoVinculo = 'SIN_VINCULO';
+    IF NOT EXISTS (SELECT 1 FROM #docentes WHERE idDocente = @dSinVinculo AND tieneVinculoActivo = 0 AND programas IS NULL AND totalProgramas = 0 AND totalGrupos = 0)
+       OR EXISTS (SELECT 1 FROM #docentes WHERE tieneVinculoActivo = 1)
+        THROW 56175, 'TEST FAILED T-136-02: SIN_VINCULO no trajo al docente retirado con programa vacio o trajo vinculados.', 1;
+    TRUNCATE TABLE #docentes;
+    INSERT INTO #docentes EXEC dbo.usp_consultar_docentes_facultad_paginado
+        @idUsuarioEjecutor = @uAdmin, @idCorrelacion = @c, @numeroPagina = 1, @tamanoPagina = 100, @estadoVinculo = 'TODOS';
+    IF NOT EXISTS (SELECT 1 FROM #docentes WHERE idDocente = @dSinVinculo) OR NOT EXISTS (SELECT 1 FROM #docentes WHERE idDocente = @idDocente)
+        THROW 56176, 'TEST FAILED T-136-02: TODOS no trajo a vinculados y sin vinculo.', 1;
+    TRUNCATE TABLE #docentes;
+    INSERT INTO #docentes EXEC dbo.usp_consultar_docentes_facultad_paginado
+        @idUsuarioEjecutor = @uDecTitular, @idCorrelacion = @c, @numeroPagina = 1, @tamanoPagina = 100, @estadoVinculo = 'TODOS';
+    IF EXISTS (SELECT 1 FROM #docentes WHERE idDocente = @dSinVinculo OR tieneVinculoActivo = 0)
+        THROW 56177, 'TEST FAILED T-136-02: el decano vio docentes sin vinculo activo (HU128 no cambia).', 1;
+    PRINT 'TEST_PASS:HU136_ADMIN_TEACHERS_INSTITUTION';
 
     PRINT '-> T-143-01: busqueda de asignaturas (administrador: institucion; decano: su facultad)';
     INSERT INTO #asignaturas EXEC dbo.usp_buscar_asignaturas_paginado
