@@ -96,3 +96,16 @@ NEXT AUTHORIZED PHASE:                 LB-002.1C-B1 - BACKEND AS-IS CONTRACT ANA
 - **Manifiesto:** `DB_UTC_D06_POST_FREEZE_MANIFEST.sha256` actualiza solo el hash de ese archivo, de `099a5cf4…` a `ef9de7e9…`. La cadena de reemplazo sigue apuntando al hash DB-GP-001C (`f4c71c7b…`).
 - **Prueba:** `test_rec3_falla_intermedia_transaccion.sql`, caso TX-04.
 - **Work item:** `docs/work-items/REC3-transacciones/PLAN.md`.
+
+## Revisión post-freeze SES-01 (2026-11-03) — EXCEPCIÓN AUTORIZADA
+
+- **Objeto:** `schema/stored-procedures/usp_registrar_asistencias_sesion.sql` (DB-GP-001C, Golden Path). La revisión REC3 dejó constancia de que este SP **no** se modificaba; SES-01 lo propone de nuevo por una decisión funcional posterior (2026-11-02: cierre estricto a la hora de fin).
+- **Aprobación:** excepción de congelamiento **autorizada expresamente por el responsable funcional del proyecto** (instrucción del 2026-11-03, «Finalización integral de SES-01 a SES-05»). La autorización cubre desarrollar, probar y proponer el cambio; la **revisión formal del owner DB (John Duque)** se solicita en el PR y es requisito para fusionar y para aplicarlo en bases compartidas, que se hace solo con el mecanismo oficial de despliegue.
+- **Cambio:**
+  - PASO 4.0: dentro de la transacción (propia o savepoint) llama a `usp_validar_sesion_ventana_registro_interno` antes de escribir;
+  - PASO 4.2: repite la validación antes del `COMMIT`;
+  - fuera de ventana devuelve `SES_007` / `SES_008` / `SES_009` y no escribe.
+  - No cambian la firma, el resultset, la prioridad de las validaciones previas ni el patrón savepoint/`XACT_STATE()` (sin `XACT_ABORT ON`, ver REC3).
+- **Manifiesto:** `DB_UTC_D06_POST_FREEZE_MANIFEST.sha256` agrega la supersesión de ese archivo, de `a0372fd6…` (DB-GP-001C) a `7217604b…`; `scripts/freeze-manifest.ps1` lo incluye en `$postFreezeSuperseded`.
+- **Prueba:** `test/test_ses01_ventana_asistencia.sql` (12 IDs `SES01_*`).
+- **Work item:** `docs/work-items/SES-01-cierre-estricto-asistencia/PLAN.md`.

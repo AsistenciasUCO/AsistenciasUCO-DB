@@ -1,6 +1,115 @@
-param ([string]$ContainerName, [string]$Password)
+param ([string]$ContainerName, [string]$Password, [switch]$ParserSelfTestOnly)
 
 $ErrorActionPreference = 'Stop'
+
+function Test-CanonicalResultBlock {
+    param (
+        [string]$OutputText,
+        [string]$ResultId,
+        [string]$ExpectedState,
+        [string]$ExpectedErrorCode
+    )
+
+    $escapedId = [regex]::Escape($ResultId)
+    $beginMarkers = [regex]::Matches($OutputText, "(?m)^TEST_RESULT_BEGIN:$escapedId\r?$")
+    $endMarkers = [regex]::Matches($OutputText, "(?m)^TEST_RESULT_END:$escapedId\r?$")
+    $userMarkers = [regex]::Matches($OutputText, "(?m)^TEST_EXPECTED_USER:$escapedId\|([^\r\n]*)\r?$")
+    # The CI log's merged SQLCMD capture showed this one known prefix on a PRINT line.
+    # Accept only the observed literal "o." before this official marker; keep every other
+    # marker anchored and exact, and reject duplicate clean/prefixed copies below.
+    $techMarkers = [regex]::Matches($OutputText, "(?m)^(?:o\.)?TEST_EXPECTED_TECH:$escapedId\|([^\r\n]*)\r?$")
+    $techRegexMarkers = [regex]::Matches($OutputText, "(?m)^TEST_EXPECTED_TECH_REGEX:$escapedId\|([^\r\n]*)\r?$")
+    $stateMarkers = [regex]::Matches($OutputText, "(?m)^TEST_STATE_PASS:$escapedId\r?$")
+
+    if ($beginMarkers.Count -ne 1 -or $endMarkers.Count -ne 1 -or $beginMarkers[0].Index -ge $endMarkers[0].Index) {
+        return [pscustomobject]@{ Success = $false; Failure = 'missing, duplicated, or out-of-order result boundary' }
+    }
+    if ($userMarkers.Count -ne 1 -or ($techMarkers.Count + $techRegexMarkers.Count) -ne 1 -or $stateMarkers.Count -ne 1) {
+        return [pscustomobject]@{ Success = $false; Failure = 'missing or duplicated catalog expectation/state assertion' }
+    }
+
+    $bodyStart = $beginMarkers[0].Index + $beginMarkers[0].Length
+    $body = $OutputText.Substring($bodyStart, $endMarkers[0].Index - $bodyStart)
+    $rows = [regex]::Matches($body, '(?im)^([0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12})\|([^|\r\n]*)\|(.*)\|\s*([01])\s*$')
+    if ($rows.Count -ne 1) {
+        return [pscustomobject]@{ Success = $false; Failure = "expected one canonical row; found $($rows.Count)" }
+    }
+    if ($body -match 'SECRET_MARKER') {
+        return [pscustomobject]@{ Success = $false; Failure = 'leaked the password marker in the canonical result' }
+    }
+
+    $row = $rows[0]
+    $expectedUser = $userMarkers[0].Groups[1].Value.Trim()
+    if ($row.Groups[4].Value -ne $ExpectedState -or $row.Groups[2].Value.Trim() -cne $expectedUser) {
+        return [pscustomobject]@{ Success = $false; Failure = "actual result differs from state=$ExpectedState/catalog user message" }
+    }
+
+    $expectedTech = if ($techMarkers.Count -eq 1) { $techMarkers[0].Groups[1].Value.Trim() } else { $null }
+    $expectedTechRegex = if ($techRegexMarkers.Count -eq 1) { $techRegexMarkers[0].Groups[1].Value.Trim() } else { $null }
+    $actualTech = $row.Groups[3].Value.Trim()
+    if ($expectedTechRegex) {
+        if ($actualTech -notmatch $expectedTechRegex) {
+            return [pscustomobject]@{ Success = $false; Failure = 'actual technical message does not match its expected pattern' }
+        }
+    }
+    elseif ($actualTech -cne $expectedTech) {
+        return [pscustomobject]@{ Success = $false; Failure = 'actual technical message differs from the catalog expectation' }
+    }
+
+    if ($ExpectedErrorCode) {
+        if ($expectedTech -cnotmatch ('^DBCODE=' + [regex]::Escape($ExpectedErrorCode) + '\|') -or
+            $actualTech -cnotmatch ('^DBCODE=' + [regex]::Escape($ExpectedErrorCode) + '\|')) {
+            return [pscustomobject]@{ Success = $false; Failure = "expected technical catalog code $ExpectedErrorCode" }
+        }
+        $correlation = [regex]::Match($expectedTech, '(?:^|\s)Correlacion:\s*([0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12})\s*$')
+        if (-not $correlation.Success -or $row.Groups[1].Value -ine $correlation.Groups[1].Value) {
+            return [pscustomobject]@{ Success = $false; Failure = 'result correlation does not match the expected technical marker' }
+        }
+    }
+
+    return [pscustomobject]@{ Success = $true; Failure = $null }
+}
+
+function Invoke-ResultParserSelfTests {
+    $id = 'SES01_AUTO_CLOSED'
+    $correlation = 'f7f690e0-68cc-45bc-a50e-622056bf23a1'
+    $otherCorrelation = '03f3a4c8-1c6e-4bb4-86b9-f968acbda92d'
+    $technical = "DBCODE=SES_008|La sesión está cerrada. Correlacion: $correlation"
+    $row = "$correlation|La sesión ya finalizó.|$technical|0"
+    $base = @(
+        "TEST_EXPECTED_USER:$id|La sesión ya finalizó."
+        "TEST_EXPECTED_TECH:$id|$technical"
+        "TEST_RESULT_BEGIN:$id"
+        $row
+        "TEST_RESULT_END:$id"
+        "TEST_STATE_PASS:$id"
+    ) -join "`n"
+
+    $cases = @(
+        @{ Name = 'CLEAN'; Text = $base; Expected = $true; Code = 'SES_008' },
+        @{ Name = 'CLEAN_CRLF'; Text = $base.Replace("`n", "`r`n"); Expected = $true; Code = 'SES_008' },
+        @{ Name = 'OBSERVED_PREFIX'; Text = $base.Replace("TEST_EXPECTED_TECH:$id|", "o.TEST_EXPECTED_TECH:$id|"); Expected = $true; Code = 'SES_008' },
+        @{ Name = 'STATE_ONLY_FORGERY'; Text = "TEST_STATE_PASS:$id"; Expected = $false; Code = 'SES_008' },
+        @{ Name = 'DUPLICATE_ROW'; Text = $base.Replace("$row`nTEST_RESULT_END", "$row`n$row`nTEST_RESULT_END"); Expected = $false; Code = 'SES_008' },
+        @{ Name = 'INCOMPLETE_BLOCK'; Text = $base.Replace("TEST_RESULT_END:$id`n", ''); Expected = $false; Code = 'SES_008' },
+        @{ Name = 'WRONG_CATALOG_MESSAGE'; Text = $base.Replace("TEST_EXPECTED_USER:$id|La sesión ya finalizó.", "TEST_EXPECTED_USER:$id|Mensaje de catálogo incorrecto."); Expected = $false; Code = 'SES_008' },
+        @{ Name = 'WRONG_ERROR_CODE'; Text = $base; Expected = $false; Code = 'SES_007' },
+        @{ Name = 'CORRELATION_MISMATCH'; Text = $base.Replace("$correlation|La sesión ya finalizó.", "$otherCorrelation|La sesión ya finalizó."); Expected = $false; Code = 'SES_008' },
+        @{ Name = 'DUPLICATE_TECH_MARKER'; Text = "$base`nTEST_EXPECTED_TECH:$id|$technical"; Expected = $false; Code = 'SES_008' }
+    )
+
+    foreach ($case in $cases) {
+        $parsed = Test-CanonicalResultBlock -OutputText $case.Text -ResultId $id -ExpectedState '0' -ExpectedErrorCode $case.Code
+        if ($parsed.Success -ne $case.Expected) {
+            throw "Result parser self-test $($case.Name) failed: $($parsed.Failure)"
+        }
+        Write-Host "TEST_PARSER_PASS:$($case.Name)"
+    }
+}
+
+Invoke-ResultParserSelfTests
+if ($ParserSelfTestOnly) { exit 0 }
+
 $envFile = Join-Path $PSScriptRoot '.env'
 if (Test-Path $envFile) {
     Get-Content $envFile | ForEach-Object {
@@ -63,39 +172,28 @@ $resultIds = @('STUDENT_DUPLICATE', 'STUDENT_GROUP_NOT_FOUND', 'STUDENT_GROUP_DI
     'PLAN_PUBLIC_DUPLICATE_BUSINESS_KEY', 'PLAN_PUBLIC_UPDATE_TO_TAKEN_INP', 'PLAN_PUBLIC_FOREIGN_PLAN',
     'PLAN_PUBLIC_ROLLBACK_SAVEPOINT', 'PLAN_PUBLIC_ROLLBACK_OWN_TRANSACTION',
     # F1: rechazo de usp_guardar_horarios_grupo despues de escribir (rollback a savepoint y transaccion propia)
-    'GROUP_SCHEDULE_TEACHER_CONFLICT_SAVEPOINT', 'GROUP_SCHEDULE_TEACHER_CONFLICT_OWN_TRANSACTION')
+    'GROUP_SCHEDULE_TEACHER_CONFLICT_SAVEPOINT', 'GROUP_SCHEDULE_TEACHER_CONFLICT_OWN_TRANSACTION',
+    # SES-01: rechazos por ventana de registro (el SP revierte su savepoint/transaccion)
+    'SES01_BULK_BEFORE_START', 'SES01_BULK_EXACT_END', 'SES01_BULK_TWO_HOURS_AFTER', 'SES01_BULK_INDETERMINATE',
+    'SES01_BULK_CLOSED_HISTORY_PRESERVED', 'SES01_AUTO_CLOSED', 'SES01_AUTO_BEFORE_START', 'SES01_AUTO_INDETERMINATE')
 $resultFailures = @()
 $clientPassed = @()
+$ses01ExpectedErrorCodes = @{
+    SES01_BULK_BEFORE_START = 'SES_007'
+    SES01_BULK_EXACT_END = 'SES_008'
+    SES01_BULK_TWO_HOURS_AFTER = 'SES_008'
+    SES01_BULK_INDETERMINATE = 'SES_009'
+    SES01_BULK_CLOSED_HISTORY_PRESERVED = 'SES_008'
+    SES01_AUTO_CLOSED = 'SES_008'
+    SES01_AUTO_BEFORE_START = 'SES_007'
+    SES01_AUTO_INDETERMINATE = 'SES_009'
+}
 foreach ($id in $resultIds) {
-    $escaped = [regex]::Escape($id)
-    $block = [regex]::Match($outputStr, "(?ms)^TEST_RESULT_BEGIN:$escaped\r?\n(.*?)^TEST_RESULT_END:$escaped\s*$")
-    $user = [regex]::Match($outputStr, "(?m)^TEST_EXPECTED_USER:$escaped\|(.*)$")
-    $tech = [regex]::Match($outputStr, "(?m)^TEST_EXPECTED_TECH:$escaped\|(.*)$")
-    # Mensajes tecnicos con detalle de error de SQL Server no son deterministas: se verifican por expresion regular.
-    $techRegex = [regex]::Match($outputStr, "(?m)^TEST_EXPECTED_TECH_REGEX:$escaped\|(.*)$")
-    $statePassed = $outputStr -match "(?m)^TEST_STATE_PASS:$escaped\s*$"
-    if (-not $block.Success -or -not $user.Success -or (-not $tech.Success -and -not $techRegex.Success) -or -not $statePassed) {
-        $resultFailures += "$id missing result, catalog expectation, or state assertion"
-        continue
-    }
-    $rows = @([regex]::Matches($block.Groups[1].Value, '(?m)^([0-9a-fA-F-]{36})\|([^|]*)\|(.*)\|\s*([01])\s*$'))
-    if ($rows.Count -ne 1) {
-        $resultFailures += "$id expected one canonical row; found $($rows.Count)"
-        continue
-    }
-    $row = $rows[0]
-    # Ningun proveedor publico puede devolver el hash del password en un resultado canonico (CC-003G-01).
-    if ($block.Groups[1].Value -match 'SECRET_MARKER') {
-        $resultFailures += "$id leaked the password marker in the canonical result"
-        continue
-    }
-    $techMatches = if ($techRegex.Success) { $row.Groups[3].Value -match $techRegex.Groups[1].Value.Trim() }
-                   else { $row.Groups[3].Value.Trim() -ceq $tech.Groups[1].Value.Trim() }
     $expectedState = if ($id -eq 'MASS_CLOSE_SUCCESS') { '1' } else { '0' }
-    if ($row.Groups[4].Value -ne $expectedState -or
-        $row.Groups[2].Value.Trim() -cne $user.Groups[1].Value.Trim() -or
-        -not $techMatches) {
-        $resultFailures += "$id actual result differs from state=$expectedState/catalog message"
+    $expectedErrorCode = if ($ses01ExpectedErrorCodes.ContainsKey($id)) { $ses01ExpectedErrorCodes[$id] } else { $null }
+    $parsedResult = Test-CanonicalResultBlock -OutputText $outputStr -ResultId $id -ExpectedState $expectedState -ExpectedErrorCode $expectedErrorCode
+    if (-not $parsedResult.Success) {
+        $resultFailures += "$id $($parsedResult.Failure)"
         continue
     }
     $clientPassed += $id
@@ -151,8 +249,9 @@ BEGIN
 END;
 DECLARE @session UNIQUEIDENTIFIER = NEWID();
 DECLARE @number INT = 1 + (SELECT ISNULL(MAX(numero), 0) FROM dbo.Sesion WHERE grupo = @group);
-INSERT dbo.Sesion (id, nombre, numero, codigo, numeroSemana, grupo, fechaHoraInicio, fechaHoraFin)
-VALUES (@session, N'QA Concurrent Upsert', @number, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, DATEADD(HOUR, 30, SYSUTCDATETIME()), DATEADD(HOUR, 31, SYSUTCDATETIME()));
+-- SES-01: el upsert concurrente solo puede escribir con la sesion activa y procedencia UTC confirmada.
+INSERT dbo.Sesion (id, nombre, numero, codigo, numeroSemana, grupo, fechaHoraInicio, fechaHoraFin, procedenciaTemporal)
+VALUES (@session, N'QA Concurrent Upsert', @number, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group, DATEADD(HOUR, -1, SYSUTCDATETIME()), DATEADD(HOUR, 1, SYSUTCDATETIME()), N'UTC_V2');
 SELECT CONCAT(CONVERT(VARCHAR(36), @session), '|', CONVERT(VARCHAR(36), @student), '|', CONVERT(VARCHAR(36), @owner));
 "@
     $setup = @(docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $Password -C -b -h -1 -W -Q $setupSql 2>&1 |
@@ -424,6 +523,22 @@ catch {
     $resultFailures += "CC003G01_RUNTIME_LOGIN $($_.Exception.Message)"
 }
 
+# F2: dos sqlcmd independientes precargan el mismo grupo y luego se valida el reintento.
+try {
+    $preloadConcurrencyOutput = @(& (Join-Path $PSScriptRoot 'test/test_usp_precargar_sesiones_concurrency.ps1') `
+        -ContainerName $ContainerName -Password $Password 2>&1 | ForEach-Object { "$_" })
+    foreach ($line in $preloadConcurrencyOutput) { Write-Host $line }
+    if ($preloadConcurrencyOutput -contains 'TEST_PASS:PRELOAD_CONCURRENT_IDEMPOTENT') {
+        $clientPassed += 'PRELOAD_CONCURRENT_IDEMPOTENT'
+    }
+    else {
+        $resultFailures += 'PRELOAD_CONCURRENT_IDEMPOTENT not reported by test_usp_precargar_sesiones_concurrency.ps1'
+    }
+}
+catch {
+    $resultFailures += "PRELOAD_CONCURRENT_IDEMPOTENT $($_.Exception.Message)"
+}
+
 . (Join-Path $PSScriptRoot 'scripts/secret-hygiene.ps1')
 $secretScanList = @(Get-SecretScanFiles -Root $PSScriptRoot)
 $secretFindings = @(Invoke-SecretHygieneScan -Root $PSScriptRoot)
@@ -504,19 +619,31 @@ $criticalIds = @(
     'USER_SYNC_SUCCESS', 'USER_SYNC_INVALID', 'DEAN_SUCCESS',
     'SESSION_CLOSE_NOT_SUPPORTED',
     'REVIEW_FILE_INVALID', 'REVIEW_FILE_SUCCESS', 'REVIEW_RESOLVE_NON_OWNER', 'REVIEW_RESOLVE_SUCCESS',
+    # SES-04 (test/test_ses04_reclamo_justificada.sql): reclamo aprobado => EX con asistio = 0; rechazo conserva la asistencia
+    'SES04_INVALID_ACTION', 'SES04_NOT_FOUND', 'SES04_NON_OWNER', 'SES04_APPROVE_SJC_TO_EX', 'SES04_APPROVE_AUDITED',
+    'SES04_APPROVE_IDEMPOTENT', 'SES04_CONTRADICTORY_REJECTED', 'SES04_REJECT_KEEPS_ATTENDANCE', 'SES04_NO_DETAIL',
+    'SES04_PRESENT_NOT_JUSTIFIABLE', 'SES04_AFTER_SESSION_CLOSE',
     'SUBJECT_CREATE', 'SUBJECT_UPDATE', 'SUBJECT_TOGGLE',
     'SUBJECT_UPSERT_CREATE', 'SUBJECT_UPSERT_UPDATE', 'CATALOG_INSERT', 'CATALOG_GET',
     'PROGRAM_UPSERT_CREATE', 'PROGRAM_UPSERT_UPDATE',
     'PLAN_UPSERT_CREATE', 'PLAN_UPSERT_UPDATE',
     'GROUP_UPSERT_CREATE', 'GROUP_UPSERT_UPDATE', 'STUDENT_PROGRAM_REGISTER',
     'MASS_CLOSE_SUCCESS',
+    'HU159_IDENTITY_CORRECTION_SUCCESS', 'HU159_IDENTITY_CORRECTION_REASON_REQUIRED', 'HU159_IDENTITY_CORRECTION_SCOPE',
+    'HU159_IDENTITY_CORRECTION_DOCUMENT_UNIQUE', 'HU159_IDENTITY_CORRECTION_RBAC', 'HU159_DEAN_IDENTITY_CORRECTION',
+    'HU121_COORDINATOR_DOCUMENT_CORRECTION', 'HU092_TEACHER_DOCUMENT_CORRECTION', 'IDENTITY_DOCUMENT_CORRECTION_PARAMETER_OFF',
+    'HU136_ADMIN_TEACHERS_INSTITUTION',
     'STUDENT_SUCCESS', 'STUDENT_DUPLICATE', 'STUDENT_GROUP_NOT_FOUND', 'STUDENT_GROUP_DISABLED', 'STUDENT_CAPACITY_EXCEEDED',
     'OWNERSHIP_STUDENT', 'OWNERSHIP_DEAN', 'OWNERSHIP_COORDINATOR',
     'GROUP_CREATE', 'GROUP_UPDATE', 'GROUP_CAPACITY_REJECT',
     'TEACHER_SCHEDULE_CREATE_ALLOWED', 'TEACHER_SCHEDULE_CONFLICT_REJECTED', 'TEACHER_SCHEDULE_ADJACENT_ALLOWED',
     'TEACHER_SCHEDULE_OTHER_DAY_ALLOWED', 'TEACHER_SCHEDULE_OTHER_PERIOD_ALLOWED', 'TEACHER_SCHEDULE_SAME_TITULAR_ALLOWED',
     'GROUP_SCHEDULE_SAVE_SUCCESS', 'GROUP_SCHEDULE_REPLACE', 'GROUP_SCHEDULE_OVERLAP_REJECTED', 'GROUP_SCHEDULE_ADJACENT_ALLOWED',
-    'GROUP_SCHEDULE_INVALID', 'GROUP_SCHEDULE_SCOPE', 'GROUP_SCHEDULE_TEACHER_CONFLICT_SAVEPOINT', 'GROUP_SCHEDULE_TEACHER_CONFLICT_OWN_TRANSACTION', 'TEACHER_CREATES_GROUP', 'TEACHER_OFFER_LINKED', 'TEACHER_OFFER_NO_LINK', 'TEACHER_OFFER_REJECTS_OTHER_PROFILES', 'PRELOAD_CREATES', 'PRELOAD_IDEMPOTENT', 'PRELOAD_REGENERATE', 'PRELOAD_SCOPE', 'PRELOAD_REQUIRES_SCHEDULE', 'PRELOAD_NO_PAST',
+    'GROUP_SCHEDULE_INVALID', 'GROUP_SCHEDULE_SCOPE', 'GROUP_SCHEDULE_TEACHER_CONFLICT_SAVEPOINT', 'GROUP_SCHEDULE_TEACHER_CONFLICT_OWN_TRANSACTION', 'TEACHER_CREATES_GROUP', 'TEACHER_OFFER_LINKED', 'TEACHER_OFFER_NO_LINK', 'TEACHER_OFFER_REJECTS_OTHER_PROFILES',
+    'PRELOAD_CREATES', 'PRELOAD_IDEMPOTENT', 'PRELOAD_PRESERVES_ATTENDANCE', 'PRELOAD_PRESERVES_CLASSIFICATION', 'PRELOAD_PRESERVES_HISTORY',
+    'PRELOAD_REGENERATE', 'PRELOAD_CROSS_PROGRAM_DENIED', 'PRELOAD_NO_PRIVILEGE_DENIED', 'PRELOAD_SCOPE', 'PRELOAD_REQUIRES_SCHEDULE', 'PRELOAD_NO_PAST',
+    'PRELOAD_VARIABLE_8WEEK_SINGLE', 'PRELOAD_VARIABLE_12WEEK_TWO', 'PRELOAD_VARIABLE_16WEEK_SINGLE', 'PRELOAD_VARIABLE_18WEEK_TWO',
+    'PRELOAD_RUNTIME_LEAST_PRIVILEGE', 'PRELOAD_CONCURRENT_IDEMPOTENT',
     'SESSION_CREATE', 'SESSION_UPDATE', 'SESSION_NON_OWNER', 'SESSION_REQUIRED_START',
     'SESSION_REQUIRED_END', 'SESSION_END_AFTER_START', 'SESSION_EXECUTOR_REQUIRED', 'SESSION_NOT_FOUND_CODE',
     'SESSION_COMMON_VALIDATION_HAPPY_PATH', 'SESSION_COMMON_VALIDATION_RESERVED_PROVENANCE',
@@ -542,6 +669,10 @@ $criticalIds = @(
     'ATTENDANCE_HELPER_CLOSED_CATALOG', 'ATTENDANCE_NO_LEGACY_PUBLIC_STATE',
     'ATTENDANCE_BULK_STUDENT_NOT_IN_GROUP', 'ATTENDANCE_BULK_ATOMIC',
     'ATTENDANCE_AUTO_SUCCESS', 'ATTENDANCE_AUTO_INVALID',
+    # SES-01 (test/test_ses01_ventana_asistencia.sql): ventana [inicio, fin) con reloj del motor y procedencia confirmada
+    'SES01_WINDOW_LOCK_HELD', 'SES01_BULK_EXACT_START', 'SES01_BULK_DURING', 'SES01_BULK_JUST_BEFORE_END',
+    'SES01_BULK_BEFORE_START', 'SES01_BULK_EXACT_END', 'SES01_BULK_TWO_HOURS_AFTER', 'SES01_BULK_INDETERMINATE',
+    'SES01_BULK_CLOSED_HISTORY_PRESERVED', 'SES01_AUTO_CLOSED', 'SES01_AUTO_BEFORE_START', 'SES01_AUTO_INDETERMINATE',
     'COORDINATOR_SUCCESS', 'COORDINATOR_PROGRAM_MISSING', 'COORDINATOR_FACULTY_MISSING', 'COORDINATOR_SCOPE_MISMATCH',
     'SUITE_TRANCOUNT_ZERO',
     'USP_CONSULTAR_GRUPOS_PAGINADO_SUCCESS', 'USP_CONSULTAR_GRUPOS_PAGINADO_FILTER_AND_PAGINATION',

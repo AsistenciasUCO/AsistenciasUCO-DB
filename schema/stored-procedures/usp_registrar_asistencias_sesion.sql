@@ -12,6 +12,10 @@ GO
 --     el default = NULL se conserva solo por compatibilidad de firma; NULL se rechaza funcionalmente (GEN_002).
 --   * RazonCausa es un catalogo cerrado: este SP jamas crea filas en dbo.RazonCausa.
 --   * El lote es atomico: todo se valida antes de escribir y cualquier fallo revierte el lote completo.
+--   * SES-01: solo se escribe con la sesion activa, fechaHoraInicio <= SYSUTCDATETIME() < fechaHoraFin, y procedencia
+--     UTC confirmada (usp_validar_sesion_ventana_registro_interno). Fuera de ventana: SES_007 / SES_008 / SES_009
+--     y ninguna fila modificada. Sin tolerancia posterior al cierre. Las rectificaciones posteriores solo
+--     ocurren por el flujo formal de reclamos (usp_resolver_solicitud_revision_asistencia).
 --   * Result set canonico (una unica fila): idCorrelacion, mensajeUsuarioResultado, mensajeTecnicoResultado, estadoResultado.
 CREATE OR ALTER PROCEDURE [dbo].[usp_registrar_asistencias_sesion]
 (
@@ -286,6 +290,15 @@ BEGIN
                 SET @savepointCreado = 1;
             END
 
+            -- PASO 4.0 (SES-01): ventana activa [inicio, fin) con procedencia UTC confirmada, evaluada con el reloj
+            -- del motor DENTRO de la transaccion y con la fila de la sesion bloqueada hasta el cierre del bloque.
+            EXEC dbo.usp_validar_sesion_ventana_registro_interno
+                @idSesion = @idSesionDefecto,
+                @idCorrelacion = @idCorrelacionDefecto,
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+                @estadoResultado = @estadoResultado OUTPUT;
+
             WHILE @iterador <= @totalEstudiantes AND @estadoResultado = 1
             BEGIN
                 SELECT
@@ -308,6 +321,18 @@ BEGIN
                 END
 
                 SET @iterador = @iterador + 1;
+            END
+
+            -- PASO 4.2 (SES-01): la ventana debe seguir abierta en el punto de confirmacion; si el fin se alcanzo
+            -- durante la escritura, el lote completo se revierte (sin tolerancia posterior al cierre).
+            IF @estadoResultado = 1
+            BEGIN
+                EXEC dbo.usp_validar_sesion_ventana_registro_interno
+                    @idSesion = @idSesionDefecto,
+                    @idCorrelacion = @idCorrelacionDefecto,
+                    @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                    @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+                    @estadoResultado = @estadoResultado OUTPUT;
             END
 
             -- Control transaccional de cierre del bloque de asistencias respetando ownership

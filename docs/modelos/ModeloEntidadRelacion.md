@@ -218,6 +218,14 @@ erDiagram
         NVARCHAR codigo
     }
 
+    %% HU005/HU016: catalogo de solo consulta; sin relacion hasta el cambio coordinado TD-060 (LB-004D)
+    CategoriaJustificacion {
+        UUID id PK
+        NVARCHAR codigo UK
+        NVARCHAR nombre UK
+        NVARCHAR descripcion
+    }
+
     DetalleAsistencia {
         UUID id PK
         UUID asistencia FK

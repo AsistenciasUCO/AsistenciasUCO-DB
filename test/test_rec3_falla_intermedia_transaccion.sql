@@ -77,7 +77,7 @@ GO
 
 -- ---------------------------------------------------------------------------
 -- TX-02: usp_resolver_solicitud_revision_asistencia. 1a escritura: SolicitudRevisionAsistencia (estado/respuesta);
--- 2a: DetalleAsistencia.asistio = 1 (falla).
+-- 2a: DetalleAsistencia.razonCausa = EX con asistio = 0 (SES-04; falla).
 -- ---------------------------------------------------------------------------
 DECLARE @group UNIQUEIDENTIFIER, @enrollment UNIQUEIDENTIFIER, @teacher UNIQUEIDENTIFIER;
 SELECT TOP 1 @group = eg.idGrupo, @enrollment = eg.id, @teacher = g.idDocente
@@ -112,8 +112,9 @@ INSERT INTO #preTX02 EXEC dbo.usp_resolver_solicitud_revision_asistencia @idSoli
 IF NOT EXISTS (SELECT 1 FROM #preTX02 WHERE estadoResultado = 1) SET @fallo = 'TX02 precondicion: la llamada sin falla inyectada no fue exitosa.';
 IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
 DROP TABLE #preTX02;
+-- SES-04: la segunda escritura cambia la causal a EX; la restriccion temporal solo admite la causal original.
 SET @sql = CONCAT(N'ALTER TABLE dbo.DetalleAsistencia WITH NOCHECK ADD CONSTRAINT CK_REC3_TMP_DETALLE CHECK (id <> ''',
-                  CONVERT(NVARCHAR(36), @detail), N''' OR asistio = 0);');
+                  CONVERT(NVARCHAR(36), @detail), N''' OR razonCausa = ''', CONVERT(NVARCHAR(36), @reason), N''');');
 EXEC sys.sp_executesql @sql;
 BEGIN TRY
     IF @fallo IS NOT NULL THROW 54390, @fallo, 1;
@@ -122,7 +123,7 @@ BEGIN TRY
     IF @@TRANCOUNT <> 0 SET @fallo = 'TX-02 dejo una transaccion abierta.';
     ELSE IF NOT EXISTS (SELECT 1 FROM dbo.SolicitudRevisionAsistencia WHERE id = @request AND estado = @pending AND justificacionRespuesta = N'')
         SET @fallo = 'TX-02 la actualizacion de la solicitud anterior a la falla NO se revirtio.';
-    ELSE IF NOT EXISTS (SELECT 1 FROM dbo.DetalleAsistencia WHERE id = @detail AND asistio = 0)
+    ELSE IF NOT EXISTS (SELECT 1 FROM dbo.DetalleAsistencia WHERE id = @detail AND asistio = 0 AND razonCausa = @reason)
         SET @fallo = 'TX-02 el detalle de asistencia cambio.';
 END TRY
 BEGIN CATCH

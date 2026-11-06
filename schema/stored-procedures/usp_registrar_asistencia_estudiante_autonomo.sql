@@ -5,6 +5,10 @@ GO
 SET QUOTED_IDENTIFIER ON;
 GO
 
+-- SES-01: el registro autonomo del estudiante tambien exige la sesion activa,
+-- fechaHoraInicio <= SYSUTCDATETIME() < fechaHoraFin, con procedencia UTC confirmada
+-- (usp_validar_sesion_ventana_registro_interno, SES_007 / SES_008 / SES_009). La validacion y la escritura ocurren en
+-- la misma transaccion (propia o savepoint bajo una transaccion externa) con la fila de la sesion bloqueada.
 CREATE OR ALTER PROCEDURE [dbo].[usp_registrar_asistencia_estudiante_autonomo]
 (
     @idEstudiante       UNIQUEIDENTIFIER,
@@ -27,6 +31,10 @@ AS
     DECLARE @mensajeUsuarioResultado NVARCHAR(4000) = dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA');
     DECLARE @mensajeTecnicoResultado NVARCHAR(4000) = dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA');
     DECLARE @estadoResultado BIT = 1;
+
+    -- Control de ownership transaccional (ver docs/procedimiento-transacciones)
+    DECLARE @transaccionPropia BIT = 0;
+    DECLARE @savepointCreado   BIT = 0;
 
 BEGIN
     SET NOCOUNT ON;
@@ -108,16 +116,53 @@ BEGIN
         END
 
         -- PASO 5: Registro de la asistencia auto-gestionada por el estudiante (Estado AN - Asistió)
+        --         dentro de la ventana activa de la sesión (SES-01), con ownership transaccional
         IF @estadoResultado = 1
         BEGIN
-            EXEC dbo.usp_sincronizar_asistencia_estudiante_interno
-                @idEstudiante = @idEstudianteDefecto,
+            IF @@TRANCOUNT = 0
+            BEGIN
+                BEGIN TRANSACTION;
+                SET @transaccionPropia = 1;
+            END
+            ELSE
+            BEGIN
+                SAVE TRANSACTION sp_asistencia_autonoma;
+                SET @savepointCreado = 1;
+            END
+
+            -- PASO 5.1 (SES-01): ventana activa evaluada con el reloj del motor y la fila de la sesión bloqueada
+            EXEC dbo.usp_validar_sesion_ventana_registro_interno
                 @idSesion = @idSesionDefecto,
-                @codigoEstado = 'AN',
                 @idCorrelacion = @idCorrelacionDefecto,
                 @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                 @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
                 @estadoResultado = @estadoResultado OUTPUT;
+
+            IF @estadoResultado = 1
+            BEGIN
+                EXEC dbo.usp_sincronizar_asistencia_estudiante_interno
+                    @idEstudiante = @idEstudianteDefecto,
+                    @idSesion = @idSesionDefecto,
+                    @codigoEstado = 'AN',
+                    @idCorrelacion = @idCorrelacionDefecto,
+                    @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                    @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+                    @estadoResultado = @estadoResultado OUTPUT;
+            END
+
+            -- Control transaccional de cierre respetando ownership
+            IF @transaccionPropia = 1
+            BEGIN
+                IF XACT_STATE() = 1 AND @estadoResultado = 1
+                    COMMIT TRANSACTION;
+                ELSE IF XACT_STATE() <> 0
+                    ROLLBACK TRANSACTION;
+            END
+            ELSE IF @savepointCreado = 1
+            BEGIN
+                IF XACT_STATE() = 1 AND @estadoResultado = 0
+                    ROLLBACK TRANSACTION sp_asistencia_autonoma;
+            END
         END
 
         -- PASO 6: Evaluación de resultado final y generación de mensaje de éxito desde el Catálogo de Mensajes
@@ -134,7 +179,25 @@ BEGIN
 
     END TRY
     BEGIN CATCH
-        -- BLOQUE CATCH: Captura centralizada de excepciones inesperadas
+        -- BLOQUE CATCH: Captura centralizada de excepciones y reversión respetando ownership transaccional
+        DECLARE @estadoTransaccionCatch INT = XACT_STATE();
+
+        IF @transaccionPropia = 1
+        BEGIN
+            IF @estadoTransaccionCatch <> 0
+                ROLLBACK TRANSACTION;
+        END
+        ELSE IF @savepointCreado = 1 AND @estadoTransaccionCatch = 1
+        BEGIN
+            ROLLBACK TRANSACTION sp_asistencia_autonoma;
+        END
+
+        -- Transacción externa condenada (XACT_STATE = -1) que no nos pertenece: propagar al propietario
+        IF @transaccionPropia = 0 AND @estadoTransaccionCatch = -1
+        BEGIN
+            THROW;
+        END
+
         EXEC dbo.usp_obtener_mensaje_catalogo
             @p_codigo = 'SYS_001',
             @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,

@@ -12,13 +12,7 @@ PRINT '======================================================================';
 :r /tmp/test/test_usp_crear_facultad.sql
 :r /tmp/test/test_usp_actualizar_facultad.sql
 :r /tmp/test/test_usp_cambiar_estado_facultad.sql
-:r /tmp/test/test_usp_crear_tipo_programa.sql
-:r /tmp/test/test_usp_actualizar_tipo_programa.sql
-:r /tmp/test/test_usp_cambiar_estado_tipo_programa.sql
 :r /tmp/test/test_uv_tipo_programa_contrato.sql
-:r /tmp/test/test_usp_crear_area.sql
-:r /tmp/test/test_usp_actualizar_area.sql
-:r /tmp/test/test_usp_cambiar_estado_area.sql
 :r /tmp/test/test_uv_area_contrato.sql
 :r /tmp/test/test_user_dean_close.sql
 :r /tmp/test/test_subject_catalog.sql
@@ -33,6 +27,8 @@ PRINT '======================================================================';
 :r /tmp/test/test_usp_periodo_academico_gestion.sql
 :r /tmp/test/test_consultas_coordinador_programa.sql
 :r /tmp/test/test_consultas_decano_facultad.sql
+:r /tmp/test/test_consultas_transversales_hu112_hu157.sql
+:r /tmp/test/test_consolidado_auditoria_catalogos.sql
 :r /tmp/test/test_consultas_reclamos_estudiante.sql
 :r /tmp/test/test_usp_retirar_estudiante_grupo.sql
 :r /tmp/test/test_solicitud_ingreso_grupo.sql
@@ -51,11 +47,14 @@ PRINT '======================================================================';
 :r /tmp/test/test_group_capacity_decoupling.sql
 :r /tmp/test/test_titularidad_jerarquica.sql
 :r /tmp/test/test_attendance_commands.sql
+:r /tmp/test/test_ses01_ventana_asistencia.sql
 :r /tmp/test/test_attendance_review.sql
+:r /tmp/test/test_ses04_reclamo_justificada.sql
 :r /tmp/test/test_rec3_falla_intermedia_transaccion.sql
 :r /tmp/test/test_lb004d_support_binding.sql
 :r /tmp/test/test_usp_crear_coordinador.sql
 :r /tmp/test/test_usp_actualizar_coordinador.sql
+:r /tmp/test/test_usp_corregir_identidad_usuario.sql
 :r /tmp/test/test_usp_cambiar_estado_coordinador.sql
 :r /tmp/test/test_hu121_hu122_esquema_coordinador.sql
 :r /tmp/test/test_sec_baseline_identidad_externa.sql

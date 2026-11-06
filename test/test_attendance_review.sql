@@ -104,9 +104,10 @@ BEGIN TRY
         INNER JOIN dbo.Estado e ON e.id = r.idEstado
         WHERE r.id = @request AND e.codigo = 'A')
         THROW 51960, 'TEST FAILED: REVIEW_RESOLVE_SUCCESS must set approved (A) state.', 1;
+    -- SES-04: aprobar un reclamo de inasistencia produce JUSTIFICADA (EX, asistio = 0), nunca presencia (AN / asistio = 1).
     IF NOT EXISTS (SELECT 1 FROM dbo.uv_detalle_asistencia
-        WHERE id = @detail AND idAsistencia = @attendance AND asistio = 1)
-        THROW 51959, 'TEST FAILED: REVIEW_RESOLVE_SUCCESS did not approve attendance.', 1;
+        WHERE id = @detail AND idAsistencia = @attendance AND asistio = 0 AND codigoRazonCausa = 'EX')
+        THROW 51959, 'TEST FAILED: REVIEW_RESOLVE_SUCCESS did not justify attendance (EX, asistio = 0).', 1;
 END TRY
 BEGIN CATCH
     IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;

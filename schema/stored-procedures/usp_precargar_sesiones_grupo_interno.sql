@@ -92,6 +92,7 @@ BEGIN
             -- 1900-01-01 fue lunes: el resto de dividir los dias desde esa fecha entre 7 da el dia de la semana sin depender del idioma
             WITH fechas AS (
                 SELECT fecha = @fechaDesde
+                WHERE @fechaDesde <= @fechaFin
                 UNION ALL
                 SELECT DATEADD(DAY, 1, fecha) FROM fechas WHERE fecha < @fechaFin
             )

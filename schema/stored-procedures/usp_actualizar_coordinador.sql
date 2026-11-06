@@ -7,7 +7,10 @@ GO
 
 -- HU121: edita nombres, apellidos y correo de un coordinador de la facultad del decano ejecutor.
 -- Fachada transaccional: valida RBAC y titularidad, y delega la escritura en usp_actualizar_datos_usuario_interno.
--- El documento no se edita. Devuelve idUsuario para que el backend sincronice la cuenta de identidad.
+-- HU159 (decision de John 2026-11-05): tambien corrige el tipo y el numero de documento, opcionales (NULL conserva el
+-- actual), con usp_corregir_documento_usuario_interno; si el documento cambia, el motivo es obligatorio y se audita
+-- CORREGIR_DOCUMENTO_COORDINADOR con los valores anteriores y nuevos.
+-- Devuelve idUsuario para que el backend sincronice la cuenta de identidad (y el username si cambio el documento).
 CREATE OR ALTER PROCEDURE [dbo].[usp_actualizar_coordinador]
 (
     @idCoordinador      UNIQUEIDENTIFIER,
@@ -18,13 +21,18 @@ CREATE OR ALTER PROCEDURE [dbo].[usp_actualizar_coordinador]
     @correo             NVARCHAR(100),
     @idFacultad         UNIQUEIDENTIFIER,
     @idCorrelacion      UNIQUEIDENTIFIER,
-    @idUsuarioEjecutor  UNIQUEIDENTIFIER = NULL
+    @idUsuarioEjecutor  UNIQUEIDENTIFIER = NULL,
+    @idTipoIdIdentificacion UNIQUEIDENTIFIER = NULL,
+    @numeroIdentificacion   INT = NULL,
+    @motivo                 NVARCHAR(500) = NULL
 )
 AS
     DECLARE @mensajeUsuarioResultado NVARCHAR(4000) = dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA');
     DECLARE @mensajeTecnicoResultado NVARCHAR(4000) = dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA');
     DECLARE @estadoResultado         BIT = 1;
     DECLARE @idUsuarioCoordinador    UNIQUEIDENTIFIER = NULL;
+    DECLARE @identidadAnterior       NVARCHAR(MAX) = NULL;
+    DECLARE @documentoCambiado       BIT = 0;
 
     -- Control de ownership transaccional (ver docs/procedimiento-transacciones)
     DECLARE @conteoTransaccionesInicial INT = 0;
@@ -114,6 +122,21 @@ BEGIN
             FROM dbo.uv_coordinador_identidad
             WHERE id = @idCoordinador;
 
+            -- Documento: se valida antes de escribir (un rechazo no necesita ROLLBACK)
+            SET @identidadAnterior = dbo.ufn_obtener_identidad_usuario_json(@idUsuarioCoordinador);
+            EXEC dbo.usp_corregir_documento_usuario_interno
+                @idUsuario = @idUsuarioCoordinador,
+                @idTipoIdIdentificacion = @idTipoIdIdentificacion,
+                @numeroIdentificacion = @numeroIdentificacion,
+                @motivo = @motivo,
+                @idCorrelacion = @idCorrelacion,
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+                @estadoResultado = @estadoResultado OUTPUT,
+                @documentoCambiado = @documentoCambiado OUTPUT,
+                @soloValidar = 1;
+
+            IF @estadoResultado = 1
             EXEC dbo.usp_actualizar_datos_usuario_interno
                 @idUsuario = @idUsuarioCoordinador,
                 @primerNombre = @primerNombre,
@@ -125,6 +148,32 @@ BEGIN
                 @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                 @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
                 @estadoResultado = @estadoResultado OUTPUT;
+
+            IF @estadoResultado = 1 AND @documentoCambiado = 1
+            BEGIN
+                EXEC dbo.usp_corregir_documento_usuario_interno
+                    @idUsuario = @idUsuarioCoordinador,
+                    @idTipoIdIdentificacion = @idTipoIdIdentificacion,
+                    @numeroIdentificacion = @numeroIdentificacion,
+                    @motivo = @motivo,
+                    @idCorrelacion = @idCorrelacion,
+                    @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                    @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+                    @estadoResultado = @estadoResultado OUTPUT,
+                    @documentoCambiado = @documentoCambiado OUTPUT;
+
+                IF @estadoResultado = 1
+                    EXEC dbo.usp_registrar_auditoria_identidad_interno
+                        @idUsuario = @idUsuarioCoordinador,
+                        @identidadAnterior = @identidadAnterior,
+                        @motivo = @motivo,
+                        @accion = 'CORREGIR_DOCUMENTO_COORDINADOR',
+                        @tipoRecurso = 'Coordinador',
+                        @idRecurso = @idCoordinador,
+                        @ruta = N'/api/v1/decano/coordinadores/{id}',
+                        @idUsuarioEjecutor = @idUsuarioEjecutor,
+                        @idCorrelacion = @idCorrelacion;
+            END
 
             IF @estadoResultado = 1
             BEGIN
