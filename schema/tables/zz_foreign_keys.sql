@@ -380,3 +380,13 @@ BEGIN
     ALTER TABLE [dbo].[TokenVerificacionCorreo] ADD CONSTRAINT [FK_TokenVerificacionCorreo_Usuario] FOREIGN KEY ([usuario]) REFERENCES [dbo].[Usuario] ([id]);
 END
 GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_TokenMatriculaGrupo_Grupo')
+BEGIN
+    ALTER TABLE [dbo].[TokenMatriculaGrupo] ADD CONSTRAINT [FK_TokenMatriculaGrupo_Grupo] FOREIGN KEY ([grupo]) REFERENCES [dbo].[Grupo] ([id]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_TokenMatriculaGrupo_Docente')
+BEGIN
+    ALTER TABLE [dbo].[TokenMatriculaGrupo] ADD CONSTRAINT [FK_TokenMatriculaGrupo_Docente] FOREIGN KEY ([docenteEmisor]) REFERENCES [dbo].[Docente] ([id]);
+END
+GO
