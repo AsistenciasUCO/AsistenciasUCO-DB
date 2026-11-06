@@ -1,4 +1,4 @@
-﻿USE [gestionasistenciadb];
+USE [gestionasistenciadb];
 GO
 SET ANSI_NULLS ON;
 GO
@@ -103,10 +103,16 @@ USING (VALUES
     ('SEC_001', 'BUSINESS_ERROR', 'ALTO', 'No tiene permisos suficientes para realizar esta operación.'),
     ('SEC_002', 'BUSINESS_ERROR', 'ALTO', 'No tiene autorización sobre el recurso solicitado.'),
 
-    -- Notificaciones (NOTIF-001)
+    -- Notificaciones (NOTIF-001 / NOTIF-002B)
     ('NTF_001', 'BUSINESS_ERROR', 'MEDIO', N'Los datos de la notificación no son válidos.'),
     ('NTF_002', 'BUSINESS_ERROR', 'MEDIO', N'La notificación especificada no existe en el sistema.'),
     ('NTF_003', 'BUSINESS_ERROR', 'MEDIO', N'La notificación ya no está reservada por este proceso.'),
+    ('NTF_004', 'BUSINESS_ERROR', 'MEDIO', N'La plantilla de notificación no contiene todos los marcadores obligatorios o incluye marcadores no permitidos para este tipo.'),
+    ('NTF_005', 'BUSINESS_ERROR', 'MEDIO', N'No existe la versión de plantilla solicitada para el tipo e idioma indicados.'),
+    ('NTF_006', 'SUCCESS', 'BAJO', N'La plantilla de correo se actualizó y activó correctamente en una nueva versión.'),
+    ('NTF_007', 'SUCCESS', 'BAJO', N'La notificación fallida fue reencolada exitosamente para un nuevo intento de envío.'),
+    ('NTF_008', 'BUSINESS_ERROR', 'MEDIO', N'Solo se pueden reencolar notificaciones en estado fallido definitivo o reintentable.'),
+    ('NTF_009', 'SUCCESS', 'BAJO', N'Correo de prueba encolado correctamente.'),
 
     -- Capacidades no implementadas
     ('ERR_SOLICITUD_MATRICULA_NO_IMPLEMENTADA', 'BUSINESS_ERROR', 'MEDIO', 'La gestión de solicitudes de matrícula aún no se encuentra disponible.'),
@@ -233,10 +239,16 @@ USING (VALUES
     ('SEC_001', 'BUSINESS_ERROR', 'ALTO', 'RBAC denegado: el usuario no posee perfil activo requerido o no existe/está inactivo.'),
     ('SEC_002', 'BUSINESS_ERROR', 'ALTO', 'Titularidad denegada: el usuario no está autorizado sobre el recurso solicitado.'),
 
-    -- Notificaciones (NOTIF-001)
+    -- Notificaciones (NOTIF-001 / NOTIF-002B)
     ('NTF_001', 'BUSINESS_ERROR', 'MEDIO', N'Datos de la notificación o parámetros de invocación no cumplen el contrato.'),
     ('NTF_002', 'BUSINESS_ERROR', 'MEDIO', N'Notificación no encontrada por identificador.'),
     ('NTF_003', 'BUSINESS_ERROR', 'MEDIO', N'La notificación no está reservada por la instancia o la reserva ya venció.'),
+    ('NTF_004', 'BUSINESS_ERROR', 'MEDIO', N'Validación de plantilla fallida: marcadores obligatorios ausentes o marcadores no permitidos para el tipo.'),
+    ('NTF_005', 'BUSINESS_ERROR', 'MEDIO', N'No existe la versión de plantilla solicitada para el tipo e idioma indicados.'),
+    ('NTF_006', 'SUCCESS', 'BAJO', N'La plantilla de correo se actualizó y activó correctamente en una nueva versión.'),
+    ('NTF_007', 'SUCCESS', 'BAJO', N'La notificación fallida fue reencolada exitosamente para un nuevo intento de envío.'),
+    ('NTF_008', 'BUSINESS_ERROR', 'MEDIO', N'Solo se pueden reencolar notificaciones en estado fallido definitivo o reintentable.'),
+    ('NTF_009', 'SUCCESS', 'BAJO', N'Correo de prueba encolado correctamente.'),
 
     -- Capacidades no implementadas
     ('ERR_SOLICITUD_MATRICULA_NO_IMPLEMENTADA', 'BUSINESS_ERROR', 'MEDIO', 'Capability SolicitudMatricula is not implemented in the current schema.'),
