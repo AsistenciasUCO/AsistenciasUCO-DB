@@ -9,7 +9,7 @@ GO
 -- MATRICULA_QR/ROTACION_SEGUNDOS: la fila guarda el token vigente y el inmediatamente anterior (tolerancia).
 -- Solo se guarda el SHA-256 del token; el token en claro nunca se persiste.
 -- estado: ACTIVA / CERRADA / EXPIRADA (valores de los parametros MATRICULA_QR/ESTADO_*).
-IF OBJECT_ID('dbo.TokenMatriculaGrupo', 'U') IS NULL
+IF OBJECT_ID('dbo.[TokenMatriculaGrupo]', 'U') IS NULL
 BEGIN
     CREATE TABLE dbo.TokenMatriculaGrupo (
         id                 UNIQUEIDENTIFIER NOT NULL CONSTRAINT DF_TokenMatriculaGrupo_id DEFAULT NEWID(),
@@ -33,7 +33,7 @@ END
 GO
 
 -- Un token anterior solo puede pertenecer a una fila.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_TokenMatriculaGrupo_tokenHashAnterior' AND object_id = OBJECT_ID('dbo.TokenMatriculaGrupo'))
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_TokenMatriculaGrupo_tokenHashAnterior')
 BEGIN
     CREATE UNIQUE NONCLUSTERED INDEX UX_TokenMatriculaGrupo_tokenHashAnterior
     ON dbo.TokenMatriculaGrupo (tokenHashAnterior)
@@ -44,7 +44,7 @@ GO
 -- Unicidad fisica del PIN vigente y de la ventana por grupo entre las ventanas ACTIVAS.
 -- El literal del filtro es el valor del parametro MATRICULA_QR/ESTADO_ACTIVA: unica excepcion tecnica documentada
 -- (CONTRACT §2.2). La unicidad del PIN frente a los PIN anteriores se garantiza en usp_abrir_/usp_rotar_ (UPDLOCK, HOLDLOCK).
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_TokenMatriculaGrupo_pin_activo' AND object_id = OBJECT_ID('dbo.TokenMatriculaGrupo'))
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_TokenMatriculaGrupo_pin_activo')
 BEGIN
     CREATE UNIQUE NONCLUSTERED INDEX UX_TokenMatriculaGrupo_pin_activo
     ON dbo.TokenMatriculaGrupo (pin)
@@ -52,7 +52,7 @@ BEGIN
 END
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_TokenMatriculaGrupo_grupo_activo' AND object_id = OBJECT_ID('dbo.TokenMatriculaGrupo'))
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_TokenMatriculaGrupo_grupo_activo')
 BEGIN
     CREATE UNIQUE NONCLUSTERED INDEX UX_TokenMatriculaGrupo_grupo_activo
     ON dbo.TokenMatriculaGrupo (grupo)

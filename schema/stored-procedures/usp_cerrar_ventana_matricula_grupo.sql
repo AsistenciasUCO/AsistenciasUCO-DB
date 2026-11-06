@@ -24,7 +24,6 @@ AS
     DECLARE @conteoTransaccionesInicial INT = 0;
     DECLARE @transaccionPropia          BIT = 0;
     DECLARE @savepointCreado            BIT = 0;
-    DECLARE @idDocenteTitular           UNIQUEIDENTIFIER;
 BEGIN
     SET NOCOUNT ON;
     BEGIN TRY
@@ -46,6 +45,16 @@ BEGIN
 
         IF @estadoResultado = 1
         BEGIN
+            EXEC dbo.usp_validar_grupo_exista_por_id_interno
+                @idGrupo = @idGrupoDefecto,
+                @idCorrelacion = @idCorrelacionDefecto,
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+                @estadoResultado = @estadoResultado OUTPUT;
+        END
+
+        IF @estadoResultado = 1
+        BEGIN
             EXEC dbo.usp_validar_permiso_rbac_usuario_interno
                 @idUsuario = @idUsuarioEjecutor,
                 @codigoPerfilRequerido = 'DOCENTE',
@@ -57,30 +66,14 @@ BEGIN
 
         IF @estadoResultado = 1
         BEGIN
-            EXEC dbo.usp_validar_grupo_exista_por_id_interno
-                @idGrupo = @idGrupoDefecto,
+            EXEC dbo.usp_validar_titularidad_jerarquica_interno
+                @idUsuario = @idUsuarioEjecutor,
+                @idEntidadPadre = @idGrupoDefecto,
+                @tipoEntidadPadre = 'GRUPO',
                 @idCorrelacion = @idCorrelacionDefecto,
                 @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                 @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
                 @estadoResultado = @estadoResultado OUTPUT;
-        END
-
-        IF @estadoResultado = 1
-        BEGIN
-            SELECT @idDocenteTitular = d.id
-            FROM dbo.Grupo g
-            INNER JOIN dbo.Docente d ON d.id = g.docente
-            WHERE g.id = @idGrupoDefecto AND d.usuario = @idUsuarioEjecutor;
-
-            IF @idDocenteTitular IS NULL
-            BEGIN
-                EXEC dbo.usp_obtener_mensaje_catalogo
-                    @p_codigo = 'SEC_002',
-                    @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
-                    @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
-                SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
-                SET @estadoResultado = 0;
-            END
         END
 
         IF @estadoResultado = 1
