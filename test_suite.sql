@@ -26,7 +26,6 @@ PRINT '======================================================================';
 :r /tmp/test/test_reactive_academic.sql
 :r /tmp/test/test_mass_period_close.sql
 :r /tmp/test/test_usp_registrar_estudiante_en_grupo_usuario_no_existente.sql
-:r /tmp/test/test_usp_registrar_estudiante_en_grupo_autonomo.sql
 :r /tmp/test/test_transaction_ownership.sql
 :r /tmp/test/test_usp_sincronizar_usuario.sql
 :r /tmp/test/test_usp_registrar_o_actualizar_plan_estudio.sql
@@ -104,6 +103,11 @@ PRINT '======================================================================';
 :r /tmp/test/test_notificacion_migracion_catalogo.sql
 :r /tmp/test/test_notif002a_plantillas_contacto.sql
 :r /tmp/test/test_ident001_correo_verificacion.sql
+:r /tmp/test/test_usp_abrir_ventana_matricula_grupo.sql
+:r /tmp/test/test_usp_cerrar_ventana_matricula_grupo.sql
+:r /tmp/test/test_usp_rotar_token_matricula_grupo.sql
+:r /tmp/test/test_usp_validar_token_matricula_publico.sql
+:r /tmp/test/test_usp_matricular_estudiante_por_token.sql
 
 IF @@TRANCOUNT <> 0
 BEGIN

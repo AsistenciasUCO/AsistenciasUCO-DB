@@ -222,6 +222,12 @@ DECLARE @badResultSets TABLE (
 --   usp_consultar_estructura_facultad / usp_consultar_sesiones_facultad_paginado (HU104/HU105/HU109/HU119/HU145)
 --                                            READ_QUERY_RESULTSET: filas de datos del decano; NON_GOLDEN_PATH_EXTENSION.
 --   usp_consultar_token_verificacion_correo / usp_consultar_reenvio_verificacion_correo (IDENT-001): READ_QUERY_RESULTSET: 0..1 fila con idUsuario; NON_GOLDEN_PATH_EXTENSION.
+--   usp_abrir_ventana_matricula_grupo / usp_rotar_token_matricula_grupo / usp_rotar_token_matricula_automatico /
+--   usp_matricular_estudiante_por_token / usp_registrar_estudiante_por_token_publico (HU176B, CONTRACT §2.3, §2.3b, §2.5 y A2):
+--                                            comando canonico + columnas extra documentadas (idVentana, fechas, idEstudiante/idUsuario/idGrupo),
+--                                            igual que usp_resolver_solicitud_ingreso_grupo.
+--   usp_consultar_ventanas_matricula_por_rotar / usp_validar_token_matricula_publico (HU176B)
+--                                            READ_QUERY_RESULTSET: ventanas por rotar / datos minimos del curso; NON_GOLDEN_PATH_EXTENSION.
 --   usp_establecer_contexto_usuario_ejecutor helper de SESSION_CONTEXT: no devuelve resultset.
 -- El resultset canonico de 4 columnas es exclusivo de los SP de comando/mutacion del Golden Path.
 INSERT @badResultSets (procedureName, reason)
@@ -238,7 +244,7 @@ WHERE SCHEMA_NAME(sp.schema_id) = 'dbo'
   AND sp.name <> 'usp_consultar_sesiones_grupo_paginado'
   AND sp.name <> 'usp_consultar_asistencias_sesion_paginado'
   AND sp.name NOT IN ('usp_consultar_estudiantes_facultad_paginado', 'usp_consultar_estudiante_facultad_detalle', 'usp_consultar_estructura_facultad', 'usp_consultar_sesiones_facultad_paginado')
-  AND sp.name NOT IN ('usp_establecer_contexto_usuario_ejecutor', 'usp_consultar_token_verificacion_correo', 'usp_consultar_reenvio_verificacion_correo')
+  AND sp.name NOT IN ('usp_establecer_contexto_usuario_ejecutor', 'usp_consultar_token_verificacion_correo', 'usp_consultar_reenvio_verificacion_correo', 'usp_abrir_ventana_matricula_grupo', 'usp_rotar_token_matricula_grupo', 'usp_rotar_token_matricula_automatico', 'usp_matricular_estudiante_por_token', 'usp_registrar_estudiante_por_token_publico', 'usp_consultar_ventanas_matricula_por_rotar', 'usp_validar_token_matricula_publico')
   AND d.error_number IS NOT NULL;
 
 INSERT @badResultSets (procedureName, reason)
@@ -255,7 +261,7 @@ WHERE SCHEMA_NAME(sp.schema_id) = 'dbo'
   AND sp.name <> 'usp_consultar_sesiones_grupo_paginado'
   AND sp.name <> 'usp_consultar_asistencias_sesion_paginado'
   AND sp.name NOT IN ('usp_consultar_estudiantes_facultad_paginado', 'usp_consultar_estudiante_facultad_detalle', 'usp_consultar_estructura_facultad', 'usp_consultar_sesiones_facultad_paginado')
-  AND sp.name NOT IN ('usp_establecer_contexto_usuario_ejecutor', 'usp_consultar_token_verificacion_correo', 'usp_consultar_reenvio_verificacion_correo')
+  AND sp.name NOT IN ('usp_establecer_contexto_usuario_ejecutor', 'usp_consultar_token_verificacion_correo', 'usp_consultar_reenvio_verificacion_correo', 'usp_abrir_ventana_matricula_grupo', 'usp_rotar_token_matricula_grupo', 'usp_rotar_token_matricula_automatico', 'usp_matricular_estudiante_por_token', 'usp_registrar_estudiante_por_token_publico', 'usp_consultar_ventanas_matricula_por_rotar', 'usp_validar_token_matricula_publico')
   AND d.error_number IS NULL
 GROUP BY sp.name
 HAVING COUNT(d.column_ordinal) <> 4;
@@ -274,7 +280,7 @@ WHERE SCHEMA_NAME(sp.schema_id) = 'dbo'
   AND sp.name <> 'usp_consultar_sesiones_grupo_paginado'
   AND sp.name <> 'usp_consultar_asistencias_sesion_paginado'
   AND sp.name NOT IN ('usp_consultar_estudiantes_facultad_paginado', 'usp_consultar_estudiante_facultad_detalle', 'usp_consultar_estructura_facultad', 'usp_consultar_sesiones_facultad_paginado')
-  AND sp.name NOT IN ('usp_establecer_contexto_usuario_ejecutor', 'usp_consultar_token_verificacion_correo', 'usp_consultar_reenvio_verificacion_correo')
+  AND sp.name NOT IN ('usp_establecer_contexto_usuario_ejecutor', 'usp_consultar_token_verificacion_correo', 'usp_consultar_reenvio_verificacion_correo', 'usp_abrir_ventana_matricula_grupo', 'usp_rotar_token_matricula_grupo', 'usp_rotar_token_matricula_automatico', 'usp_matricular_estudiante_por_token', 'usp_registrar_estudiante_por_token_publico', 'usp_consultar_ventanas_matricula_por_rotar', 'usp_validar_token_matricula_publico')
   AND d.error_number IS NULL
   AND (
        (d.column_ordinal = 1 AND (d.name <> 'idCorrelacion' OR d.system_type_name <> 'uniqueidentifier'))

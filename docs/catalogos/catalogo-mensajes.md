@@ -12,7 +12,7 @@ generated-by: scripts/generar-catalogo-mensajes.ps1
 
 Uso en SP: `EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = '<CODIGO>', @p_param1 = ...`. Los marcadores `{}` / `{0}` se reemplazan con los parámetros. El mensaje técnico se entrega como `DBCODE=<CODIGO>|<texto>` (ver `docs/contracts/DB_BASELINE_CONTRACT.md`).
 
-Total de códigos: **144**.
+Total de códigos: **151**.
 
 ## ARC
 
@@ -163,6 +163,18 @@ Total de códigos: **144**.
 | `KPI_002` | BUSINESS_ERROR | CRITICO | No fue posible calcular los indicadores porque falta la configuración de umbrales de asistencia. | Falta el parámetro ASISTENCIA/UMBRAL_ALERTA_ADVERTENCIA o ASISTENCIA/UMBRAL_ALERTA_PERDIDA en CatalogoParametro. | `18_mensajes_kpis_coordinador.sql` |
 | `KPI_003` | BUSINESS_ERROR | ALTO | No tiene una facultad a su cargo para consultar estos indicadores. | Ámbito: el ejecutor {} no es decano de ninguna facultad en uv_facultad. | `19_mensajes_kpis_decano.sql` |
 | `KPI_004` | BUSINESS_ERROR | ALTO | No tiene una institución a su cargo para consultar estos indicadores. | Ámbito: el ejecutor {} no es administrador de ninguna institución en uv_administrador. | `20_mensajes_kpis_admin.sql` |
+
+## MQR
+
+| Código | Tipo | Severidad | Mensaje usuario | Mensaje técnico | Seed |
+|---|---|---|---|---|---|
+| `MQR_001` | BUSINESS_ERROR | MEDIO | El código de matrícula no es válido o ya no está disponible. Solicítale al docente uno nuevo. | Token o PIN de matrícula inexistente, cerrado, expirado o fuera de la tolerancia de rotación. | `29_mensajes_matricula_qr.sql` |
+| `MQR_002` | BUSINESS_ERROR | MEDIO | La matrícula por código solo está disponible desde la red Wi-Fi del campus UCO. | Regla: la IP del cliente no pertenece a asistencias:red:cidrs-campus. | `29_mensajes_matricula_qr.sql` |
+| `MQR_003` | BUSINESS_ERROR | BAJO | Demasiados intentos. Espera un momento antes de volver a intentarlo. | Límite de intentos por IP o por token superado en la ventana de tiempo. | `29_mensajes_matricula_qr.sql` |
+| `MQR_004` | BUSINESS_ERROR | BAJO | Ya estás matriculado en este grupo. | Regla: el estudiante ya tiene matrícula en el grupo. | `29_mensajes_matricula_qr.sql` |
+| `MQR_005` | BUSINESS_ERROR | MEDIO | Ya tienes una cuenta registrada. Inicia sesión para completar tu matrícula. | Existencia: el documento o el correo ya pertenecen a un usuario registrado. | `29_mensajes_matricula_qr.sql` |
+| `MQR_006` | BUSINESS_ERROR | BAJO | No fue posible generar un código único. Inténtalo de nuevo. | Unicidad: el PIN ya está en uso por el token vigente o anterior de otra ventana activa. | `29_mensajes_matricula_qr.sql` |
+| `MQR_007` | BUSINESS_ERROR | MEDIO | Debes indicar el código QR o el PIN, pero no ambos. | Validación: debe indicarse exactamente uno entre tokenHash y pin. | `29_mensajes_matricula_qr.sql` |
 
 ## NTF
 
