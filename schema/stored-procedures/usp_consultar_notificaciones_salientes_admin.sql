@@ -49,8 +49,21 @@ BEGIN
             @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
             @estadoResultado = @estadoResultado OUTPUT;
 
-        -- 2. Validar perfil RBAC ADMINISTRADOR cuando se informa el usuario ejecutor
-        IF @estadoResultado = 1 AND @idUsuarioEjecutor IS NOT NULL AND @idUsuarioEjecutorDefecto <> @guidVacio
+        -- 2. El usuario ejecutor es obligatorio: sin el no se consulta (nunca se omite el RBAC)
+        IF @estadoResultado = 1 AND @idUsuarioEjecutorDefecto = @guidVacio
+        BEGIN
+            EXEC dbo.usp_obtener_mensaje_catalogo
+                @p_codigo = 'VAL_001',
+                @p_param1 = 'UsuarioEjecutor',
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
+
+            SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+            SET @estadoResultado = 0;
+        END
+
+        -- 3. Validar perfil RBAC ADMINISTRADOR
+        IF @estadoResultado = 1
         BEGIN
             EXEC dbo.usp_validar_permiso_rbac_usuario_interno
                 @idUsuario = @idUsuarioEjecutorDefecto,
