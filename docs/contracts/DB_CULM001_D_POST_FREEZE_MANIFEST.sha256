@@ -1,0 +1,2 @@
+b61204f085bcc3a13c98cb6dd18e64e4b3ef123518d96ac54ec91bc50d0d9605  schema/functions/ufn_calcular_fecha_limite_justificacion.sql  WORK_ITEM
+2c690a735602ff1d095bb7b6607d76c97c27c1a8250991a236a61149d881277c  schema/stored-procedures/usp_internal_validar_plazo_justificacion.sql  WORK_ITEM
