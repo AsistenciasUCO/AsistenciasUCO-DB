@@ -41,6 +41,8 @@ DECLARE @n INT = 1 + (SELECT ISNULL(MAX(numero), 0) FROM dbo.Sesion WHERE grupo 
 DECLARE @s UNIQUEIDENTIFIER, @corr UNIQUEIDENTIFIER;
 DECLARE @u NVARCHAR(4000), @t NVARCHAR(4000), @e BIT, @userMsg NVARCHAR(4000), @techMsg NVARCHAR(4000);
 DECLARE @tranBefore INT;
+DECLARE @existingSession UNIQUEIDENTIFIER = (SELECT TOP 1 id FROM dbo.Sesion ORDER BY id);
+IF @existingSession IS NULL THROW 57015, 'TEST FAILED CULM001_B1_VEN: no hay una sesion existente para la prueba de bloqueo.', 1;
 
 BEGIN TRANSACTION;
 BEGIN TRY
@@ -232,6 +234,11 @@ BEGIN TRY
     PRINT 'TEST_PASS:CULM001_B1_VEN_05_PROCEDENCIA_ANTES_QUE_TOLERANCIA';
 
     -- La lectura de la ventana con tolerancia sigue reteniendo el bloqueo de actualizacion sobre dbo.Sesion
+    -- (sobre una sesion existente: las creadas en esta transaccion ya tienen bloqueo exclusivo)
+    SET @corr = NEWID();
+    EXEC dbo.usp_validar_sesion_ventana_registro_interno @idSesion = @existingSession, @idCorrelacion = @corr,
+        @mensajeUsuarioResultado = @u OUTPUT, @mensajeTecnicoResultado = @t OUTPUT, @estadoResultado = @e OUTPUT,
+        @toleranciaMinutos = @tol, @margenMinutos = @margen;
     IF NOT EXISTS (
         SELECT 1 FROM sys.dm_tran_locks l
         JOIN sys.partitions p ON p.hobt_id = l.resource_associated_entity_id

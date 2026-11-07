@@ -29,7 +29,7 @@ function Invoke-ContainerSql {
     if ($LASTEXITCODE -ne 0) { throw "could not copy ${Name}: $($copy -join '; ')" }
     $null = & docker exec -u 0 $ContainerName chmod a+r $remote 2>&1
     $sqlArgs = @('exec', $ContainerName, '/opt/mssql-tools18/bin/sqlcmd', '-S', 'localhost', '-d', 'gestionasistenciadb', '-U', 'sa', '-P', $Password,
-              '-C', '-h', '-1', '-W', '-s', '|', '-w', '65535', '-t', '300', '-i', $remote)
+              '-C', '-I', '-h', '-1', '-W', '-s', '|', '-w', '65535', '-t', '300', '-i', $remote)
     if ($AbortOnError) { $sqlArgs += '-b' }
     $output = @(& docker @sqlArgs 2>&1 | ForEach-Object { "$_".Trim() })
     return [pscustomobject]@{ ExitCode = $LASTEXITCODE; Lines = $output }
@@ -38,6 +38,12 @@ function Invoke-ContainerSql {
 function Get-Rows {
     param ([string[]]$Lines, [string]$Pattern = $guidRow)
     return @($Lines | Where-Object { $_ -match $Pattern })
+}
+
+function Get-TupleRows {
+    param ([string]$Text, [string]$Begin, [string]$End)
+    $segment = [regex]::Match($Text, "(?s)$Begin(.*?)$End").Groups[1].Value
+    return ,@($segment -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -match $guidRow })
 }
 
 function Split-Tuple {
@@ -62,9 +68,9 @@ IF @institution IS NULL OR @assignment IS NULL OR @teacher IS NULL OR @teacherUs
 # ---------------------------------------------------------------------------------------------------------------
 # B1-FES-05: dos cargas concurrentes del mismo anio (2099) => sin duplicados ni error de clave; la segunda espera
 # ---------------------------------------------------------------------------------------------------------------
-$cleanup2099 = "SET NOCOUNT ON; DELETE FROM dbo.CargaDiaFestivo WHERE anio = 2099; DELETE FROM dbo.DiaFestivo WHERE anio = 2099;"
+$cleanup2099 = "SET NOCOUNT ON; SET QUOTED_IDENTIFIER ON; DELETE FROM dbo.CargaDiaFestivo WHERE anio = 2099; DELETE FROM dbo.DiaFestivo WHERE anio = 2099;"
 try {
-    $null = Invoke-ContainerSql -Name 'fes05_cleanup_before' -Sql $cleanup2099 -AbortOnError
+    $cr = Invoke-ContainerSql -Name 'fes05_cleanup_before' -Sql $cleanup2099 -AbortOnError; if ($cr.ExitCode -ne 0) { throw "cleanup exit $($cr.ExitCode): $($cr.Lines -join '; ')" }
     $workerSql = @'
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
@@ -85,7 +91,7 @@ COMMIT TRANSACTION;
     $null = & docker exec -u 0 $ContainerName chmod a+r $remoteWorker 2>&1
     $job = {
         param($cn, $pw, $file)
-        $out = @(& docker exec $cn /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $pw -C -b -h -1 -W -s '|' -w 65535 -i $file 2>&1 | ForEach-Object { "$_".Trim() })
+        $out = @(& docker exec $cn /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $pw -C -I -b -h -1 -W -s '|' -w 65535 -i $file 2>&1 | ForEach-Object { "$_".Trim() })
         [pscustomobject]@{ ExitCode = $LASTEXITCODE; Lines = $out }
     }
     $jobs = @((Start-Job -ScriptBlock $job -ArgumentList $ContainerName, $Password, $remoteWorker),
@@ -110,7 +116,7 @@ COMMIT TRANSACTION;
     Write-Host 'TEST_PASS:CULM001_B1_FES_05_CARGA_CONCURRENTE'
 }
 catch { $failures += "CULM001_B1_FES_05_CARGA_CONCURRENTE $($_.Exception.Message)" }
-finally { try { $null = Invoke-ContainerSql -Name 'fes05_cleanup' -Sql $cleanup2099 -AbortOnError } catch { $failures += 'CULM001_B1_FES_05 cleanup failed' } }
+finally { try { $cr = Invoke-ContainerSql -Name 'fes05_cleanup' -Sql $cleanup2099 -AbortOnError; if ($cr.ExitCode -ne 0) { throw "cleanup exit $($cr.ExitCode): $($cr.Lines -join '; ')" } } catch { $failures += 'CULM001_B1_FES_05 cleanup failed' } }
 
 # ---------------------------------------------------------------------------------------------------------------
 # B1-FES-07 (tupla): v2 en un periodo con festivos => sesionesCanceladasPorFestivo = 3; segunda ejecucion = 0
@@ -120,14 +126,14 @@ try {
 SET NOCOUNT ON;
 SET XACT_ABORT OFF;
 $fixtureSql
-DECLARE @json NVARCHAR(MAX) = N'[{"fecha":"2027-01-01","nombre":"Año Nuevo"},{"fecha":"2027-01-11","nombre":"Reyes Magos"},{"fecha":"2027-03-22","nombre":"San José"},{"fecha":"2027-03-25","nombre":"Jueves Santo"},{"fecha":"2027-03-26","nombre":"Viernes Santo"},{"fecha":"2027-05-01","nombre":"Día del Trabajo"},{"fecha":"2027-05-10","nombre":"Ascensión del Señor"},{"fecha":"2027-05-31","nombre":"Corpus Christi"},{"fecha":"2027-06-07","nombre":"Sagrado Corazón"},{"fecha":"2027-07-05","nombre":"San Pedro y San Pablo"},{"fecha":"2027-07-12","nombre":"Nuestra Señora del Rosario de Chiquinquirá"},{"fecha":"2027-07-20","nombre":"Independencia"},{"fecha":"2027-08-07","nombre":"Batalla de Boyacá"},{"fecha":"2027-08-16","nombre":"Asunción de la Virgen"},{"fecha":"2027-10-18","nombre":"Día de la Raza"},{"fecha":"2027-11-01","nombre":"Todos los Santos"},{"fecha":"2027-11-15","nombre":"Independencia de Cartagena"},{"fecha":"2027-12-08","nombre":"Inmaculada Concepción"},{"fecha":"2027-12-25","nombre":"Navidad"}]';
+DECLARE @json NVARCHAR(MAX) = N'[{"fecha":"2026-01-01","nombre":"Año Nuevo"},{"fecha":"2026-01-12","nombre":"Reyes Magos"},{"fecha":"2026-03-23","nombre":"San José"},{"fecha":"2026-04-02","nombre":"Jueves Santo"},{"fecha":"2026-04-03","nombre":"Viernes Santo"},{"fecha":"2026-05-01","nombre":"Día del Trabajo"},{"fecha":"2026-05-18","nombre":"Ascensión del Señor"},{"fecha":"2026-06-08","nombre":"Corpus Christi"},{"fecha":"2026-06-15","nombre":"Sagrado Corazón"},{"fecha":"2026-06-29","nombre":"San Pedro y San Pablo"},{"fecha":"2026-07-13","nombre":"Nuestra Señora del Rosario de Chiquinquirá"},{"fecha":"2026-07-20","nombre":"Independencia"},{"fecha":"2026-08-07","nombre":"Batalla de Boyacá"},{"fecha":"2026-08-17","nombre":"Asunción de la Virgen"},{"fecha":"2026-10-12","nombre":"Día de la Raza"},{"fecha":"2026-11-02","nombre":"Todos los Santos"},{"fecha":"2026-11-16","nombre":"Independencia de Cartagena"},{"fecha":"2026-12-08","nombre":"Inmaculada Concepción"},{"fecha":"2026-12-25","nombre":"Navidad"}]';
 DECLARE @period UNIQUEIDENTIFIER = NEWID(), @group UNIQUEIDENTIFIER = NEWID(), @corr UNIQUEIDENTIFIER = NEWID();
 CREATE TABLE #cf (a UNIQUEIDENTIFIER, b NVARCHAR(4000), c NVARCHAR(4000), d BIT, e INT, f INT, g INT, h INT, i INT);
 BEGIN TRANSACTION;
-INSERT INTO #cf EXEC dbo.usp_cargar_dias_festivos_automatico @anio = 2027, @festivosJSON = @json, @fuente = N'CALCULO_LOCAL', @diferenciasCalculoLocal = 0, @idCorrelacion = @corr;
-IF NOT EXISTS (SELECT 1 FROM #cf WHERE d = 1) THROW 57501, 'FES07 festivos 2027 no cargados', 1;
+INSERT INTO #cf EXEC dbo.usp_cargar_dias_festivos_automatico @anio = 2026, @festivosJSON = @json, @fuente = N'CALCULO_LOCAL', @diferenciasCalculoLocal = 0, @idCorrelacion = @corr;
+IF NOT EXISTS (SELECT 1 FROM #cf WHERE d = 1) THROW 57501, 'FES07 festivos 2026 no cargados', 1;
 INSERT dbo.PeriodoAcademico (id, institucion, nombre, codigo, fechaInicio, fechaFin, anio)
-VALUES (@period, @institution, N'CULM1 Periodo FES07', 3800000 + ABS(CHECKSUM(NEWID()) % 99999), '2027-03-20', '2027-03-31', 2027);
+VALUES (@period, @institution, N'CULM1 Periodo FES07', 3800000 + ABS(CHECKSUM(NEWID()) % 99999), '2026-11-01', '2026-11-20', 2026);
 INSERT dbo.Grupo (id, asignatura, periodoAcademico, codigo, nombre, cantidadEstudiantes, cantidadEstudiantesFinalizaron,
     cantidadEstudiantesCancelaronVoluntadPropia, cantidadEstudiantesCancelaronAutomaticamente, docente)
 VALUES (@group, @assignment, @period, 943000 + ABS(CHECKSUM(NEWID()) % 56999), N'CULM1 Grupo FES07', 20, 0, 0, 0, @teacher);
@@ -144,11 +150,11 @@ SELECT CONCAT('FES07_AFTER|', @@TRANCOUNT, '|', (SELECT COUNT(*) FROM dbo.Grupo 
 "@
     $res = Invoke-ContainerSql -Name 'fes07' -Sql $sql
     $text = $res.Lines -join "`n"
-    $run1 = [regex]::Match($text, '(?s)FES07_RUN1_BEGIN(.*?)FES07_RUN1_END').Groups[1].Value -split "`n" | Where-Object { $_ -match $guidRow }
-    $run2 = [regex]::Match($text, '(?s)FES07_RUN2_BEGIN(.*?)FES07_RUN2_END').Groups[1].Value -split "`n" | Where-Object { $_ -match $guidRow }
-    if (@($run1).Count -ne 1 -or $run1 -notmatch '\|DBCODE=GEN_004\|.*\|1\|3\|0$') { throw "first run tuple: $run1 / $text" }
-    if (@($run2).Count -ne 1 -or $run2 -notmatch '\|DBCODE=GEN_004\|.*\|1\|0\|0$') { throw "second run tuple: $run2" }
-    if (@($res.Lines | Where-Object { $_ -eq 'FES07|12|3' }).Count -ne 1) { throw "expected 12 sessions and 3 cancelled: $text" }
+    $run1 = Get-TupleRows -Text $text -Begin 'FES07_RUN1_BEGIN' -End 'FES07_RUN1_END'
+    $run2 = Get-TupleRows -Text $text -Begin 'FES07_RUN2_BEGIN' -End 'FES07_RUN2_END'
+    if ($run1.Count -ne 1 -or $run1[0] -notmatch '\|DBCODE=GEN_004\|.*\|1\|2\|0$') { throw "first run tuple: $($run1 -join ';') / $text" }
+    if ($run2.Count -ne 1 -or $run2[0] -notmatch '\|DBCODE=GEN_004\|.*\|1\|0\|0$') { throw "second run tuple: $($run2 -join ';')" }
+    if (@($res.Lines | Where-Object { $_ -eq 'FES07|20|2' }).Count -ne 1) { throw "expected 20 sessions and 2 cancelled: $text" }
     if (@($res.Lines | Where-Object { $_ -eq 'FES07_AFTER|0|0' }).Count -ne 1) { throw "rollback did not restore state: $text" }
     Write-Host 'TEST_PASS:CULM001_B1_FES_07_TUPLA_CONTEOS'
 }
@@ -191,8 +197,8 @@ SELECT CONCAT('FES08A_STATE|', @@TRANCOUNT, '|', (SELECT COUNT(*) FROM dbo.Sesio
     $res = Invoke-ContainerSql -Name 'fes08a_run' -Sql $run
     $text = $res.Lines -join "`n"
     $expectedUser = (@($res.Lines | Where-Object { $_ -like 'EXPECTED_SYS001|*' })[0]).Substring('EXPECTED_SYS001|'.Length)
-    $rows = [regex]::Match($text, '(?s)FES08A_BEGIN(.*?)FES08A_END').Groups[1].Value -split "`n" | Where-Object { $_ -match $guidRow }
-    if (@($rows).Count -ne 1) { throw "expected one tuple; found $(@($rows).Count): $text" }
+    $rows = Get-TupleRows -Text $text -Begin 'FES08A_BEGIN' -End 'FES08A_END'
+    if ($rows.Count -ne 1) { throw "expected one tuple; found $($rows.Count): $text" }
     $t = Split-Tuple -Line $rows[0]
     if ($t.User -cne $expectedUser -or $t.Rest -notmatch '\|0\|NULL\|NULL$') { throw "expected SYS_001 tuple with estadoResultado = 0: $($rows[0])" }
     if (@($res.Lines | Where-Object { $_ -eq 'FES08A_STATE|0|0' }).Count -ne 1) { throw "expected @@TRANCOUNT = 0 and 0 sessions: $text" }
@@ -205,7 +211,7 @@ finally {
     if ($fes08Ids) {
         $cleanup += " DELETE FROM dbo.Sesion WHERE grupo = '$($fes08Ids[2])'; DELETE FROM dbo.Horario WHERE grupo = '$($fes08Ids[2])'; DELETE FROM dbo.Grupo WHERE id = '$($fes08Ids[2])'; DELETE FROM dbo.PeriodoAcademico WHERE id = '$($fes08Ids[1])';"
     }
-    try { $null = Invoke-ContainerSql -Name 'fes08a_cleanup' -Sql $cleanup -AbortOnError } catch { $failures += 'CULM001_B1_FES_08A cleanup failed' }
+    try { $cr = Invoke-ContainerSql -Name 'fes08a_cleanup' -Sql $cleanup -AbortOnError; if ($cr.ExitCode -ne 0) { throw "cleanup exit $($cr.ExitCode): $($cr.Lines -join '; ')" } } catch { $failures += 'CULM001_B1_FES_08A cleanup failed' }
 }
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -243,8 +249,8 @@ SELECT CONCAT('FES08B2_STATE|', @@TRANCOUNT, '|', (SELECT COUNT(*) FROM dbo.Sesi
     $res = Invoke-ContainerSql -Name 'fes08b2' -Sql $sql
     $text = $res.Lines -join "`n"
     if ($text -match 'FES08B2_NO_THROW') { throw "the v2 did not THROW with an external transaction: $text" }
-    $rows = [regex]::Match($text, '(?s)FES08B2_BEGIN(.*?)FES08B2_END').Groups[1].Value -split "`n" | Where-Object { $_ -match $guidRow }
-    if (@($rows).Count -ne 0) { throw "the v2 returned a tuple with an external transaction: $($rows -join ';')" }
+    $rows = Get-TupleRows -Text $text -Begin 'FES08B2_BEGIN' -End 'FES08B2_END'
+    if ($rows.Count -ne 0) { throw "the v2 returned a tuple with an external transaction: $($rows -join ';')" }
     if (@($res.Lines | Where-Object { $_ -eq 'FES08B2_XACT|-1' }).Count -ne 1) { throw "caller must see XACT_STATE() = -1: $text" }
     if (@($res.Lines | Where-Object { $_ -eq 'FES08B2_STATE|0|0|0' }).Count -ne 1) { throw "state after caller rollback: $text" }
     Write-Host 'TEST_PASS:CULM001_B1_FES_08B2_SIN_TUPLA'
@@ -287,22 +293,23 @@ PRINT 'P_END';
 "@
     $res = Invoke-ContainerSql -Name 'fes08b_run' -Sql $run
     $text = $res.Lines -join "`n"
-    function Get-Between([string]$a, [string]$b) { return @([regex]::Match($text, "(?s)$a(.*?)$b").Groups[1].Value -split "`n" | Where-Object { $_ -match $guidRow }) }
-    $v1a = Get-Between 'P_V1_SIN_HORARIO' 'P_V2_SIN_HORARIO'; $v2a = Get-Between 'P_V2_SIN_HORARIO' 'P_V1_NO_TITULAR'
-    $v1b = Get-Between 'P_V1_NO_TITULAR' 'P_V2_NO_TITULAR'; $v2b = Get-Between 'P_V2_NO_TITULAR' 'P_END'
-    foreach ($pair in @(@($v1a, $v2a, 'sin horario'), @($v1b, $v2b, 'no titular'))) {
-        if ($pair[0].Count -ne 1 -or $pair[1].Count -ne 1) { throw "missing tuple ($($pair[2])): $text" }
-        if ($pair[0][0] -notmatch '\|0$') { throw "v1 should reject ($($pair[2])): $($pair[0][0])" }
-        if ("$($pair[0][0])|NULL|NULL" -cne $pair[1][0]) { throw "tuple parity ($($pair[2])): v1=[$($pair[0][0])] v2=[$($pair[1][0])]" }
+    $casos = @(
+        [pscustomobject]@{ Nombre = 'sin horario'; V1 = (Get-TupleRows -Text $text -Begin 'P_V1_SIN_HORARIO' -End 'P_V2_SIN_HORARIO'); V2 = (Get-TupleRows -Text $text -Begin 'P_V2_SIN_HORARIO' -End 'P_V1_NO_TITULAR') },
+        [pscustomobject]@{ Nombre = 'no titular'; V1 = (Get-TupleRows -Text $text -Begin 'P_V1_NO_TITULAR' -End 'P_V2_NO_TITULAR'); V2 = (Get-TupleRows -Text $text -Begin 'P_V2_NO_TITULAR' -End 'P_END') }
+    )
+    foreach ($caso in $casos) {
+        if ($caso.V1.Count -ne 1 -or $caso.V2.Count -ne 1) { throw "missing tuple ($($caso.Nombre)): $text" }
+        if ($caso.V1[0] -notmatch '\|0$') { throw "v1 should reject ($($caso.Nombre)): $($caso.V1[0])" }
+        if ("$($caso.V1[0])|NULL|NULL" -cne $caso.V2[0]) { throw "tuple parity ($($caso.Nombre)): v1=[$($caso.V1[0])] v2=[$($caso.V2[0])]" }
     }
-    if ($v1b[0] -notmatch '\|DBCODE=SEC_002\|') { throw "non-owner should be SEC_002: $($v1b[0])" }
+    if ($casos[1].V1[0] -notmatch '\|DBCODE=SEC_002\|') { throw "non-owner should be SEC_002: $($casos[1].V1[0])" }
     Write-Host 'TEST_PASS:CULM001_B1_FES_08B_PARIDAD_TUPLA'
 }
 catch { $failures += "CULM001_B1_FES_08B_PARIDAD_TUPLA $($_.Exception.Message)" }
 finally {
     if ($parityIds) {
         $cleanup = "SET NOCOUNT ON; DELETE FROM dbo.Sesion WHERE grupo = '$($parityIds[2])'; DELETE FROM dbo.Grupo WHERE id = '$($parityIds[2])'; DELETE FROM dbo.PeriodoAcademico WHERE id = '$($parityIds[1])';"
-        try { $null = Invoke-ContainerSql -Name 'fes08b_cleanup' -Sql $cleanup -AbortOnError } catch { $failures += 'CULM001_B1_FES_08B cleanup failed' }
+        try { $cr = Invoke-ContainerSql -Name 'fes08b_cleanup' -Sql $cleanup -AbortOnError; if ($cr.ExitCode -ne 0) { throw "cleanup exit $($cr.ExitCode): $($cr.Lines -join '; ')" } } catch { $failures += 'CULM001_B1_FES_08B cleanup failed' }
     }
 }
 

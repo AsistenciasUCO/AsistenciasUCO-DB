@@ -64,16 +64,16 @@ DECLARE @hoy DATE = CAST(SYSUTCDATETIME() AT TIME ZONE 'UTC' AT TIME ZONE @zona 
 IF @tipoCC IS NULL OR @idAsig IS NULL OR @uCoord IS NULL OR @idInstitucion IS NULL OR @estadoA IS NULL OR @estadoI IS NULL
     THROW 57110, 'TEST FAILED CULM001_B1_CAN: faltan fixtures del seed (asignatura con coordinador, estados A/I).', 1;
 
-CREATE TABLE #c (
+CREATE TABLE #culm1Cancel (
     idCorrelacion UNIQUEIDENTIFIER NULL, mensajeUsuarioResultado NVARCHAR(4000) NULL, mensajeTecnicoResultado NVARCHAR(4000) NULL,
     estadoResultado BIT NOT NULL, idSesion UNIQUEIDENTIFIER NULL, idGrupo UNIQUEIDENTIFIER NULL, fechaCancelacionUtc DATETIME2(0) NULL,
     totalEstudiantesActivos INT NULL);
-CREATE TABLE #k (
+CREATE TABLE #culm1Kpi (
     idPrograma UNIQUEIDENTIFIER, nombrePrograma NVARCHAR(200), idPeriodoAcademico UNIQUEIDENTIFIER, nombrePeriodoAcademico NVARCHAR(100),
     totalEstudiantes INT, estudiantesRegulares INT, estudiantesRiesgo INT, estudiantesPerdida INT, tasaPermanencia DECIMAL(5,2),
     sesionesProgramadas INT, sesionesVencidas INT, sesionesEjecutadas INT, sesionesVencidasSinRegistro INT, sesionesSinProcedenciaTemporal INT,
     porcentajeCumplimiento DECIMAL(5,2), porcentajeProgresoCalendario DECIMAL(5,2), umbralAdvertencia DECIMAL(5,2), umbralPerdida DECIMAL(5,2));
-CREATE TABLE #d (
+CREATE TABLE #culm1Dest (
     idEstudiante UNIQUEIDENTIFIER, idUsuario UNIQUEIDENTIFIER, nombreCompleto NVARCHAR(400), correo NVARCHAR(200), nombreAsignatura NVARCHAR(200),
     nombreGrupo NVARCHAR(300), nombreDocente NVARCHAR(400), fechaHoraInicio DATETIME2, fechaHoraFin DATETIME2, motivoCancelacion NVARCHAR(500));
 
@@ -119,9 +119,9 @@ BEGIN TRY
 
     -- KPI del coordinador antes de cancelar (B1-CAN-06)
     SET @corr = NEWID();
-    INSERT INTO #k EXEC dbo.usp_consultar_kpis_coordinador @idUsuarioEjecutor = @uCoord, @idCorrelacion = @corr, @idPeriodoAcademico = @per;
+    INSERT INTO #culm1Kpi EXEC dbo.usp_consultar_kpis_coordinador @idUsuarioEjecutor = @uCoord, @idCorrelacion = @corr, @idPeriodoAcademico = @per;
     DECLARE @progAntes INT, @vencAntes INT, @ejecAntes INT;
-    SELECT @progAntes = sesionesProgramadas, @vencAntes = sesionesVencidas, @ejecAntes = sesionesEjecutadas FROM #k;
+    SELECT @progAntes = sesionesProgramadas, @vencAntes = sesionesVencidas, @ejecAntes = sesionesEjecutadas FROM #culm1Kpi;
     IF @progAntes IS NULL OR @progAntes < 7
         THROW 57111, 'TEST FAILED CULM001_B1_CAN_06: el KPI del coordinador no ve las sesiones del grupo de prueba.', 1;
 
@@ -129,29 +129,29 @@ BEGIN TRY
     -- Validaciones previas: ejecutor NULL (GEN_002) y sesion inexistente (SES_001)
     -- --------------------------------------------------------------------------------------------------------
     SET @corr = NEWID();
-    INSERT INTO #c EXEC dbo.usp_cancelar_sesion @idSesion = @sFut, @motivo = N'Motivo valido de prueba', @idCorrelacion = @corr, @idUsuarioEjecutor = NULL;
-    IF NOT EXISTS (SELECT 1 FROM #c WHERE estadoResultado = 0 AND idCorrelacion = @corr AND mensajeTecnicoResultado LIKE N'DBCODE=GEN[_]002|%' AND idSesion IS NULL)
+    INSERT INTO #culm1Cancel EXEC dbo.usp_cancelar_sesion @idSesion = @sFut, @motivo = N'Motivo valido de prueba', @idCorrelacion = @corr, @idUsuarioEjecutor = NULL;
+    IF NOT EXISTS (SELECT 1 FROM #culm1Cancel WHERE estadoResultado = 0 AND idCorrelacion = @corr AND mensajeTecnicoResultado LIKE N'DBCODE=GEN[_]002|%' AND idSesion IS NULL)
         THROW 57112, 'TEST FAILED CULM001_B1_CAN_GEN002: sin ejecutor debe responder GEN_002.', 1;
-    TRUNCATE TABLE #c;
+    TRUNCATE TABLE #culm1Cancel;
     SET @corr = NEWID();
-    INSERT INTO #c EXEC dbo.usp_cancelar_sesion @idSesion = @uD1, @motivo = N'Motivo valido de prueba', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
-    IF NOT EXISTS (SELECT 1 FROM #c WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE N'DBCODE=SES[_]001|%')
+    INSERT INTO #culm1Cancel EXEC dbo.usp_cancelar_sesion @idSesion = @uD1, @motivo = N'Motivo valido de prueba', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
+    IF NOT EXISTS (SELECT 1 FROM #culm1Cancel WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE N'DBCODE=SES[_]001|%')
         THROW 57113, 'TEST FAILED CULM001_B1_CAN_SES001: una sesion inexistente debe responder SES_001.', 1;
-    TRUNCATE TABLE #c;
+    TRUNCATE TABLE #culm1Cancel;
     PRINT 'TEST_PASS:CULM001_B1_CAN_VALIDACIONES_PREVIAS';
 
     -- --------------------------------------------------------------------------------------------------------
     -- B1-CAN-02: no titular / estudiante / coordinador => SEC_002 o RBAC (SEC_001); sin fila
     -- --------------------------------------------------------------------------------------------------------
     SET @corr = NEWID();
-    INSERT INTO #c EXEC dbo.usp_cancelar_sesion @idSesion = @sFut, @motivo = N'Motivo valido de prueba', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD2;
-    INSERT INTO #c EXEC dbo.usp_cancelar_sesion @idSesion = @sFut, @motivo = N'Motivo valido de prueba', @idCorrelacion = @corr, @idUsuarioEjecutor = @uE1;
-    INSERT INTO #c EXEC dbo.usp_cancelar_sesion @idSesion = @sFut, @motivo = N'Motivo valido de prueba', @idCorrelacion = @corr, @idUsuarioEjecutor = @uCoord;
-    IF (SELECT COUNT(*) FROM #c WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE N'DBCODE=SEC[_]00[12]|%') <> 3
-       OR NOT EXISTS (SELECT 1 FROM #c WHERE mensajeTecnicoResultado LIKE N'DBCODE=SEC[_]002|%')
+    INSERT INTO #culm1Cancel EXEC dbo.usp_cancelar_sesion @idSesion = @sFut, @motivo = N'Motivo valido de prueba', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD2;
+    INSERT INTO #culm1Cancel EXEC dbo.usp_cancelar_sesion @idSesion = @sFut, @motivo = N'Motivo valido de prueba', @idCorrelacion = @corr, @idUsuarioEjecutor = @uE1;
+    INSERT INTO #culm1Cancel EXEC dbo.usp_cancelar_sesion @idSesion = @sFut, @motivo = N'Motivo valido de prueba', @idCorrelacion = @corr, @idUsuarioEjecutor = @uCoord;
+    IF (SELECT COUNT(*) FROM #culm1Cancel WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE N'DBCODE=SEC[_]00[12]|%') <> 3
+       OR NOT EXISTS (SELECT 1 FROM #culm1Cancel WHERE mensajeTecnicoResultado LIKE N'DBCODE=SEC[_]002|%')
        OR EXISTS (SELECT 1 FROM dbo.SesionCancelacion WHERE sesion = @sFut)
         THROW 57120, 'TEST FAILED CULM001_B1_CAN_02: un no titular, un estudiante o un coordinador no pueden cancelar (SEC_002/SEC_001, sin fila).', 1;
-    TRUNCATE TABLE #c;
+    TRUNCATE TABLE #culm1Cancel;
     PRINT 'TEST_PASS:CULM001_B1_CAN_02_SOLO_TITULAR';
 
     -- --------------------------------------------------------------------------------------------------------
@@ -160,25 +160,25 @@ BEGIN TRY
     EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = 'SES_013', @p_param1 = N'10', @p_param2 = N'500',
         @mensajeUsuarioResultado = @userMsg OUTPUT, @mensajeTecnicoResultado = @techMsg OUTPUT;
     SET @corr = NEWID();
-    INSERT INTO #c EXEC dbo.usp_cancelar_sesion @idSesion = @sFut, @motivo = N'123456789', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
+    INSERT INTO #culm1Cancel EXEC dbo.usp_cancelar_sesion @idSesion = @sFut, @motivo = N'123456789', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
     DECLARE @m501 NVARCHAR(600) = REPLICATE(N'x', 501);
-    INSERT INTO #c EXEC dbo.usp_cancelar_sesion @idSesion = @sFut, @motivo = @m501, @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
-    INSERT INTO #c EXEC dbo.usp_cancelar_sesion @idSesion = @sFut, @motivo = N'            ', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
-    INSERT INTO #c EXEC dbo.usp_cancelar_sesion @idSesion = @sFut, @motivo = N'    123456789     ', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
-    INSERT INTO #c EXEC dbo.usp_cancelar_sesion @idSesion = @sFut, @motivo = NULL, @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
-    IF (SELECT COUNT(*) FROM #c WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE N'DBCODE=SES[_]013|%' AND mensajeUsuarioResultado = @userMsg) <> 5
+    INSERT INTO #culm1Cancel EXEC dbo.usp_cancelar_sesion @idSesion = @sFut, @motivo = @m501, @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
+    INSERT INTO #culm1Cancel EXEC dbo.usp_cancelar_sesion @idSesion = @sFut, @motivo = N'            ', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
+    INSERT INTO #culm1Cancel EXEC dbo.usp_cancelar_sesion @idSesion = @sFut, @motivo = N'    123456789     ', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
+    INSERT INTO #culm1Cancel EXEC dbo.usp_cancelar_sesion @idSesion = @sFut, @motivo = NULL, @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
+    IF (SELECT COUNT(*) FROM #culm1Cancel WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE N'DBCODE=SES[_]013|%' AND mensajeUsuarioResultado = @userMsg) <> 5
        OR EXISTS (SELECT 1 FROM dbo.SesionCancelacion WHERE sesion = @sFut)
        OR @userMsg NOT LIKE N'%10%500%'
         THROW 57130, 'TEST FAILED CULM001_B1_CAN_03: motivos fuera de 10..500 (tras recortar) deben responder SES_013 con los limites y sin escribir.', 1;
-    TRUNCATE TABLE #c;
+    TRUNCATE TABLE #culm1Cancel;
     PRINT 'TEST_PASS:CULM001_B1_CAN_03_MOTIVO_SES013';
 
     -- --------------------------------------------------------------------------------------------------------
     -- B1-CAN-01: el titular cancela una sesion futura sin registros (motivo recortado)
     -- --------------------------------------------------------------------------------------------------------
     SET @corr = NEWID();
-    INSERT INTO #c EXEC dbo.usp_cancelar_sesion @idSesion = @sFut, @motivo = N'   Calamidad domestica del docente   ', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
-    IF NOT EXISTS (SELECT 1 FROM #c WHERE estadoResultado = 1 AND idCorrelacion = @corr AND mensajeTecnicoResultado LIKE N'DBCODE=SES[_]014|%'
+    INSERT INTO #culm1Cancel EXEC dbo.usp_cancelar_sesion @idSesion = @sFut, @motivo = N'   Calamidad domestica del docente   ', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
+    IF NOT EXISTS (SELECT 1 FROM #culm1Cancel WHERE estadoResultado = 1 AND idCorrelacion = @corr AND mensajeTecnicoResultado LIKE N'DBCODE=SES[_]014|%'
                    AND idSesion = @sFut AND idGrupo = @g AND fechaCancelacionUtc IS NOT NULL AND totalEstudiantesActivos = 2)
         THROW 57140, 'TEST FAILED CULM001_B1_CAN_01: la cancelacion del titular debe responder SES_014 con idSesion, idGrupo, fecha y 2 estudiantes activos.', 1;
     IF NOT EXISTS (SELECT 1 FROM dbo.SesionCancelacion sc JOIN dbo.TipoCancelacionSesion t ON t.id = sc.tipoCancelacion
@@ -190,7 +190,7 @@ BEGIN TRY
                    AND idDiaFestivo IS NULL AND ventanaAbierta = 0)
        OR NOT EXISTS (SELECT 1 FROM dbo.uv_sesion_estado WHERE idSesion = @sFut2 AND estaCancelada = 0 AND codigoTipoCancelacion IS NULL)
         THROW 57142, 'TEST FAILED CULM001_B1_CAN_01: uv_sesion_estado no refleja la cancelacion.', 1;
-    TRUNCATE TABLE #c;
+    TRUNCATE TABLE #culm1Cancel;
     PRINT 'TEST_PASS:CULM001_B1_CAN_01_TITULAR_CANCELA';
 
     -- uv_sesion_estado: ventana con tolerancia/margen y horas de la sesion
@@ -206,38 +206,38 @@ BEGIN TRY
     -- B1-CAN-05: cancelar dos veces => SES_011 y motivo original intacto
     -- --------------------------------------------------------------------------------------------------------
     SET @corr = NEWID();
-    INSERT INTO #c EXEC dbo.usp_cancelar_sesion @idSesion = @sFut, @motivo = N'Otro motivo distinto de prueba', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
-    IF NOT EXISTS (SELECT 1 FROM #c WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE N'DBCODE=SES[_]011|%' AND idSesion IS NULL)
+    INSERT INTO #culm1Cancel EXEC dbo.usp_cancelar_sesion @idSesion = @sFut, @motivo = N'Otro motivo distinto de prueba', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
+    IF NOT EXISTS (SELECT 1 FROM #culm1Cancel WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE N'DBCODE=SES[_]011|%' AND idSesion IS NULL)
        OR NOT EXISTS (SELECT 1 FROM dbo.SesionCancelacion WHERE sesion = @sFut AND motivo = N'Calamidad domestica del docente')
        OR (SELECT COUNT(*) FROM dbo.SesionCancelacion WHERE sesion = @sFut) <> 1
         THROW 57150, 'TEST FAILED CULM001_B1_CAN_05: la segunda cancelacion debe responder SES_011 y conservar el motivo original.', 1;
-    TRUNCATE TABLE #c;
+    TRUNCATE TABLE #culm1Cancel;
     PRINT 'TEST_PASS:CULM001_B1_CAN_05_DOBLE_SES011';
 
     -- --------------------------------------------------------------------------------------------------------
     -- B1-CAN-04 / B1-CAN-08: con asistencia => SES_012 (ventana vigente) o SES_016 (terminada); pasada sin asistencia se cancela
     -- --------------------------------------------------------------------------------------------------------
     SET @corr = NEWID();
-    INSERT INTO #c EXEC dbo.usp_cancelar_sesion @idSesion = @sAttOpen, @motivo = N'Motivo valido de prueba', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
-    INSERT INTO #c EXEC dbo.usp_cancelar_sesion @idSesion = @sAttMargen, @motivo = N'Motivo valido de prueba', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
-    IF (SELECT COUNT(*) FROM #c WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE N'DBCODE=SES[_]012|%') <> 2
+    INSERT INTO #culm1Cancel EXEC dbo.usp_cancelar_sesion @idSesion = @sAttOpen, @motivo = N'Motivo valido de prueba', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
+    INSERT INTO #culm1Cancel EXEC dbo.usp_cancelar_sesion @idSesion = @sAttMargen, @motivo = N'Motivo valido de prueba', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
+    IF (SELECT COUNT(*) FROM #culm1Cancel WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE N'DBCODE=SES[_]012|%') <> 2
        OR EXISTS (SELECT 1 FROM dbo.SesionCancelacion WHERE sesion IN (@sAttOpen, @sAttMargen))
         THROW 57160, 'TEST FAILED CULM001_B1_CAN_04: una sesion con asistencia y ventana vigente (en curso o dentro del margen) debe responder SES_012 sin fila.', 1;
-    TRUNCATE TABLE #c;
+    TRUNCATE TABLE #culm1Cancel;
     PRINT 'TEST_PASS:CULM001_B1_CAN_04_CON_ASISTENCIA_SES012';
 
     SET @corr = NEWID();
-    INSERT INTO #c EXEC dbo.usp_cancelar_sesion @idSesion = @sAttEnded, @motivo = N'Motivo valido de prueba', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
-    IF NOT EXISTS (SELECT 1 FROM #c WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE N'DBCODE=SES[_]016|%')
+    INSERT INTO #culm1Cancel EXEC dbo.usp_cancelar_sesion @idSesion = @sAttEnded, @motivo = N'Motivo valido de prueba', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
+    IF NOT EXISTS (SELECT 1 FROM #culm1Cancel WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE N'DBCODE=SES[_]016|%')
        OR EXISTS (SELECT 1 FROM dbo.SesionCancelacion WHERE sesion = @sAttEnded)
         THROW 57161, 'TEST FAILED CULM001_B1_CAN_08: una sesion terminada con asistencia debe responder SES_016 sin fila.', 1;
-    TRUNCATE TABLE #c;
+    TRUNCATE TABLE #culm1Cancel;
     SET @corr = NEWID();
-    INSERT INTO #c EXEC dbo.usp_cancelar_sesion @idSesion = @sPastNoAtt, @motivo = N'Se reporta que la clase no se dicto', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
-    IF NOT EXISTS (SELECT 1 FROM #c WHERE estadoResultado = 1 AND mensajeTecnicoResultado LIKE N'DBCODE=SES[_]014|%')
+    INSERT INTO #culm1Cancel EXEC dbo.usp_cancelar_sesion @idSesion = @sPastNoAtt, @motivo = N'Se reporta que la clase no se dicto', @idCorrelacion = @corr, @idUsuarioEjecutor = @uD1;
+    IF NOT EXISTS (SELECT 1 FROM #culm1Cancel WHERE estadoResultado = 1 AND mensajeTecnicoResultado LIKE N'DBCODE=SES[_]014|%')
        OR NOT EXISTS (SELECT 1 FROM dbo.uv_sesion_estado WHERE idSesion = @sPastNoAtt AND estaCancelada = 1)
         THROW 57162, 'TEST FAILED CULM001_B1_CAN_08: una sesion pasada sin asistencia debe poder cancelarse.', 1;
-    TRUNCATE TABLE #c;
+    TRUNCATE TABLE #culm1Cancel;
     PRINT 'TEST_PASS:CULM001_B1_CAN_08_PASADA_Y_TERMINADA';
 
     -- --------------------------------------------------------------------------------------------------------
@@ -246,10 +246,10 @@ BEGIN TRY
     IF EXISTS (SELECT 1 FROM dbo.uv_cumplimiento_sesion_grupo WHERE idSesion IN (@sFut, @sPastNoAtt))
        OR NOT EXISTS (SELECT 1 FROM dbo.uv_cumplimiento_sesion_grupo WHERE idSesion = @sNormal)
         THROW 57170, 'TEST FAILED CULM001_B1_CAN_06: uv_cumplimiento_sesion_grupo debe excluir solo las sesiones canceladas.', 1;
-    TRUNCATE TABLE #k;
+    TRUNCATE TABLE #culm1Kpi;
     SET @corr = NEWID();
-    INSERT INTO #k EXEC dbo.usp_consultar_kpis_coordinador @idUsuarioEjecutor = @uCoord, @idCorrelacion = @corr, @idPeriodoAcademico = @per;
-    IF NOT EXISTS (SELECT 1 FROM #k WHERE sesionesProgramadas = @progAntes - 2 AND sesionesVencidas = @vencAntes - 1 AND sesionesEjecutadas = @ejecAntes
+    INSERT INTO #culm1Kpi EXEC dbo.usp_consultar_kpis_coordinador @idUsuarioEjecutor = @uCoord, @idCorrelacion = @corr, @idPeriodoAcademico = @per;
+    IF NOT EXISTS (SELECT 1 FROM #culm1Kpi WHERE sesionesProgramadas = @progAntes - 2 AND sesionesVencidas = @vencAntes - 1 AND sesionesEjecutadas = @ejecAntes
                    AND porcentajeProgresoCalendario = CAST(IIF(@progAntes - 2 = 0, NULL, 100.0 * (@vencAntes - 1) / (@progAntes - 2)) AS DECIMAL(5,2))
                    AND ISNULL(porcentajeCumplimiento, -1) = ISNULL(CAST(IIF(@vencAntes - 1 = 0, NULL, 100.0 * @ejecAntes / (@vencAntes - 1)) AS DECIMAL(5,2)), -1))
         THROW 57171, 'TEST FAILED CULM001_B1_CAN_06: el KPI del coordinador sigue contando las sesiones canceladas.', 1;
@@ -259,26 +259,17 @@ BEGIN TRY
     -- B1-CAN-07: destinatarios = matriculas A de la sesion cancelada; sesion no cancelada => sin filas; no titular => THROW
     -- --------------------------------------------------------------------------------------------------------
     SET @corr = NEWID();
-    INSERT INTO #d EXEC dbo.usp_consultar_destinatarios_sesion_cancelada @idUsuarioEjecutor = @uD1, @idCorrelacion = @corr, @idSesion = @sFut;
-    IF (SELECT COUNT(*) FROM #d) <> 2
-       OR EXISTS (SELECT 1 FROM #d WHERE idEstudiante NOT IN (@e1, @e2))
-       OR EXISTS (SELECT 1 FROM #d WHERE idUsuario NOT IN (@uE1, @uE2) OR correo NOT LIKE N'culm1.e%@test.local'
+    INSERT INTO #culm1Dest EXEC dbo.usp_consultar_destinatarios_sesion_cancelada @idUsuarioEjecutor = @uD1, @idCorrelacion = @corr, @idSesion = @sFut;
+    IF (SELECT COUNT(*) FROM #culm1Dest) <> 2
+       OR EXISTS (SELECT 1 FROM #culm1Dest WHERE idEstudiante NOT IN (@e1, @e2))
+       OR EXISTS (SELECT 1 FROM #culm1Dest WHERE idUsuario NOT IN (@uE1, @uE2) OR correo NOT LIKE N'culm1.e%@test.local'
                   OR motivoCancelacion <> N'Calamidad domestica del docente' OR nombreAsignatura IS NULL OR nombreGrupo IS NULL
                   OR nombreDocente NOT LIKE N'%Diana%' OR fechaHoraInicio IS NULL OR fechaHoraFin IS NULL OR nombreCompleto IS NULL)
         THROW 57180, 'TEST FAILED CULM001_B1_CAN_07: los destinatarios deben ser solo las 2 matriculas activas, con correo, docente y motivo.', 1;
-    TRUNCATE TABLE #d;
-    INSERT INTO #d EXEC dbo.usp_consultar_destinatarios_sesion_cancelada @idUsuarioEjecutor = @uD1, @idCorrelacion = @corr, @idSesion = @sFut2;
-    IF EXISTS (SELECT 1 FROM #d)
+    TRUNCATE TABLE #culm1Dest;
+    INSERT INTO #culm1Dest EXEC dbo.usp_consultar_destinatarios_sesion_cancelada @idUsuarioEjecutor = @uD1, @idCorrelacion = @corr, @idSesion = @sFut2;
+    IF EXISTS (SELECT 1 FROM #culm1Dest)
         THROW 57181, 'TEST FAILED CULM001_B1_CAN_07: una sesion no cancelada no debe tener destinatarios.', 1;
-    SET @err = NULL;
-    BEGIN TRY
-        INSERT INTO #d EXEC dbo.usp_consultar_destinatarios_sesion_cancelada @idUsuarioEjecutor = @uD2, @idCorrelacion = @corr, @idSesion = @sFut;
-    END TRY
-    BEGIN CATCH
-        SET @err = ERROR_MESSAGE();
-    END CATCH;
-    IF @err IS NULL OR @err NOT LIKE N'%DBCODE=SEC[_]002|%' OR EXISTS (SELECT 1 FROM #d)
-        THROW 57182, 'TEST FAILED CULM001_B1_CAN_07: un docente no titular debe recibir SEC_002 (THROW) al consultar destinatarios.', 1;
     PRINT 'TEST_PASS:CULM001_B1_CAN_07_DESTINATARIOS';
 
     -- Invariante de coherencia tipo/diaFestivo en toda la tabla
@@ -289,14 +280,40 @@ BEGIN TRY
 END TRY
 BEGIN CATCH
     IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-    DROP TABLE IF EXISTS #c, #k, #d;
+    DROP TABLE IF EXISTS #culm1Cancel, #culm1Kpi, #culm1Dest;
     THROW;
 END CATCH;
 IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-DROP TABLE IF EXISTS #c, #k, #d;
+DROP TABLE IF EXISTS #culm1Cancel, #culm1Kpi, #culm1Dest;
 IF @@TRANCOUNT <> 0 THROW 57199, 'TEST FAILED CULM001_B1_CAN: quedaron transacciones abiertas.', 1;
 IF EXISTS (SELECT 1 FROM dbo.Sesion WHERE nombre LIKE N'CULM1-CAN%')
     THROW 57198, 'TEST FAILED CULM001_B1_CAN: quedaron sesiones de prueba CULM1-CAN.', 1;
 PRINT 'TEST_PASS:CULM001_B1_CAN_TRANCOUNT_ZERO';
+GO
+
+-- B1-CAN-07 (ambito): un docente no titular recibe SEC_002 (THROW 51000). Fuera de la transaccion de la prueba porque
+-- el THROW de un SP de consulta con SET XACT_ABORT ON condena la transaccion del llamador.
+DECLARE @sesionAjena UNIQUEIDENTIFIER, @docenteAjeno UNIQUEIDENTIFIER, @err NVARCHAR(4000) = NULL, @corr UNIQUEIDENTIFIER = NEWID();
+SELECT TOP 1 @sesionAjena = s.id, @docenteAjeno = di2.idUsuario
+FROM dbo.uv_sesion s
+JOIN dbo.uv_grupo g ON g.id = s.idGrupo
+JOIN dbo.uv_docente_identidad di2 ON di2.id <> g.idDocente AND di2.estaActivoUsuario = 1
+WHERE NOT EXISTS (SELECT 1 FROM dbo.uv_grupo g2 JOIN dbo.uv_docente_identidad d3 ON d3.id = g2.idDocente
+                  WHERE g2.id = s.idGrupo AND d3.idUsuario = di2.idUsuario)
+ORDER BY s.id, di2.id;
+IF @sesionAjena IS NULL THROW 57183, 'TEST FAILED CULM001_B1_CAN_07: no hay sesion con un docente no titular para la prueba de ambito.', 1;
+CREATE TABLE #culm1DestAjeno (idEstudiante UNIQUEIDENTIFIER, idUsuario UNIQUEIDENTIFIER, nombreCompleto NVARCHAR(400), correo NVARCHAR(200), nombreAsignatura NVARCHAR(200),
+    nombreGrupo NVARCHAR(300), nombreDocente NVARCHAR(400), fechaHoraInicio DATETIME2, fechaHoraFin DATETIME2, motivoCancelacion NVARCHAR(500));
+BEGIN TRY
+    INSERT INTO #culm1DestAjeno EXEC dbo.usp_consultar_destinatarios_sesion_cancelada @idUsuarioEjecutor = @docenteAjeno, @idCorrelacion = @corr, @idSesion = @sesionAjena;
+END TRY
+BEGIN CATCH
+    SET @err = ERROR_MESSAGE();
+END CATCH;
+IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+IF @err IS NULL OR @err NOT LIKE N'%DBCODE=SEC[_]002|%' OR EXISTS (SELECT 1 FROM #culm1DestAjeno)
+    THROW 57182, 'TEST FAILED CULM001_B1_CAN_07: un docente no titular debe recibir SEC_002 (THROW) al consultar destinatarios.', 1;
+DROP TABLE #culm1DestAjeno;
+PRINT 'TEST_PASS:CULM001_B1_CAN_07_AMBITO_SEC002';
 PRINT 'TEST END: test_culm001_b1_sesion_cancelada';
 GO
