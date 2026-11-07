@@ -166,7 +166,9 @@ BEGIN
 
             IF EXISTS (SELECT 1 FROM dbo.SesionCancelacion sc WHERE sc.sesion = @idSesionDefecto)
                 SET @codigoRechazo = 'SES_011';
+            -- CULM-001 B.2 (CONTRACT §2.7.2 paso 8, §2.9): una toma (aunque no tenga lecturas) tambien impide cancelar
             ELSE IF EXISTS (SELECT 1 FROM dbo.Asistencia a WHERE a.sesion = @idSesionDefecto)
+                 OR EXISTS (SELECT 1 FROM dbo.TomaAsistencia t WHERE t.sesion = @idSesionDefecto)
                 SET @codigoRechazo = IIF(SYSUTCDATETIME() >= DATEADD(MINUTE, IIF(@margenMinutos IS NULL OR @margenMinutos < 0, 0, @margenMinutos), @fechaHoraFin),
                                          'SES_016', 'SES_012');
 

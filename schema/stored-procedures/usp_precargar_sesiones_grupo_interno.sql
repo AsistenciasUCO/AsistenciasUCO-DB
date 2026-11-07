@@ -151,6 +151,7 @@ BEGIN
               AND s.procedenciaTemporal = N'UTC_GENERADOR'
               AND NOT EXISTS (SELECT 1 FROM @slots x WHERE x.inicioUtc = s.fechaHoraInicio AND x.finUtc = s.fechaHoraFin)
               AND NOT EXISTS (SELECT 1 FROM dbo.Asistencia a WHERE a.sesion = s.id)
+              AND NOT EXISTS (SELECT 1 FROM dbo.TomaAsistencia t WHERE t.sesion = s.id)
               AND NOT EXISTS (SELECT 1 FROM dbo.SesionProcedenciaClasificacion c WHERE c.sesion = s.id);
 
             DELETE sc

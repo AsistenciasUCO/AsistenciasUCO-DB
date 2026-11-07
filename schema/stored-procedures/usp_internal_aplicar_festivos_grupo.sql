@@ -106,7 +106,8 @@ BEGIN
         BEGIN
             INSERT INTO @candidatas (idSesion, idDiaFestivo, fecha, nombreFestivo, tieneAsistencia)
             SELECT  s.id, df.id, df.fecha, df.nombre,
-                    CAST(IIF(EXISTS (SELECT 1 FROM dbo.Asistencia a WHERE a.sesion = s.id), 1, 0) AS BIT)
+                    CAST(IIF(EXISTS (SELECT 1 FROM dbo.Asistencia a WHERE a.sesion = s.id)
+                             OR EXISTS (SELECT 1 FROM dbo.TomaAsistencia t WHERE t.sesion = s.id), 1, 0) AS BIT)
             FROM    dbo.Sesion s WITH (UPDLOCK, HOLDLOCK)
             INNER JOIN dbo.DiaFestivo df
             ON      df.estaActivo = 1

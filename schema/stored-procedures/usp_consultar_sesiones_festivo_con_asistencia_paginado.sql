@@ -92,7 +92,7 @@ BEGIN
         fechaHoraInicio          = se.fechaHoraInicio,
         fecha                    = df.fecha,
         nombreFestivo            = df.nombre,
-        totalTomas               = CAST(0 AS INT),
+        totalTomas               = se.totalTomas,
         totalRegistrosAsistencia = asis.total,
         totalRegistros           = COUNT(1) OVER()
     FROM dbo.uv_sesion_estado se
@@ -105,7 +105,7 @@ BEGIN
     CROSS APPLY (SELECT total = COUNT(1) FROM dbo.uv_asistencia a WHERE a.idSesion = se.idSesion) asis
     WHERE se.estaCancelada = 0
       AND se.procedenciaTemporal IS NOT NULL
-      AND asis.total > 0
+      AND (asis.total > 0 OR se.totalTomas > 0)
       AND pa.idInstitucion IN (SELECT a.idInstitucion FROM dbo.uv_administrador a WHERE a.idUsuario = @idUsuarioDefecto)
     ORDER BY se.fechaHoraInicio ASC, se.idSesion ASC
     OFFSET @offset ROWS
