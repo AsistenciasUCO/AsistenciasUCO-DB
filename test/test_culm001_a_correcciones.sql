@@ -148,10 +148,20 @@ BEGIN
         (CAST(@p + 'A3' AS UNIQUEIDENTIFIER), CAST(@p + '81' AS UNIQUEIDENTIFIER), CAST(@p + 'A1' AS UNIQUEIDENTIFIER)),
         (CAST(@p + 'A4' AS UNIQUEIDENTIFIER), CAST(@p + '83' AS UNIQUEIDENTIFIER), CAST(@p + 'A1' AS UNIQUEIDENTIFIER)),
         (CAST(@p + 'A5' AS UNIQUEIDENTIFIER), CAST(@p + '81' AS UNIQUEIDENTIFIER), CAST(@p + 'A2' AS UNIQUEIDENTIFIER));
-    INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin) VALUES
-        (CAST(@p + 'A6' AS UNIQUEIDENTIFIER), @detalle, CAST(@p + 'A3' AS UNIQUEIDENTIFIER), 1, @an, DATEADD(HOUR, -3, SYSUTCDATETIME()), DATEADD(HOUR, -2, SYSUTCDATETIME())),
-        (CAST(@p + 'A7' AS UNIQUEIDENTIFIER), @detalle + 1, CAST(@p + 'A4' AS UNIQUEIDENTIFIER), 0, @sjc, DATEADD(HOUR, -3, SYSUTCDATETIME()), DATEADD(HOUR, -2, SYSUTCDATETIME())),
-        (CAST(@p + 'A8' AS UNIQUEIDENTIFIER), @detalle + 2, CAST(@p + 'A5' AS UNIQUEIDENTIFIER), 1, @an, DATEADD(HOUR, -27, SYSUTCDATETIME()), DATEADD(HOUR, -26, SYSUTCDATETIME()));
+    -- CULM-001 B.2 ([SUPUESTO-B-20], CONTRACT §2.3): la columna obligatoria DetalleAsistencia.toma exige la toma 1 de la sesion.
+    INSERT INTO dbo.TomaAsistencia (id, sesion, numero, modo, estado, esImplicita, docenteApertura, fechaAperturaUtc, fechaCierreUtc, idCorrelacionApertura)
+    SELECT NEWID(), s.id, 1, (SELECT m.id FROM dbo.ModoTomaAsistencia m WHERE m.usaCodigoQr = 0), (SELECT e.id FROM dbo.EstadoTomaAsistencia e WHERE e.estaAbierta = 0),
+           1, g.docente, CAST(s.fechaHoraInicio AS DATETIME2(0)), CAST(IIF(s.fechaHoraFin > s.fechaHoraInicio, s.fechaHoraFin, s.fechaHoraInicio) AS DATETIME2(0)), NEWID()
+    FROM dbo.Sesion s INNER JOIN dbo.Grupo g ON g.id = s.grupo
+    WHERE s.id IN (CAST(@p + 'A1' AS UNIQUEIDENTIFIER), CAST(@p + 'A2' AS UNIQUEIDENTIFIER)) AND NOT EXISTS (SELECT 1 FROM dbo.TomaAsistencia t WHERE t.sesion = s.id AND t.numero = 1);
+    INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin, toma)
+    SELECT v.id, v.codigo, v.asistencia, v.asistio, v.razon, v.inicio, v.fin, t.id
+    FROM (VALUES
+        (CAST(@p + 'A6' AS UNIQUEIDENTIFIER), @detalle, CAST(@p + 'A3' AS UNIQUEIDENTIFIER), CAST(1 AS BIT), @an, DATEADD(HOUR, -3, SYSUTCDATETIME()), DATEADD(HOUR, -2, SYSUTCDATETIME()), CAST(@p + 'A1' AS UNIQUEIDENTIFIER)),
+        (CAST(@p + 'A7' AS UNIQUEIDENTIFIER), @detalle + 1, CAST(@p + 'A4' AS UNIQUEIDENTIFIER), CAST(0 AS BIT), @sjc, DATEADD(HOUR, -3, SYSUTCDATETIME()), DATEADD(HOUR, -2, SYSUTCDATETIME()), CAST(@p + 'A1' AS UNIQUEIDENTIFIER)),
+        (CAST(@p + 'A8' AS UNIQUEIDENTIFIER), @detalle + 2, CAST(@p + 'A5' AS UNIQUEIDENTIFIER), CAST(1 AS BIT), @an, DATEADD(HOUR, -27, SYSUTCDATETIME()), DATEADD(HOUR, -26, SYSUTCDATETIME()), CAST(@p + 'A2' AS UNIQUEIDENTIFIER))
+    ) v (id, codigo, asistencia, asistio, razon, inicio, fin, sesion)
+    INNER JOIN dbo.TomaAsistencia t ON t.sesion = v.sesion AND t.numero = 1;
     INSERT INTO dbo.SolicitudRevisionAsistencia (id, nombre, asistencia, fecha, estado, justificacionSolicitud, justificacionRespuesta) VALUES
         (CAST(@p + 'A9' AS UNIQUEIDENTIFIER), N'REC-QAA2-1', CAST(@p + 'A4' AS UNIQUEIDENTIFIER), @hoy, @recP, 'QA A2 pendiente', ''),
         (CAST(@p + 'AA' AS UNIQUEIDENTIFIER), N'REC-QAA2-2', CAST(@p + 'A3' AS UNIQUEIDENTIFIER), @hoy, @recA, 'QA A2 aprobado', 'ok'),
