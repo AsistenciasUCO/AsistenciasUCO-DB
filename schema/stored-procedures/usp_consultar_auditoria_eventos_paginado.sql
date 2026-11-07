@@ -12,6 +12,11 @@ GO
 -- antes/despues: AuditoriaEvento no los guarda (decision de John, 2026-11-04: se consulta el rastro existente).
 -- Filtros: rango [@desdeUtc, @hastaUtc) obligatorio (el backend lo acota a 90 dias y por defecto a los ultimos 7),
 -- accion, tipo e id de recurso, usuario, resultado y @soloAsistencia (1 = solo acciones de asistencia).
+-- CULM-001 D.6 (CONTRACT v2 §7.3): al final @idCorrelacionEvento (eventos de una correlacion) y @soloAdministracion
+-- (1 = solo rutas que empiezan por AUDITORIA/PREFIJO_RUTA_ADMINISTRACION). @soloAsistencia conserva su defecto 1; T-SQL no
+-- distingue un defecto de un valor pasado, asi que el backend envia SIEMPRE los dos parametros explicitos y el SP rechaza
+-- (THROW, AUD_002) la combinacion @soloAsistencia = 1 AND @soloAdministracion = 1. [SUPUESTO-D-16]: con mas de una
+-- Institucion activa falla con AUD_001 y sin filas (la auditoria no tiene ambito por institucion).
 --
 -- Resultset: READ_QUERY_RESULTSET (filas + totalRegistros), NO el resultset canonico de 4 columnas
 -- de los comandos. Las fallas de validacion se propagan con THROW (VAL_001 / SEC_001 / PAG_001 / GEN_002).
@@ -31,7 +36,9 @@ CREATE OR ALTER PROCEDURE [dbo].[usp_consultar_auditoria_eventos_paginado]
     @idRecurso          NVARCHAR(120)    = NULL,
     @idUsuarioActor     UNIQUEIDENTIFIER = NULL,
     @resultado          VARCHAR(20)      = NULL,
-    @soloAsistencia     BIT              = 1
+    @soloAsistencia     BIT              = 1,
+    @idCorrelacionEvento UNIQUEIDENTIFIER = NULL,
+    @soloAdministracion BIT              = 0
 )
 AS
     DECLARE @idUsuario               UNIQUEIDENTIFIER;
@@ -42,6 +49,8 @@ AS
     DECLARE @idRecursoFiltro         NVARCHAR(120) = NULLIF(TRIM(@idRecurso), '');
     DECLARE @resultadoFiltro         VARCHAR(20) = NULLIF(TRIM(@resultado), '');
     DECLARE @idActorFiltro           NVARCHAR(120) = CONVERT(NVARCHAR(120), @idUsuarioActor);
+    DECLARE @prefijoAdministracion   NVARCHAR(240) = dbo.ufn_obtener_parametro('AUDITORIA', 'PREFIJO_RUTA_ADMINISTRACION');
+    DECLARE @totalInstituciones      INT;
     DECLARE @contextoPrevio          SQL_VARIANT = SESSION_CONTEXT(N'idUsuarioEjecutor');
     DECLARE @mensajeUsuarioResultado NVARCHAR(4000) = dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA');
     DECLARE @mensajeTecnicoResultado NVARCHAR(4000) = dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA');
@@ -62,6 +71,32 @@ BEGIN
             @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
             @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
             @estadoResultado = @estadoResultado OUTPUT;
+
+        -- PASO 1b (D.6): filtros excluyentes (AUD_002) y [SUPUESTO-D-16] una sola Institucion activa (AUD_001)
+        IF @estadoResultado = 1 AND ISNULL(@soloAsistencia, 0) = 1 AND ISNULL(@soloAdministracion, 0) = 1
+        BEGIN
+            EXEC dbo.usp_obtener_mensaje_catalogo
+                @p_codigo = 'AUD_002',
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
+            SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', CAST(@idCorrelacionDefecto AS NVARCHAR(50)));
+            SET @estadoResultado = 0;
+        END
+
+        IF @estadoResultado = 1
+        BEGIN
+            SELECT @totalInstituciones = COUNT(1) FROM dbo.uv_institucion WHERE estaActivaInstitucion = 1;
+            IF @totalInstituciones <> 1
+            BEGIN
+                EXEC dbo.usp_obtener_mensaje_catalogo
+                    @p_codigo = 'AUD_001',
+                    @p_param1 = @totalInstituciones,
+                    @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                    @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
+                SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', CAST(@idCorrelacionDefecto AS NVARCHAR(50)));
+                SET @estadoResultado = 0;
+            END
+        END
 
         -- PASO 2: Rango de fechas obligatorio (GEN_002)
         IF @estadoResultado = 1 AND (@desdeUtc IS NULL OR @hastaUtc IS NULL)
@@ -105,6 +140,9 @@ BEGIN
             a.occurredAt >= @desdeUtc
             AND a.occurredAt < @hastaUtc
             AND (@soloAsistencia = 0 OR a.esAccionAsistencia = 1)
+            AND (ISNULL(@soloAdministracion, 0) = 0 OR (@prefijoAdministracion IS NOT NULL AND LEN(@prefijoAdministracion) > 0
+                                                         AND LEFT(a.path, LEN(@prefijoAdministracion)) = @prefijoAdministracion))
+            AND (@idCorrelacionEvento IS NULL OR a.correlationId = @idCorrelacionEvento)
             AND (@accionFiltro IS NULL OR a.action = @accionFiltro)
             AND (@tipoRecursoFiltro IS NULL OR a.resourceType = @tipoRecursoFiltro)
             AND (@idRecursoFiltro IS NULL OR a.resourceId = @idRecursoFiltro)
