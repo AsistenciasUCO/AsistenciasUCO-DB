@@ -238,7 +238,7 @@ BEGIN TRY
     EXEC #d1_expect 'D1_12_PRIMER_ENVIO_EXITOSO', @ok;
     SELECT @filasAntes = COUNT(*) FROM dbo.SolicitudRevisionAsistencia;
     -- Se vence el plazo moviendo la sesion al pasado (el limite pasa a ser anterior a ahora).
-    UPDATE dbo.Sesion SET fechaHoraInicio = DATEADD(DAY, -60, fechaHoraInicio), fechaHoraFin = DATEADD(DAY, -60, fechaHoraFin) WHERE id = @sIdem;
+    UPDATE dbo.Sesion SET fechaHoraInicio = DATEADD(DAY, -60, fechaHoraInicio), fechaHoraFin = DATEADD(DAY, -60, fechaHoraFin), procedenciaTemporal = procedenciaTemporal WHERE id = @sIdem;
     TRUNCATE TABLE #w;
     INSERT INTO #w EXEC dbo.usp_radicar_solicitud_revision_asistencia_v2 @idEstudiante = @studentA, @idSesion = @sIdem,
         @categoria = N'ASISTENCIA', @justificacion = N'QA D1-12', @idArchivoSoporte = @fileIdem, @idCorrelacion = @corr, @idUsuarioEjecutor = @userA;
@@ -298,33 +298,6 @@ BEGIN TRY
         @idMateria = @asignatura, @numeroPagina = 2, @tamanoPagina = 3;
     SET @ok = IIF((SELECT COUNT(*) FROM #sm) = 3 AND NOT EXISTS (SELECT 1 FROM #sm WHERE totalRegistros <> (SELECT COUNT(*) FROM #esp)), 1, 0);
     EXEC #d1_expect 'D1_10_PAGINACION_Y_TOTAL', @ok;
-    -- (e) paginacion invalida: PAG_001 (THROW 51000)
-    SET @errNum = NULL;
-    BEGIN TRY
-        SET @corr = NEWID();
-        INSERT INTO #sm EXEC dbo.usp_consultar_sesiones_materia_estudiante @idUsuarioEjecutor = @userA, @idCorrelacion = @corr,
-            @idMateria = @asignatura, @numeroPagina = 1, @tamanoPagina = 0;
-    END TRY
-    BEGIN CATCH
-        SET @errNum = ERROR_NUMBER();
-        SET @errMsg = ERROR_MESSAGE();
-    END CATCH
-    EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = 'PAG_001', @p_param1 = N'1', @p_param2 = N'0',
-        @mensajeUsuarioResultado = @userMsg OUTPUT, @mensajeTecnicoResultado = @techMsg OUTPUT;
-    SET @ok = IIF(@errNum = 51000 AND @errMsg = @techMsg, 1, 0);
-    EXEC #d1_expect 'D1_10_PAGINACION_INVALIDA_PAG_001', @ok;
-    -- (f) un docente no es estudiante: THROW 51000
-    SET @errNum = NULL;
-    BEGIN TRY
-        SET @corr = NEWID();
-        INSERT INTO #sm EXEC dbo.usp_consultar_sesiones_materia_estudiante @idUsuarioEjecutor = @userT, @idCorrelacion = @corr,
-            @idMateria = @asignatura, @numeroPagina = 1, @tamanoPagina = 100;
-    END TRY
-    BEGIN CATCH
-        SET @errNum = ERROR_NUMBER();
-    END CATCH
-    SET @ok = IIF(@errNum = 51000, 1, 0);
-    EXEC #d1_expect 'D1_10_NO_ESTUDIANTE_RECHAZADO', @ok;
     -- (g) matricula inactiva (I) o cancelada por inasistencia (CI): 0 filas (cambio intencional, DEC-022 §3)
     TRUNCATE TABLE #sm;
     SELECT @idInscrita = eg.id FROM dbo.EstudianteGrupo eg WHERE eg.estudiante = @studentA AND eg.grupo = @group;
@@ -354,6 +327,36 @@ BEGIN TRY
     PRINT 'TEST_PASS:CULM001_D1_SEG_PERMISOS';
 
     ROLLBACK TRANSACTION;
+
+    -- (e) paginacion invalida: PAG_001 (THROW 51000). Fuera de la transaccion de la prueba: con XACT_ABORT ON el THROW
+    -- del SP deja condenada (XACT_STATE = -1) cualquier transaccion abierta.
+    SET @errNum = NULL;
+    BEGIN TRY
+        SET @corr = NEWID();
+        INSERT INTO #sm EXEC dbo.usp_consultar_sesiones_materia_estudiante @idUsuarioEjecutor = @userA, @idCorrelacion = @corr,
+            @idMateria = @asignatura, @numeroPagina = 1, @tamanoPagina = 0;
+    END TRY
+    BEGIN CATCH
+        SET @errNum = ERROR_NUMBER();
+        SET @errMsg = ERROR_MESSAGE();
+    END CATCH
+    EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = 'PAG_001', @p_param1 = N'1', @p_param2 = N'0',
+        @mensajeUsuarioResultado = @userMsg OUTPUT, @mensajeTecnicoResultado = @techMsg OUTPUT;
+    SET @ok = IIF(@errNum = 51000 AND @errMsg = @techMsg, 1, 0);
+    EXEC #d1_expect 'D1_10_PAGINACION_INVALIDA_PAG_001', @ok;
+    -- (f) un docente no es estudiante: THROW 51000
+    SET @errNum = NULL;
+    BEGIN TRY
+        SET @corr = NEWID();
+        INSERT INTO #sm EXEC dbo.usp_consultar_sesiones_materia_estudiante @idUsuarioEjecutor = @userT, @idCorrelacion = @corr,
+            @idMateria = @asignatura, @numeroPagina = 1, @tamanoPagina = 100;
+    END TRY
+    BEGIN CATCH
+        SET @errNum = ERROR_NUMBER();
+    END CATCH
+    SET @ok = IIF(@errNum = 51000, 1, 0);
+    EXEC #d1_expect 'D1_10_NO_ESTUDIANTE_RECHAZADO', @ok;
+    PRINT 'TEST_PASS:CULM001_D1_10_ERRORES_DE_VALIDACION';
 END TRY
 BEGIN CATCH
     DECLARE @fallo NVARCHAR(2000) = CONCAT(ERROR_MESSAGE(), N' (linea ', ERROR_LINE(), N')');
