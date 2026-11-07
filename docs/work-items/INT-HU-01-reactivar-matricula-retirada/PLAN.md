@@ -62,3 +62,5 @@ Revertir el commit: se elimina el bloque `ELSE IF EXISTS (... 'I')` del SP. No h
 
 Réplica del job `DB Quality Gate CI/CD` sobre SQL Server 2022 limpio (2026-10-28): `TEST_PASS:INT_HU01_RM01..RM03`, regresión S-01..S-12, R-*, RI-01..03; `TOTAL_EXECUTED=361`, `FAILED=0`, `DB GATE PASS`; `freeze-manifest -Mode Verify` = 0.
 Re-ejecutada tras integrar `origin/develop` (HU006, #58): `TOTAL_EXECUTED=364`, `FAILED=0`, `CRITICAL_MISSING=0`, `DB GATE PASS` (incluye `TEST_PASS:HU006_*` e `INT_HU01_RM01..RM03`).
+
+> **Retirado en CULM-001 A (2026-11-07):** las solicitudes de ingreso (HU053-HU055) se descartaron; la reactivacion de la matricula retirada vive en `usp_internal_reactivar_matricula_retirada` (DEC-009). Ver `docs/arquitectura/DOCUMENTACION_PROCEDIMIENTOS_PUBLICOS.md`, addendum CULM-001 A.

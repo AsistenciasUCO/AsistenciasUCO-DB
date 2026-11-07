@@ -30,11 +30,12 @@ BEGIN TRY
         THROW 54003, 'TEST FAILED DB-C01: SP dbo.usp_consultar_contacto_notificacion no existe.', 1;
 
     -- =========================================================================
-    -- DB-P01: Semillas v1 de los 4 tipos y sus marcadores con obligatorio
+    -- DB-P01: Semilla v1 del tipo vigente y sus marcadores con obligatorio. CULM-001 A (E-11): los 3 tipos
+    -- SOLICITUD_INGRESO_* se retiran con HU053-HU055; los conteos restan exactamente sus filas (4 -> 1, 9 -> 3).
     -- =========================================================================
     PRINT '-> DB-P01: usp_consultar_plantilla_notificacion_activa semillas v1 y marcadores';
-    IF (SELECT COUNT(*) FROM dbo.PlantillaNotificacion WHERE idioma = 'es' AND version = 1 AND activa = 1 AND creadoPor IS NULL AND tipo IN ('RETIRO_ESTUDIANTE_GRUPO','SOLICITUD_INGRESO_REGISTRADA','SOLICITUD_INGRESO_RESUELTA','SOLICITUD_INGRESO_RETIRADA')) <> 4
-        THROW 54010, 'TEST FAILED DB-P01: no existen exactamente las 4 plantillas semilla v1 activas en es.', 1;
+    IF (SELECT COUNT(*) FROM dbo.PlantillaNotificacion WHERE idioma = 'es' AND version = 1 AND activa = 1 AND creadoPor IS NULL AND tipo IN ('RETIRO_ESTUDIANTE_GRUPO')) <> 1
+        THROW 54010, 'TEST FAILED DB-P01: no existe exactamente la plantilla semilla v1 activa en es.', 1;
 
     IF NOT EXISTS (
         SELECT 1 FROM dbo.PlantillaNotificacion
@@ -44,64 +45,19 @@ BEGIN TRY
     )
         THROW 54011, 'TEST FAILED DB-P01: plantilla semilla RETIRO_ESTUDIANTE_GRUPO no coincide.', 1;
 
-    IF NOT EXISTS (
-        SELECT 1 FROM dbo.PlantillaNotificacion
-        WHERE tipo = 'SOLICITUD_INGRESO_REGISTRADA' AND idioma = 'es' AND version = 1 AND activa = 1
-          AND asunto = N'Nueva solicitud de ingreso al grupo {grupo}'
-          AND cuerpo = N'{estudiante} solicitó ingresar al grupo {grupo}. Revísala en la plataforma.'
-    )
-        THROW 54012, 'TEST FAILED DB-P01: plantilla semilla SOLICITUD_INGRESO_REGISTRADA no coincide.', 1;
-
-    IF NOT EXISTS (
-        SELECT 1 FROM dbo.PlantillaNotificacion
-        WHERE tipo = 'SOLICITUD_INGRESO_RESUELTA' AND idioma = 'es' AND version = 1 AND activa = 1
-          AND asunto = N'Respuesta a tu solicitud de ingreso al grupo {grupo}'
-          AND cuerpo = N'Tu solicitud de ingreso al grupo {grupo} fue {resultado}. Consulta el detalle en la plataforma.'
-    )
-        THROW 54013, 'TEST FAILED DB-P01: plantilla semilla SOLICITUD_INGRESO_RESUELTA no coincide.', 1;
-
-    IF NOT EXISTS (
-        SELECT 1 FROM dbo.PlantillaNotificacion
-        WHERE tipo = 'SOLICITUD_INGRESO_RETIRADA' AND idioma = 'es' AND version = 1 AND activa = 1
-          AND asunto = N'Solicitud de ingreso retirada del grupo {grupo}'
-          AND cuerpo = N'{estudiante} retiró su solicitud de ingreso al grupo {grupo}.'
-    )
-        THROW 54014, 'TEST FAILED DB-P01: plantilla semilla SOLICITUD_INGRESO_RETIRADA no coincide.', 1;
-
     -- Verificar marcadores por tipo y su flag obligatorio
-    IF (SELECT COUNT(*) FROM dbo.PlantillaNotificacionMarcador WHERE tipo IN ('RETIRO_ESTUDIANTE_GRUPO','SOLICITUD_INGRESO_REGISTRADA','SOLICITUD_INGRESO_RESUELTA','SOLICITUD_INGRESO_RETIRADA')) <> 9
-        THROW 54015, 'TEST FAILED DB-P01: el catalogo PlantillaNotificacionMarcador debe tener 9 marcadores sembrados.', 1;
+    IF (SELECT COUNT(*) FROM dbo.PlantillaNotificacionMarcador WHERE tipo IN ('RETIRO_ESTUDIANTE_GRUPO')) <> 3
+        THROW 54015, 'TEST FAILED DB-P01: el catalogo PlantillaNotificacionMarcador debe tener 3 marcadores sembrados.', 1;
 
     IF NOT EXISTS (SELECT 1 FROM dbo.PlantillaNotificacionMarcador WHERE tipo = 'RETIRO_ESTUDIANTE_GRUPO' AND marcador = 'grupo' AND obligatorio = 1)
        OR NOT EXISTS (SELECT 1 FROM dbo.PlantillaNotificacionMarcador WHERE tipo = 'RETIRO_ESTUDIANTE_GRUPO' AND marcador = 'estudiante' AND obligatorio = 1)
        OR NOT EXISTS (SELECT 1 FROM dbo.PlantillaNotificacionMarcador WHERE tipo = 'RETIRO_ESTUDIANTE_GRUPO' AND marcador = 'motivo' AND obligatorio = 0)
-       OR NOT EXISTS (SELECT 1 FROM dbo.PlantillaNotificacionMarcador WHERE tipo = 'SOLICITUD_INGRESO_REGISTRADA' AND marcador = 'grupo' AND obligatorio = 1)
-       OR NOT EXISTS (SELECT 1 FROM dbo.PlantillaNotificacionMarcador WHERE tipo = 'SOLICITUD_INGRESO_REGISTRADA' AND marcador = 'estudiante' AND obligatorio = 1)
-       OR NOT EXISTS (SELECT 1 FROM dbo.PlantillaNotificacionMarcador WHERE tipo = 'SOLICITUD_INGRESO_RESUELTA' AND marcador = 'grupo' AND obligatorio = 1)
-       OR NOT EXISTS (SELECT 1 FROM dbo.PlantillaNotificacionMarcador WHERE tipo = 'SOLICITUD_INGRESO_RESUELTA' AND marcador = 'resultado' AND obligatorio = 1)
-       OR NOT EXISTS (SELECT 1 FROM dbo.PlantillaNotificacionMarcador WHERE tipo = 'SOLICITUD_INGRESO_RETIRADA' AND marcador = 'grupo' AND obligatorio = 1)
-       OR NOT EXISTS (SELECT 1 FROM dbo.PlantillaNotificacionMarcador WHERE tipo = 'SOLICITUD_INGRESO_RETIRADA' AND marcador = 'estudiante' AND obligatorio = 1)
         THROW 54016, 'TEST FAILED DB-P01: marcadores u obligatoriedad incorrectos en PlantillaNotificacionMarcador.', 1;
 
-    -- Invocar SP para los 4 tipos (normalizando minusculas/espacios)
+    -- Invocar SP para el tipo vigente (normalizando minusculas/espacios)
     DECLARE @corr UNIQUEIDENTIFIER = NEWID();
     EXEC dbo.usp_consultar_plantilla_notificacion_activa
         @tipo = N'  retiro_estudiante_grupo  ',
-        @idioma = 'es',
-        @idCorrelacion = @corr;
-
-    EXEC dbo.usp_consultar_plantilla_notificacion_activa
-        @tipo = N'SOLICITUD_INGRESO_REGISTRADA',
-        @idioma = 'es',
-        @idCorrelacion = @corr;
-
-    EXEC dbo.usp_consultar_plantilla_notificacion_activa
-        @tipo = N'SOLICITUD_INGRESO_RESUELTA',
-        @idioma = 'es',
-        @idCorrelacion = @corr;
-
-    EXEC dbo.usp_consultar_plantilla_notificacion_activa
-        @tipo = N'SOLICITUD_INGRESO_RETIRADA',
         @idioma = 'es',
         @idCorrelacion = @corr;
 
@@ -324,10 +280,7 @@ BEGIN TRY
     -- Re-ejecutar logica idempotente de semilla
     MERGE INTO [dbo].[PlantillaNotificacion] AS Target
     USING (VALUES
-        ('RETIRO_ESTUDIANTE_GRUPO', 'es', 1, N'Retiro del grupo {grupo}', N'Se registró el retiro de {estudiante} del grupo {grupo}.', 1),
-        ('SOLICITUD_INGRESO_REGISTRADA', 'es', 1, N'Nueva solicitud de ingreso al grupo {grupo}', N'{estudiante} solicitó ingresar al grupo {grupo}. Revísala en la plataforma.', 1),
-        ('SOLICITUD_INGRESO_RESUELTA', 'es', 1, N'Respuesta a tu solicitud de ingreso al grupo {grupo}', N'Tu solicitud de ingreso al grupo {grupo} fue {resultado}. Consulta el detalle en la plataforma.', 1),
-        ('SOLICITUD_INGRESO_RETIRADA', 'es', 1, N'Solicitud de ingreso retirada del grupo {grupo}', N'{estudiante} retiró su solicitud de ingreso al grupo {grupo}.', 1)
+        ('RETIRO_ESTUDIANTE_GRUPO', 'es', 1, N'Retiro del grupo {grupo}', N'Se registró el retiro de {estudiante} del grupo {grupo}.', 1)
     ) AS Source (tipo, idioma, version, asunto, cuerpo, activa)
     ON (Target.tipo = Source.tipo AND Target.idioma = Source.idioma AND Target.version = Source.version)
     WHEN MATCHED THEN

@@ -38,3 +38,5 @@ last-reviewed: 2026-10-27
 ## Cambio posterior: INT-HU-01 (2026-10-28)
 
 Decisión de John (opción a): si un estudiante retirado del grupo (HU051, matrícula `I`) vuelve a solicitar el ingreso y el docente lo acepta (HU055), `usp_resolver_solicitud_ingreso_grupo` **reactiva** esa matrícula (`I` → `A`) en lugar de fallar con 409 por duplicado. Cupo y regla ESP de HU008 respetados; una matrícula activa sigue bloqueando (`SIG_004`). Prueba: `test/test_int_hu01_reactivar_matricula_retirada.sql` (RM-01..RM-03). Detalle: `docs/work-items/INT-HU-01-reactivar-matricula-retirada/`.
+
+> **Retirado en CULM-001 A (2026-11-07):** las solicitudes de ingreso (HU053-HU055) se descartaron; la reactivacion de la matricula retirada vive en `usp_internal_reactivar_matricula_retirada` (DEC-009). Ver `docs/arquitectura/DOCUMENTACION_PROCEDIMIENTOS_PUBLICOS.md`, addendum CULM-001 A.

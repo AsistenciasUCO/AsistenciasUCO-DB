@@ -14,11 +14,11 @@ GO
 -- (basicas) e INS (institucionales) son TRANSVERSALES. La oferta incluye:
 --   - los grupos de asignaturas ESP de los programas en que esta inscrito (EstudiantePrograma);
 --   - si OFERTA.INCLUIR_TRANSVERSALES = 1 (por defecto), los grupos de asignaturas BAS/INS de cualquier programa de
---     la(s) institucion(es) de sus programas. Con 0 no se muestran transversales (solo se ingresa con el enlace del
---     docente, HU053).
--- Cada fila trae docente, horario, capacidad y cupos (capacidad - matriculas activas, minimo 0), el componente de la
--- asignatura y la relacion del estudiante con el grupo: matriculado (matricula activa A) y solicitud de ingreso abierta
--- (P o E, HU053-HU055).
+--     la(s) institucion(es) de sus programas. Con 0 no se muestran transversales (solo se ingresa con el QR/PIN del
+--     docente, HU176B, o por matricula manual del docente, HU050).
+-- Cada fila trae docente, horario, capacidad y cupos (capacidad - matriculas inscritas, minimo 0), el componente de la
+-- asignatura y si el estudiante esta matriculado. Solo la matricula con el codigo del parametro MATRICULA/ESTADO_INSCRITA
+-- cuenta como inscrita (CULM-001 A, N10). CULM-001 A.1: sin columnas de solicitud de ingreso (19 columnas).
 -- Un ejecutor que no es estudiante obtiene 0 filas. Busqueda por asignatura (nombre o codigo) o nombre del grupo.
 -- Paginacion acotada como R2 (pagina >= 1, tamano 1..100). Solo lectura.
 -- ============================================================================
@@ -49,6 +49,7 @@ AS
     DECLARE @mensajeTecnicoResultado NVARCHAR(4000) = dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA');
     DECLARE @estadoResultado BIT = 1;
     DECLARE @idEstudiante UNIQUEIDENTIFIER;
+    DECLARE @codigoInscrita NVARCHAR(10) = CAST(dbo.ufn_obtener_parametro('MATRICULA', 'ESTADO_INSCRITA') AS NVARCHAR(10));
 
 BEGIN
     SET NOCOUNT ON;
@@ -85,7 +86,7 @@ BEGIN
             asg.id AS idAsignatura, asg.codigo AS codigoAsignatura, asg.nombre AS nombreAsignatura,
             g.docente, pa.id AS idPeriodo, pa.nombre AS nombrePeriodo, pa.fechaInicio, pa.fechaFin, comp.codigo AS codigoComponente,
             activos = (SELECT COUNT(*) FROM dbo.EstudianteGrupo eg INNER JOIN dbo.EstadoEstudianteGrupo ee ON ee.id = eg.estado
-                       WHERE eg.grupo = g.id AND ee.codigo = 'A')
+                       WHERE eg.grupo = g.id AND ee.codigo = @codigoInscrita)
         FROM dbo.Grupo g
         INNER JOIN dbo.PeriodoAcademico pa ON pa.id = g.periodoAcademico
         INNER JOIN dbo.Asignatura asg ON asg.id = g.asignatura
@@ -141,20 +142,12 @@ BEGIN
         cuposDisponibles       = IIF(o.capacidad - o.activos < 0, 0, o.capacidad - o.activos),
         matriculado            = CAST(IIF(EXISTS (
                                      SELECT 1 FROM dbo.EstudianteGrupo eg INNER JOIN dbo.EstadoEstudianteGrupo ee ON ee.id = eg.estado
-                                     WHERE eg.grupo = o.id AND eg.estudiante = @idEstudiante AND ee.codigo = 'A'), 1, 0) AS BIT),
-        idSolicitudAbierta     = sol.id,
-        codigoEstadoSolicitud  = CAST(sol.codigo AS CHAR(1)),
+                                     WHERE eg.grupo = o.id AND eg.estudiante = @idEstudiante AND ee.codigo = @codigoInscrita), 1, 0) AS BIT),
         codigoComponente       = CAST(o.codigoComponente AS NVARCHAR(3)),
         totalRegistros         = COUNT(*) OVER()
     FROM oferta o
     INNER JOIN dbo.Docente doc ON doc.id = o.docente
     INNER JOIN dbo.Usuario ud  ON ud.id = doc.usuario
-    OUTER APPLY (
-        SELECT TOP 1 s.id, est.codigo
-        FROM dbo.SolicitudIngresoGrupo s
-        INNER JOIN dbo.Estado est ON est.id = s.estado
-        WHERE s.grupo = o.id AND s.estudiante = @idEstudiante AND est.codigo IN ('P', 'E')
-    ) sol
     ORDER BY o.nombreAsignatura ASC, o.fechaInicio ASC, o.codigo ASC, o.id ASC
     OFFSET @offset ROWS
     FETCH NEXT @tamano ROWS ONLY;

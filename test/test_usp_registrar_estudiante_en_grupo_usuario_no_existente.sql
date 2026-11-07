@@ -10,7 +10,9 @@ DECLARE @numero INT = 1000000000 + ABS(CHECKSUM(NEWID()) % 500000000);
 DECLARE @corr UNIQUEIDENTIFIER = NEWID();
 DECLARE @usuario UNIQUEIDENTIFIER;
 DECLARE @estudiante UNIQUEIDENTIFIER;
-DECLARE @idUsuarioEstudianteEjecutor UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_docente_identidad WHERE estaActivoUsuario = 1);
+-- CULM-001 A (E-15, F-COO-004): solo el DOCENTE titular del grupo matricula; el ejecutor es el titular de @grupo.
+DECLARE @idUsuarioEstudianteEjecutor UNIQUEIDENTIFIER = (SELECT di.idUsuario FROM dbo.uv_grupo g
+    INNER JOIN dbo.uv_docente_identidad di ON di.id = g.idDocente WHERE g.id = @grupo);
 
 IF @tipoId IS NULL OR @grupo IS NULL OR @idUsuarioEstudianteEjecutor IS NULL THROW 51100, 'TEST FAILED: STUDENT_SUCCESS fixture missing.', 1;
 
@@ -151,7 +153,8 @@ DECLARE @period UNIQUEIDENTIFIER = NEWID(), @closedGroup UNIQUEIDENTIFIER = NEWI
 DECLARE @correo NVARCHAR(255) = CONCAT(N'qa.student.closed.', REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), dbo.ufn_obtener_parametro('REGISTRO', 'DOMINIO_CORREO_ESTUDIANTE'));
 DECLARE @numero INT = 1000000000 + ABS(CHECKSUM(NEWID()) % 500000000);
 DECLARE @userMsg NVARCHAR(4000), @techMsg NVARCHAR(4000);
-DECLARE @idUsuarioEstudianteEjecutor UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_docente_identidad WHERE estaActivoUsuario = 1);
+-- CULM-001 A (E-15): el ejecutor es el titular del grupo cerrado (@teacher).
+DECLARE @idUsuarioEstudianteEjecutor UNIQUEIDENTIFIER = (SELECT idUsuario FROM dbo.uv_docente_identidad WHERE id = @teacher);
 IF @baseGroup IS NULL OR @institution IS NULL OR @idUsuarioEstudianteEjecutor IS NULL THROW 51110, 'TEST FAILED: STUDENT_GROUP_DISABLED fixture missing.', 1;
 BEGIN TRANSACTION;
 BEGIN TRY
@@ -210,7 +213,8 @@ DECLARE @fullGroup UNIQUEIDENTIFIER = NEWID(), @corr UNIQUEIDENTIFIER = NEWID();
 DECLARE @correo NVARCHAR(255) = CONCAT(N'qa.student.full.', REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), dbo.ufn_obtener_parametro('REGISTRO', 'DOMINIO_CORREO_ESTUDIANTE'));
 DECLARE @numero INT = 1000000000 + ABS(CHECKSUM(NEWID()) % 500000000);
 DECLARE @userMsg NVARCHAR(4000), @techMsg NVARCHAR(4000);
-DECLARE @idUsuarioEstudianteEjecutor UNIQUEIDENTIFIER = (SELECT TOP 1 idUsuario FROM dbo.uv_docente_identidad WHERE estaActivoUsuario = 1);
+-- CULM-001 A (E-15): el ejecutor es el titular del grupo lleno (@teacher).
+DECLARE @idUsuarioEstudianteEjecutor UNIQUEIDENTIFIER = (SELECT idUsuario FROM dbo.uv_docente_identidad WHERE id = @teacher);
 IF @baseGroup IS NULL OR @existingStudent IS NULL OR @activeState IS NULL OR @idUsuarioEstudianteEjecutor IS NULL
     THROW 51113, 'TEST FAILED: STUDENT_CAPACITY_EXCEEDED fixture missing.', 1;
 BEGIN TRANSACTION;

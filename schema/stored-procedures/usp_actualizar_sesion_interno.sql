@@ -11,6 +11,9 @@ GO
 -- PUT completo de horas: horas y marca se escriben en el MISMO UPDATE. Una actualizacion v1 de una
 -- sesion confirmada la vuelve INDETERMINADA aunque el valor temporal sea identico, porque v1 no
 -- declara zona. Solo NULL o UTC_V2 se aceptan por esta via.
+-- CULM-001 A.2-10 (F-DOC-017): si cambian fechaHoraInicio o fechaHoraFin respecto de la fila guardada (N6), la sesion no
+-- puede cruzarse con otra del grupo o de otro grupo del mismo docente (SES_017, excluida ella misma); un cambio de solo
+-- nombre no se valida, asi una sesion con un solape heredado puede seguir renombrandose. Transaccion propia o savepoint.
 CREATE OR ALTER PROCEDURE [dbo].[usp_actualizar_sesion_interno]
 (
     @idSesion                UNIQUEIDENTIFIER,
@@ -32,6 +35,13 @@ AS
     DECLARE @nombreDefecto            NVARCHAR(50)     = TRIM(@nombre);
 
     DECLARE @idGrupoSesion UNIQUEIDENTIFIER;
+    DECLARE @inicioActual  DATETIME2;
+    DECLARE @finActual     DATETIME2;
+
+    -- Ownership transaccional (propia o savepoint bajo transaccion externa)
+    DECLARE @transaccionPropia      BIT = 0;
+    DECLARE @savepointCreado        BIT = 0;
+    DECLARE @estadoTransaccionCatch INT;
 
 BEGIN
     SET NOCOUNT ON;
@@ -99,6 +109,38 @@ BEGIN
                 @faseValidacion = 2;
         END
 
+        -- PASO 5 (CULM-001 A.2-10): transaccion y solape solo si cambia el horario guardado (N6)
+        IF @estadoResultado = 1
+        BEGIN
+            IF @@TRANCOUNT = 0
+            BEGIN
+                BEGIN TRANSACTION;
+                SET @transaccionPropia = 1;
+            END
+            ELSE
+            BEGIN
+                SAVE TRANSACTION usp_actualizar_sesion;
+                SET @savepointCreado = 1;
+            END
+
+            SELECT @inicioActual = s.fechaHoraInicio, @finActual = s.fechaHoraFin
+            FROM dbo.Sesion s WITH (UPDLOCK, HOLDLOCK)
+            WHERE s.id = @idSesionDefecto;
+
+            IF @inicioActual IS NULL OR @finActual IS NULL OR @inicioActual <> @fechaHoraInicio OR @finActual <> @fechaHoraFin
+            BEGIN
+                EXEC dbo.usp_validar_solape_sesion_interno
+                    @idGrupo = @idGrupoSesion,
+                    @idSesionExcluir = @idSesionDefecto,
+                    @fechaHoraInicio = @fechaHoraInicio,
+                    @fechaHoraFin = @fechaHoraFin,
+                    @idCorrelacion = @idCorrelacionDefecto,
+                    @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                    @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+                    @estadoResultado = @estadoResultado OUTPUT;
+            END
+        END
+
         IF @estadoResultado = 1
         BEGIN
             -- Horas y procedencia en la MISMA sentencia (UTC-D06).
@@ -108,13 +150,41 @@ BEGIN
                 fechaHoraFin = @fechaHoraFin,
                 procedenciaTemporal = @procedenciaTemporal
             WHERE id = @idSesionDefecto;
+        END
 
+        -- Cierre de la transaccion propia (el rechazo por solape no escribe)
+        IF @transaccionPropia = 1
+        BEGIN
+            IF XACT_STATE() = 1
+                COMMIT TRANSACTION;
+            ELSE IF XACT_STATE() <> 0
+                ROLLBACK TRANSACTION;
+        END
+
+        IF @estadoResultado = 1
+        BEGIN
             EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = 'GEN_004', @p_param1 = 'Sesion', @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT, @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
             SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
         END
 
     END TRY
     BEGIN CATCH
+        SET @estadoTransaccionCatch = XACT_STATE();
+        IF @transaccionPropia = 1
+        BEGIN
+            IF @estadoTransaccionCatch <> 0
+                ROLLBACK TRANSACTION;
+        END
+        ELSE IF @savepointCreado = 1 AND @estadoTransaccionCatch = 1
+        BEGIN
+            ROLLBACK TRANSACTION usp_actualizar_sesion;
+        END
+
+        IF @transaccionPropia = 0 AND @estadoTransaccionCatch = -1
+        BEGIN
+            THROW;
+        END
+
         EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = 'SYS_001', @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT, @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
         SET @mensajeTecnicoResultado = dbo.ufn_obtener_detalle_error(@idCorrelacionDefecto);
         SET @estadoResultado = 0;

@@ -5,6 +5,17 @@ GO
 SET QUOTED_IDENTIFIER ON;
 GO
 
+-- ============================================================================
+-- usp_registrar_estudiante_en_grupo (HU050, STUDENT-GROUP CANONICAL COMMAND, NON-GOLDEN)
+--
+-- Matricula manual de un estudiante en un grupo. CULM-001 A.1:
+--   * F-COO-004: solo el DOCENTE TITULAR del grupo matricula (perfil DOCENTE y titularidad GRUPO, SEC_001/SEC_002).
+--   * DEC-009: una matricula retirada del estudiante en el grupo se reactiva (la misma fila) en el interno.
+--   * Atomico (bloqueante 1): SET XACT_ABORT ON; transaccion propia si @@TRANCOUNT = 0, si no savepoint
+--     sp_registrar_estudiante_grupo. Las validaciones sin escritura van antes del savepoint de negocio
+--     sp_registrar_estudiante_negocio; un rechazo posterior a crear Usuario/Estudiante revierte ese savepoint (sin filas
+--     parciales). El resultset canonico va fuera de la transaccion. Firma y resultset sin cambio.
+-- ============================================================================
 CREATE OR ALTER PROCEDURE [dbo].[usp_registrar_estudiante_en_grupo]
 (
     @idGrupo                 UNIQUEIDENTIFIER,
@@ -31,9 +42,27 @@ AS
     DECLARE @mensajeTecnicoResultado NVARCHAR(4000) = dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA');
     DECLARE @estadoResultado         BIT = 1;
 
+    DECLARE @conteoTransaccionesInicial INT = 0;
+    DECLARE @transaccionPropia          BIT = 0;
+    DECLARE @savepointCreado            BIT = 0;
+    DECLARE @identidadEscrita           BIT = 0;
+    DECLARE @estadoTransaccionCatch     INT;
+
 BEGIN
     SET NOCOUNT ON;
+    SET XACT_ABORT ON;
     BEGIN TRY
+        SET @conteoTransaccionesInicial = @@TRANCOUNT;
+        IF @conteoTransaccionesInicial = 0
+        BEGIN
+            BEGIN TRANSACTION;
+            SET @transaccionPropia = 1;
+        END
+        ELSE
+        BEGIN
+            SAVE TRANSACTION sp_registrar_estudiante_grupo;
+            SET @savepointCreado = 1;
+        END
 
         -- PASO 1: Validación del identificador de correlación obligatorio
         EXEC dbo.usp_validar_id_correlacion_esta_presente_interno
@@ -59,7 +88,7 @@ BEGIN
         BEGIN
             EXEC dbo.usp_validar_permiso_rbac_usuario_interno
                 @idUsuario = @idUsuarioEjecutorDefecto,
-                @codigoPerfilRequerido = 'DOCENTE,COORDINADOR',
+                @codigoPerfilRequerido = 'DOCENTE',
                 @idCorrelacion = @idCorrelacionDefecto,
                 @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                 @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
@@ -71,6 +100,19 @@ BEGIN
         BEGIN
             EXEC dbo.usp_validar_grupo_exista_por_id_interno
                 @idGrupo = @idGrupoDefecto,
+                @idCorrelacion = @idCorrelacionDefecto,
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+                @estadoResultado = @estadoResultado OUTPUT;
+        END
+
+        -- PASO 1.85 (CULM-001 A.1, F-COO-004): el ejecutor debe ser el docente titular del grupo (SEC_002).
+        IF @estadoResultado = 1
+        BEGIN
+            EXEC dbo.usp_validar_titularidad_jerarquica_interno
+                @idUsuario = @idUsuarioEjecutorDefecto,
+                @idEntidadPadre = @idGrupoDefecto,
+                @tipoEntidadPadre = 'GRUPO',
                 @idCorrelacion = @idCorrelacionDefecto,
                 @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                 @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
@@ -90,9 +132,11 @@ BEGIN
                 @estadoResultado = @estadoResultado OUTPUT;
         END
 
-        -- PASO 2: Sincronización de identidad (Usuario y Estudiante) e inscripción en grupo
+        -- PASO 2: Sincronización de identidad (Usuario y Estudiante) e inscripción en grupo, bajo el savepoint de negocio
         IF @estadoResultado = 1
         BEGIN
+            SAVE TRANSACTION sp_registrar_estudiante_negocio;
+
             DECLARE @idTipoIdTarget UNIQUEIDENTIFIER = @idTipoIdIdentificacion;
             IF @idTipoIdTarget IS NULL
             BEGIN
@@ -123,6 +167,7 @@ BEGIN
 
             IF @estadoResultado = 1 AND @idUsuarioTarget IS NULL
             BEGIN
+                SET @identidadEscrita = 1;
                 EXEC dbo.usp_sincronizar_usuario_interno
                     @idTipoIdIdentificacion = @idTipoIdTarget,
                     @numeroIdentificacion = @numeroIdentificacion,
@@ -147,6 +192,7 @@ BEGIN
 
                 IF @idEstudianteResultado IS NULL
                 BEGIN
+                    SET @identidadEscrita = 1;
                     EXEC dbo.usp_sincronizar_estudiante_interno
                         @idUsuario = @idUsuarioTarget,
                         @idCorrelacion = @idCorrelacionDefecto,
@@ -169,10 +215,37 @@ BEGIN
                     @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
                     @estadoResultado = @estadoResultado OUTPUT;
             END
+
+            -- Rechazo despues de crear Usuario/Estudiante: se revierte solo el trabajo de negocio. Sin identidad escrita
+            -- no hay nada que revertir (el interno no deja escrituras en sus rechazos de negocio), y se evita un
+            -- ROLLBACK innecesario, que SQL Server prohibe bajo INSERT ... EXEC.
+            IF @estadoResultado = 0 AND @identidadEscrita = 1 AND XACT_STATE() = 1
+                ROLLBACK TRANSACTION sp_registrar_estudiante_negocio;
+        END
+
+        -- Cierre de la transaccion propia
+        IF @transaccionPropia = 1
+        BEGIN
+            IF XACT_STATE() = 1
+                COMMIT TRANSACTION;
+            ELSE IF XACT_STATE() = -1
+                ROLLBACK TRANSACTION;
         END
 
     END TRY
     BEGIN CATCH
+        SET @estadoTransaccionCatch = XACT_STATE();
+        IF @transaccionPropia = 1
+        BEGIN
+            IF @@TRANCOUNT > 0
+                ROLLBACK TRANSACTION;
+        END
+        ELSE IF @savepointCreado = 1 AND @estadoTransaccionCatch = 1
+            ROLLBACK TRANSACTION sp_registrar_estudiante_grupo;
+
+        IF @transaccionPropia = 0 AND @estadoTransaccionCatch = -1
+            THROW;
+
         EXEC dbo.usp_obtener_mensaje_catalogo
             @p_codigo = 'SYS_001',
             @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,

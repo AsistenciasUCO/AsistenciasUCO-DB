@@ -18,11 +18,10 @@ DECLARE @compINS UNIQUEIDENTIFIER = (SELECT id FROM dbo.Componente WHERE codigo 
 DECLARE @compBAS UNIQUEIDENTIFIER = (SELECT id FROM dbo.Componente WHERE codigo = N'BAS');
 DECLARE @estA          UNIQUEIDENTIFIER = (SELECT id FROM dbo.EstadoEstudianteGrupo WHERE codigo = N'A');
 DECLARE @estI          UNIQUEIDENTIFIER = (SELECT id FROM dbo.EstadoEstudianteGrupo WHERE codigo = N'I');
-DECLARE @solP          UNIQUEIDENTIFIER = (SELECT id FROM dbo.Estado WHERE codigo = 'P' AND id = 'B4B4D37E-6A8F-4E1D-AF32-0B2C60E2E977');
 DECLARE @diaLu UNIQUEIDENTIFIER = (SELECT id FROM dbo.Dia WHERE codigo = N'LU');
 DECLARE @diaMa UNIQUEIDENTIFIER = (SELECT id FROM dbo.Dia WHERE codigo = N'MA');
 IF @idInstitucion IS NULL OR @tipoId IS NULL OR @tipoProg IS NULL OR @semestre IS NULL OR @area IS NULL OR @compESP IS NULL OR @compINS IS NULL OR @compBAS IS NULL
-   OR @estA IS NULL OR @estI IS NULL OR @solP IS NULL OR @diaLu IS NULL OR @diaMa IS NULL
+   OR @estA IS NULL OR @estI IS NULL OR @diaLu IS NULL OR @diaMa IS NULL
     THROW 53900, 'TEST FAILED: fixtures base no disponibles.', 1;
 
 BEGIN TRANSACTION;
@@ -92,21 +91,18 @@ BEGIN TRY
         (NEWID(), @g1, @diaMa, '10:00', '12:00'), (NEWID(), @g1, @diaLu, '08:00', '10:00');
     INSERT INTO dbo.EstudianteGrupo (id, estado, estudiante, grupo) VALUES
         (NEWID(), @estA, @e2, @g1), (NEWID(), @estI, @e1, @g1), (NEWID(), @estA, @e1, @g5);
-    DECLARE @sol UNIQUEIDENTIFIER = NEWID();
-    INSERT INTO dbo.SolicitudIngresoGrupo (id, estudiante, grupo, estado, fechaSolicitudUtc) VALUES (@sol, @e1, @g2, @solP, SYSUTCDATETIME());
 
     DECLARE @c UNIQUEIDENTIFIER = NEWID(), @err NVARCHAR(4000);
     CREATE TABLE #o (n INT IDENTITY(1,1), idGrupo UNIQUEIDENTIFIER, codigoGrupo INT, nombreGrupo NVARCHAR(50), idAsignatura UNIQUEIDENTIFIER,
         codigoAsignatura NVARCHAR(20), nombreAsignatura NVARCHAR(100), nombreDocente NVARCHAR(400), idPeriodoAcademico UNIQUEIDENTIFIER,
         nombrePeriodoAcademico NVARCHAR(50), fechaInicioPeriodo DATE, fechaFinPeriodo DATE, estadoPeriodo NVARCHAR(10), horario NVARCHAR(400),
-        capacidadMaxima INT, estudiantesActivos INT, cuposDisponibles INT, matriculado BIT, idSolicitudAbierta UNIQUEIDENTIFIER,
-        codigoEstadoSolicitud CHAR(1), codigoComponente NVARCHAR(3), totalRegistros INT);
+        capacidadMaxima INT, estudiantesActivos INT, cuposDisponibles INT, matriculado BIT, codigoComponente NVARCHAR(3), totalRegistros INT);
 
     -- O-01: especificas de su programa + transversales (BAS/INS) de la institucion, en periodos vigentes y proximos;
     --       excluye el periodo finalizado y las especificas de otro programa.
     INSERT INTO #o (idGrupo, codigoGrupo, nombreGrupo, idAsignatura, codigoAsignatura, nombreAsignatura, nombreDocente, idPeriodoAcademico,
         nombrePeriodoAcademico, fechaInicioPeriodo, fechaFinPeriodo, estadoPeriodo, horario, capacidadMaxima, estudiantesActivos, cuposDisponibles,
-        matriculado, idSolicitudAbierta, codigoEstadoSolicitud, codigoComponente, totalRegistros)
+        matriculado, codigoComponente, totalRegistros)
     EXEC dbo.usp_consultar_oferta_grupos_estudiante @idCorrelacion = @c, @idUsuarioEjecutor = @uE1;
     IF (SELECT COUNT(*) FROM #o) <> 5 OR EXISTS (SELECT 1 FROM #o WHERE totalRegistros <> 5)
         THROW 53901, 'TEST FAILED: O-01 se esperaban 5 grupos (G1, G5, G7, G2, G4).', 1;
@@ -120,34 +116,35 @@ BEGIN TRY
 
     -- O-02: cupos, horario, estado del periodo y relacion del estudiante con cada grupo.
     IF NOT EXISTS (SELECT 1 FROM #o WHERE idGrupo = @g1 AND capacidadMaxima = 2 AND estudiantesActivos = 1 AND cuposDisponibles = 1
-                   AND matriculado = 0 AND idSolicitudAbierta IS NULL AND estadoPeriodo = N'VIGENTE'
+                   AND matriculado = 0 AND estadoPeriodo = N'VIGENTE'
                    AND horario = N'Lunes 08:00-10:00; Martes 10:00-12:00' AND nombreDocente LIKE N'NombreD%')
         THROW 53903, 'TEST FAILED: O-02 G1 (cupo, horario, docente, matricula inactiva no cuenta).', 1;
     IF NOT EXISTS (SELECT 1 FROM #o WHERE idGrupo = @g5 AND cuposDisponibles = 0 AND matriculado = 1 AND horario IS NULL)
         THROW 53904, 'TEST FAILED: O-02 G5 (matriculado, sin cupo, sin horario).', 1;
-    IF NOT EXISTS (SELECT 1 FROM #o WHERE idGrupo = @g2 AND estadoPeriodo = N'PROXIMO' AND idSolicitudAbierta = @sol AND codigoEstadoSolicitud = 'P' AND cuposDisponibles = 30)
-        THROW 53905, 'TEST FAILED: O-02 G2 (proximo con solicitud abierta P).', 1;
+    -- CULM-001 A (E-12): HU053-HU055 descartadas; G2 se valida como proximo, con todos sus cupos y sin matricula.
+    IF NOT EXISTS (SELECT 1 FROM #o WHERE idGrupo = @g2 AND estadoPeriodo = N'PROXIMO' AND cuposDisponibles = 30 AND matriculado = 0)
+        THROW 53905, 'TEST FAILED: O-02 G2 (proximo, 30 cupos, sin matricula).', 1;
     PRINT 'TEST_PASS:HU008_OFERTA_CUPOS_RELACION';
 
     -- O-03: busqueda por asignatura y paginacion.
     TRUNCATE TABLE #o;
     INSERT INTO #o (idGrupo, codigoGrupo, nombreGrupo, idAsignatura, codigoAsignatura, nombreAsignatura, nombreDocente, idPeriodoAcademico,
         nombrePeriodoAcademico, fechaInicioPeriodo, fechaFinPeriodo, estadoPeriodo, horario, capacidadMaxima, estudiantesActivos, cuposDisponibles,
-        matriculado, idSolicitudAbierta, codigoEstadoSolicitud, codigoComponente, totalRegistros)
+        matriculado, codigoComponente, totalRegistros)
     EXEC dbo.usp_consultar_oferta_grupos_estudiante @busqueda = N'  calculo qa008 ', @idCorrelacion = @c, @idUsuarioEjecutor = @uE1;
     IF (SELECT COUNT(*) FROM #o) <> 1 OR (SELECT idGrupo FROM #o) <> @g2
         THROW 53906, 'TEST FAILED: O-03 busqueda por asignatura.', 1;
     TRUNCATE TABLE #o;
     INSERT INTO #o (idGrupo, codigoGrupo, nombreGrupo, idAsignatura, codigoAsignatura, nombreAsignatura, nombreDocente, idPeriodoAcademico,
         nombrePeriodoAcademico, fechaInicioPeriodo, fechaFinPeriodo, estadoPeriodo, horario, capacidadMaxima, estudiantesActivos, cuposDisponibles,
-        matriculado, idSolicitudAbierta, codigoEstadoSolicitud, codigoComponente, totalRegistros)
+        matriculado, codigoComponente, totalRegistros)
     EXEC dbo.usp_consultar_oferta_grupos_estudiante @numeroPagina = 2, @tamanoPagina = 1, @idCorrelacion = @c, @idUsuarioEjecutor = @uE1;
     IF (SELECT COUNT(*) FROM #o) <> 1 OR (SELECT idGrupo FROM #o) <> @g5 OR (SELECT totalRegistros FROM #o) <> 5
         THROW 53907, 'TEST FAILED: O-03 paginacion.', 1;
     TRUNCATE TABLE #o;
     INSERT INTO #o (idGrupo, codigoGrupo, nombreGrupo, idAsignatura, codigoAsignatura, nombreAsignatura, nombreDocente, idPeriodoAcademico,
         nombrePeriodoAcademico, fechaInicioPeriodo, fechaFinPeriodo, estadoPeriodo, horario, capacidadMaxima, estudiantesActivos, cuposDisponibles,
-        matriculado, idSolicitudAbierta, codigoEstadoSolicitud, codigoComponente, totalRegistros)
+        matriculado, codigoComponente, totalRegistros)
     EXEC dbo.usp_consultar_oferta_grupos_estudiante @busqueda = N'100%_', @idCorrelacion = @c, @idUsuarioEjecutor = @uE1;
     IF (SELECT COUNT(*) FROM #o) <> 0
         THROW 53908, 'TEST FAILED: O-03 comodines escapados.', 1;
@@ -159,7 +156,7 @@ BEGIN TRY
     TRUNCATE TABLE #o;
     INSERT INTO #o (idGrupo, codigoGrupo, nombreGrupo, idAsignatura, codigoAsignatura, nombreAsignatura, nombreDocente, idPeriodoAcademico,
         nombrePeriodoAcademico, fechaInicioPeriodo, fechaFinPeriodo, estadoPeriodo, horario, capacidadMaxima, estudiantesActivos, cuposDisponibles,
-        matriculado, idSolicitudAbierta, codigoEstadoSolicitud, codigoComponente, totalRegistros)
+        matriculado, codigoComponente, totalRegistros)
     EXEC dbo.usp_consultar_oferta_grupos_estudiante @idCorrelacion = @c, @idUsuarioEjecutor = @uE1;
     IF (SELECT COUNT(*) FROM #o) <> 3 OR EXISTS (SELECT 1 FROM #o WHERE codigoComponente <> N'ESP')
         THROW 53912, 'TEST FAILED: O-05 sin transversales solo quedan las especificas (G1, G5, G2).', 1;
@@ -170,7 +167,7 @@ BEGIN TRY
     TRUNCATE TABLE #o;
     INSERT INTO #o (idGrupo, codigoGrupo, nombreGrupo, idAsignatura, codigoAsignatura, nombreAsignatura, nombreDocente, idPeriodoAcademico,
         nombrePeriodoAcademico, fechaInicioPeriodo, fechaFinPeriodo, estadoPeriodo, horario, capacidadMaxima, estudiantesActivos, cuposDisponibles,
-        matriculado, idSolicitudAbierta, codigoEstadoSolicitud, codigoComponente, totalRegistros)
+        matriculado, codigoComponente, totalRegistros)
     EXEC dbo.usp_consultar_oferta_grupos_estudiante @idCorrelacion = @c, @idUsuarioEjecutor = @uDoc;
     IF (SELECT COUNT(*) FROM #o) <> 0
         THROW 53909, 'TEST FAILED: O-04 un docente no ve oferta de estudiante.', 1;
@@ -184,6 +181,18 @@ BEGIN TRY
     IF @err IS NULL OR @err NOT LIKE N'%DBCODE=VAL_001|%'
         THROW 53910, 'TEST FAILED: O-04 ejecutor nulo (esperaba VAL_001).', 1;
     PRINT 'TEST_PASS:HU008_OFERTA_VALIDACIONES';
+
+    -- O-06 (CULM-001 A, T-02): la oferta ya no trae columnas de solicitud de ingreso. Fija el orden posicional que
+    -- lee el backend: 19 columnas, codigoComponente en la 18 y totalRegistros en la 19.
+    IF (SELECT COUNT(*) FROM sys.dm_exec_describe_first_result_set_for_object(OBJECT_ID('dbo.usp_consultar_oferta_grupos_estudiante'), 0)) <> 19
+       OR EXISTS (SELECT 1 FROM sys.dm_exec_describe_first_result_set_for_object(OBJECT_ID('dbo.usp_consultar_oferta_grupos_estudiante'), 0)
+                  WHERE name IN (N'idSolicitudAbierta', N'codigoEstadoSolicitud'))
+       OR NOT EXISTS (SELECT 1 FROM sys.dm_exec_describe_first_result_set_for_object(OBJECT_ID('dbo.usp_consultar_oferta_grupos_estudiante'), 0)
+                      WHERE column_ordinal = 18 AND name = N'codigoComponente')
+       OR NOT EXISTS (SELECT 1 FROM sys.dm_exec_describe_first_result_set_for_object(OBJECT_ID('dbo.usp_consultar_oferta_grupos_estudiante'), 0)
+                      WHERE column_ordinal = 19 AND name = N'totalRegistros')
+        THROW 53913, 'TEST FAILED: O-06 la oferta debe tener 19 columnas sin idSolicitudAbierta ni codigoEstadoSolicitud.', 1;
+    PRINT 'TEST_PASS:HU008_OFERTA_SIN_SOLICITUD';
 
     IF @@TRANCOUNT <> 1 THROW 53998, 'TEST FAILED: el objeto altero el nivel de transaccion del llamador.', 1;
     ROLLBACK TRANSACTION;
