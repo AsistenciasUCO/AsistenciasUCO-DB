@@ -149,8 +149,12 @@ BEGIN TRY
     INSERT INTO #asi (id, egId, sesId, codigo)
     SELECT NEWID(), x.id, s.id, r.codigo FROM #reg r INNER JOIN #eg x ON x.k = r.k AND x.g = r.g INNER JOIN #s s ON s.k = r.g AND s.n = r.n;
     INSERT INTO dbo.Asistencia (id, estudianteGrupo, sesion) SELECT id, egId, sesId FROM #asi;
-    INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin)
-    SELECT NEWID(), 1, a.id, IIF(a.codigo = N'SJC', 0, 1), rc.id, @ahora, @ahora FROM #asi a INNER JOIN dbo.RazonCausa rc ON rc.codigo = a.codigo;
+    -- CULM-001 B.2 ([SUPUESTO-B-20]): la columna obligatoria DetalleAsistencia.toma exige la toma 1 de la sesion (helper culm001_b2_toma_fixture.sql).
+    DECLARE @culmb2Sesiones NVARCHAR(MAX) = (SELECT DISTINCT idSesion = sesId FROM #asi FOR JSON PATH);
+    EXEC #culm001_b2_crear_tomas @sesionesJSON = @culmb2Sesiones;
+    INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin, toma)
+    SELECT NEWID(), 1, a.id, IIF(a.codigo = N'SJC', 0, 1), rc.id, @ahora, @ahora, t.id FROM #asi a INNER JOIN dbo.RazonCausa rc ON rc.codigo = a.codigo
+    INNER JOIN dbo.TomaAsistencia t ON t.sesion = a.sesId AND t.numero = 1;
 
     -- Usuarios ejecutores y de estudiantes por clave
     DECLARE @uE1 UNIQUEIDENTIFIER = (SELECT id FROM #u WHERE n = 5), @uE5 UNIQUEIDENTIFIER = (SELECT id FROM #u WHERE n = 9);
@@ -187,6 +191,8 @@ BEGIN TRY
     -- T-DB-12: grupo sin sesiones ejecutadas => 0.00 sin division por cero
     DELETE FROM dbo.DetalleAsistencia WHERE asistencia IN (SELECT id FROM dbo.Asistencia WHERE sesion IN (SELECT id FROM #s WHERE k = N'G3'));
     DELETE FROM dbo.Asistencia WHERE sesion IN (SELECT id FROM #s WHERE k = N'G3');
+    -- CULM-001 B.2 ([SUPUESTO-B-20], [SUPUESTO-B-06]): sin registros tambien es sin tomas (la toma 1 la creo el helper del fixture)
+    DELETE FROM dbo.TomaAsistencia WHERE sesion IN (SELECT id FROM #s WHERE k = N'G3');
     IF NOT EXISTS (SELECT 1 FROM dbo.uv_resumen_asistencia_estudiante_grupo v INNER JOIN #eg x ON x.id = v.idEstudianteGrupo WHERE x.k = N'E7' AND v.sesionesEjecutadas = 0 AND v.porcentajeInasistencia = 0 AND v.faltasSinJustaCausa = 0)
         THROW 53046, 'TEST FAILED T-DB-12: grupo sin ejecutadas debia dar 0.00.', 1;
     PRINT 'TEST_PASS:HU070_DIVISOR_CERO';

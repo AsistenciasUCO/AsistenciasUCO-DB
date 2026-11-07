@@ -149,8 +149,12 @@ BEGIN TRY
     INSERT INTO #asi (id, egId, sesId, codigo)
     SELECT NEWID(), x.id, s.id, r.codigo FROM #reg r INNER JOIN #eg x ON x.k = r.k AND x.g = r.g INNER JOIN #s s ON s.k = r.g AND s.n = r.n;
     INSERT INTO dbo.Asistencia (id, estudianteGrupo, sesion) SELECT id, egId, sesId FROM #asi;
-    INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin)
-    SELECT NEWID(), 1, a.id, IIF(a.codigo = N'SJC', 0, 1), rc.id, @ahora, @ahora FROM #asi a INNER JOIN dbo.RazonCausa rc ON rc.codigo = a.codigo;
+    -- CULM-001 B.2 ([SUPUESTO-B-20]): la columna obligatoria DetalleAsistencia.toma exige la toma 1 de la sesion (helper culm001_b2_toma_fixture.sql).
+    DECLARE @culmb2Sesiones NVARCHAR(MAX) = (SELECT DISTINCT idSesion = sesId FROM #asi FOR JSON PATH);
+    EXEC #culm001_b2_crear_tomas @sesionesJSON = @culmb2Sesiones;
+    INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin, toma)
+    SELECT NEWID(), 1, a.id, IIF(a.codigo = N'SJC', 0, 1), rc.id, @ahora, @ahora, t.id FROM #asi a INNER JOIN dbo.RazonCausa rc ON rc.codigo = a.codigo
+    INNER JOIN dbo.TomaAsistencia t ON t.sesion = a.sesId AND t.numero = 1;
 
 
     -- Fixture de decano: 2da facultad F2 (decano2, sin grupos), programa PX de F2, programa inactivo P4 de F, periodo pasado y grupo G4
@@ -171,7 +175,9 @@ BEGIN TRY
     CREATE TABLE #k (idFacultad UNIQUEIDENTIFIER, nombreFacultad NVARCHAR(50), idPeriodoAcademico UNIQUEIDENTIFIER, nombrePeriodoAcademico NVARCHAR(50),
         totalProgramas INT, totalEstudiantes INT, estudiantesRegulares INT, estudiantesRiesgo INT, estudiantesPerdida INT, tasaRetencion DECIMAL(5,2),
         sesionesEjecutadas INT, faltasSinJustaCausa INT, porcentajeAusentismo DECIMAL(5,2), porcentajeAsistencia DECIMAL(5,2),
-        gruposActivos INT, cupoTotal INT, matriculadosActivos INT, tasaAforo DECIMAL(7,2), umbralAdvertencia DECIMAL(5,2), umbralPerdida DECIMAL(5,2));
+        gruposActivos INT, cupoTotal INT, matriculadosActivos INT, tasaAforo DECIMAL(7,2), umbralAdvertencia DECIMAL(5,2), umbralPerdida DECIMAL(5,2),
+        -- CULM-001 B.2 (CONTRACT §2.9, NB-2): columnas nuevas al final del resultset (forma del contrato, sin cambio de asercion).
+        tomasDictadas INT, horasDictadas DECIMAL(12,6), horasFalta DECIMAL(12,6));
     -- T-DB-06: cifras exactas de F (periodo por defecto)
     INSERT INTO #k EXEC dbo.usp_consultar_kpis_decano @idUsuarioEjecutor = @uDec, @idCorrelacion = @c, @idPeriodoAcademico = NULL;
     IF NOT ((SELECT COUNT(*) FROM #k) = 1) THROW 53401, 'TEST FAILED: se esperaba exactamente 1 fila', 1;

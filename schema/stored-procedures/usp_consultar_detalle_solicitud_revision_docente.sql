@@ -102,7 +102,7 @@ BEGIN
         idAsignatura                  = asg.id,
         codigoAsignatura              = asg.codigo,
         nombreAsignatura              = asg.nombre,
-        asistio                       = det.asistio,
+        asistio                       = CAST(CASE WHEN det.codigoRazonCausaConsolidado IS NULL THEN NULL WHEN det.codigoRazonCausaConsolidado = N'AN' THEN 1 ELSE 0 END AS BIT),
         codigoRazonCausa              = rzc.codigo,
         nombreRazonCausa              = rzc.nombre,
         idArchivoSoporte              = arc.id,
@@ -120,8 +120,9 @@ BEGIN
     INNER JOIN dbo.Grupo gru              ON gru.id = ses.grupo
     INNER JOIN dbo.Docente doc            ON doc.id = gru.docente
     INNER JOIN dbo.Asignatura asg         ON asg.id = gru.asignatura
-    LEFT  JOIN dbo.DetalleAsistencia det  ON det.asistencia = asi.id
-    LEFT  JOIN dbo.RazonCausa rzc         ON rzc.id = det.razonCausa
+    -- CULM-001 B.2 (CONTRACT §2.9): estado consolidado de la sesion (una fila aunque haya varias tomas)
+    OUTER APPLY (SELECT h.codigoRazonCausaConsolidado FROM dbo.uv_asistencia_sesion_horas h WHERE h.idAsistencia = asi.id) det
+    LEFT  JOIN dbo.RazonCausa rzc         ON rzc.codigo = det.codigoRazonCausaConsolidado
     LEFT  JOIN dbo.ArchivoSoporte arc     ON arc.solicitudRevisionAsistencia = sra.id
                                          AND arc.estado = @estadoAdjunto
     WHERE sra.id = @idSolicitudDefecto

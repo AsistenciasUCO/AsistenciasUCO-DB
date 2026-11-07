@@ -43,7 +43,11 @@ BEGIN
         faltasSinJustaCausa = r.faltasSinJustaCausa,
         excusas = r.excusas,
         porcentajeInasistencia = r.porcentajeInasistencia,
-        codigoPermanencia = r.codigoPermanencia
+        codigoPermanencia = r.codigoPermanencia,
+        -- CULM-001 B.2 (NB-2): asistencias/faltas/excusas cuentan tomas; sesionesEjecutadas cuenta sesiones
+        tomasDictadas = r.tomasDictadas,
+        horasDictadas = r.horasDictadas,
+        horasFalta = r.horasFalta
     FROM dbo.uv_resumen_asistencia_estudiante_grupo r
     INNER JOIN dbo.uv_estudiante_grupo eg ON eg.id = r.idEstudianteGrupo
     INNER JOIN dbo.uv_grupo g ON g.id = r.idGrupo

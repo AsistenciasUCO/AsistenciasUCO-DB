@@ -23,6 +23,10 @@ GO
 --   * PASO 2.5 (todos los llamadores): una sesion con dbo.SesionCancelacion se rechaza con SES_010. Se lee despues del
 --     UPDLOCK + HOLDLOCK sobre dbo.Sesion, el mismo bloqueo que toma usp_cancelar_sesion: registro y cancelacion se
 --     serializan.
+-- CULM-001 B.2 (CONTRACT §2.8.3, NB-4, alternativa aprobada de antemano): @bloqueoCompartido = 1 lee la sesion con HOLDLOCK
+--   (bloqueo compartido) en lugar de UPDLOCK, HOLDLOCK. Solo lo usa usp_registrar_asistencia_por_token: los registros QR de un
+--   grupo no se serializan entre si y la cancelacion (U/X) sigue serializada contra ellos; el registro no actualiza Sesion,
+--   asi que no hay conversion de bloqueo. Por defecto 0: todos los demas llamadores conservan el bloqueo exclusivo.
 CREATE OR ALTER PROCEDURE [dbo].[usp_validar_sesion_ventana_registro_interno]
 (
     @idSesion                UNIQUEIDENTIFIER,
@@ -31,7 +35,8 @@ CREATE OR ALTER PROCEDURE [dbo].[usp_validar_sesion_ventana_registro_interno]
     @mensajeTecnicoResultado NVARCHAR(4000) OUTPUT,
     @estadoResultado         BIT OUTPUT,
     @toleranciaMinutos       INT = NULL,
-    @margenMinutos           INT = NULL
+    @margenMinutos           INT = NULL,
+    @bloqueoCompartido       BIT = 0
 )
 AS
     -- 1. Estandarización e inicialización de variables utilizando funciones de catálogo (Sin ISNULL)
@@ -71,13 +76,22 @@ BEGIN
         -- PASO 2: Lectura bloqueada del horario y su procedencia (misma fila, una sola sentencia)
         IF @estadoResultado = 1
         BEGIN
-            SELECT TOP 1
-                @existe = 1,
-                @fechaHoraInicio = s.fechaHoraInicio,
-                @fechaHoraFin = s.fechaHoraFin,
-                @procedenciaTemporal = s.procedenciaTemporal
-            FROM dbo.Sesion s WITH (UPDLOCK, HOLDLOCK)
-            WHERE s.id = @idSesionDefecto;
+            IF @bloqueoCompartido = 1
+                SELECT TOP 1
+                    @existe = 1,
+                    @fechaHoraInicio = s.fechaHoraInicio,
+                    @fechaHoraFin = s.fechaHoraFin,
+                    @procedenciaTemporal = s.procedenciaTemporal
+                FROM dbo.Sesion s WITH (HOLDLOCK)
+                WHERE s.id = @idSesionDefecto;
+            ELSE
+                SELECT TOP 1
+                    @existe = 1,
+                    @fechaHoraInicio = s.fechaHoraInicio,
+                    @fechaHoraFin = s.fechaHoraFin,
+                    @procedenciaTemporal = s.procedenciaTemporal
+                FROM dbo.Sesion s WITH (UPDLOCK, HOLDLOCK)
+                WHERE s.id = @idSesionDefecto;
 
             IF @existe = 0
             BEGIN

@@ -31,6 +31,7 @@ BEGIN
     DECLARE @programas INT = (SELECT COUNT(*) FROM dbo.uv_programa p WHERE p.idFacultad = @idFacultad);
     DECLARE @total INT = 0, @regulares INT = 0, @riesgo INT = 0, @perdida INT = 0;
     DECLARE @sesiones INT = 0, @faltas INT = 0;
+    DECLARE @tomasDictadas INT = 0, @horasDictadas DECIMAL(12,6) = 0, @horasFalta DECIMAL(12,6) = 0;
     DECLARE @grupos INT = 0, @cupo INT = 0, @matriculados INT = 0;
 
     -- PASO 3: Calcular los indicadores del periodo
@@ -50,7 +51,10 @@ BEGIN
              ) x;
 
         SELECT  @sesiones = ISNULL(SUM(r.sesionesEjecutadas), 0),
-                @faltas = ISNULL(SUM(r.faltasSinJustaCausa), 0)
+                @faltas = ISNULL(SUM(r.faltasSinJustaCausa), 0),
+                @tomasDictadas = ISNULL(SUM(r.tomasDictadas), 0),
+                @horasDictadas = ISNULL(SUM(r.horasDictadas), 0),
+                @horasFalta = ISNULL(SUM(r.horasFalta), 0)
         FROM    dbo.uv_resumen_asistencia_estudiante_grupo r
         INNER JOIN dbo.uv_programa p ON p.id = r.idPrograma
         WHERE   p.idFacultad = @idFacultad AND r.idPeriodoAcademico = @idPeriodo AND r.codigoEstadoEstudiante = N'A';
@@ -64,7 +68,9 @@ BEGIN
         WHERE   p.idFacultad = @idFacultad AND gp.idPeriodoAcademico = @idPeriodo AND gp.grupoEstaHablitado = 1;
     END
 
-    DECLARE @ausentismo DECIMAL(5,2) = CAST(IIF(@sesiones = 0, NULL, 100.0 * @faltas / @sesiones) AS DECIMAL(5,2));
+    -- CULM-001 B.2 (CONTRACT §2.9, DEC-012/DEC-024): ausentismo por horas = 100 * Sigma horasFalta / Sigma horasDictadas de las
+    -- matriculas A (antes faltas / sesiones); con sesiones de igual duracion y una toma, identico.
+    DECLARE @ausentismo DECIMAL(5,2) = CAST(IIF(@horasDictadas = 0, NULL, 100.0 * @horasFalta / @horasDictadas) AS DECIMAL(5,2));
 
     -- PASO 4: Consulta y retorno de resultados
     SELECT
@@ -87,7 +93,10 @@ BEGIN
         matriculadosActivos = @matriculados,
         tasaAforo = CAST(IIF(@cupo = 0, NULL, 100.0 * @matriculados / @cupo) AS DECIMAL(7,2)),
         umbralAdvertencia = TRY_CAST(NULLIF(TRIM(dbo.ufn_obtener_parametro('ASISTENCIA', 'UMBRAL_ALERTA_ADVERTENCIA')), '') AS DECIMAL(5,2)),
-        umbralPerdida = TRY_CAST(NULLIF(TRIM(dbo.ufn_obtener_parametro('ASISTENCIA', 'UMBRAL_ALERTA_PERDIDA')), '') AS DECIMAL(5,2))
+        umbralPerdida = TRY_CAST(NULLIF(TRIM(dbo.ufn_obtener_parametro('ASISTENCIA', 'UMBRAL_ALERTA_PERDIDA')), '') AS DECIMAL(5,2)),
+        tomasDictadas = @tomasDictadas,
+        horasDictadas = @horasDictadas,
+        horasFalta = @horasFalta
     FROM dbo.uv_facultad f
     LEFT JOIN dbo.uv_periodo_academico pa ON pa.id = @idPeriodo
     WHERE f.id = @idFacultad;

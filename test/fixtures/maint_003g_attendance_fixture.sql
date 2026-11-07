@@ -43,6 +43,16 @@ INNER JOIN dbo.Asistencia a ON a.id = d.asistencia
 INNER JOIN dbo.Sesion s ON s.id = a.sesion
 WHERE s.nombre = @fixtureName;
 
+-- CULM-001 B.2 ([SUPUESTO-B-20]): el lote congelado crea la toma 1 implicita; orden DetalleAsistencia -> TokenAsistenciaToma ->
+-- TomaAsistencia -> SesionCancelacion -> Asistencia -> Sesion (en linea: este fixture se ejecuta fuera de test_suite.sql).
+IF OBJECT_ID(N'dbo.TomaAsistencia', N'U') IS NOT NULL
+BEGIN
+    EXEC sys.sp_executesql N'DELETE tk FROM dbo.TokenAsistenciaToma tk INNER JOIN dbo.TomaAsistencia t ON t.id = tk.toma INNER JOIN dbo.Sesion s ON s.id = t.sesion WHERE s.nombre = @n;
+        DELETE t FROM dbo.TomaAsistencia t INNER JOIN dbo.Sesion s ON s.id = t.sesion WHERE s.nombre = @n;', N'@n NVARCHAR(200)', @n = @fixtureName;
+END
+IF OBJECT_ID(N'dbo.SesionCancelacion', N'U') IS NOT NULL
+    EXEC sys.sp_executesql N'DELETE sc FROM dbo.SesionCancelacion sc INNER JOIN dbo.Sesion s ON s.id = sc.sesion WHERE s.nombre = @n;', N'@n NVARCHAR(200)', @n = @fixtureName;
+
 DELETE a
 FROM dbo.Asistencia a
 INNER JOIN dbo.Sesion s ON s.id = a.sesion

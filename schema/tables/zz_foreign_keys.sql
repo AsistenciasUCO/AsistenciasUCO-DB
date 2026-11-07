@@ -390,3 +390,41 @@ BEGIN
     ALTER TABLE [dbo].[CargaDiaFestivo] ADD CONSTRAINT [FK_CargaDiaFestivo_Usuario] FOREIGN KEY ([usuarioEjecutor]) REFERENCES [dbo].[Usuario] ([id]);
 END
 GO
+-- CULM-001 B.2 (CONTRACT §2.2, §2.3): tomas de asistencia y tokens QR por toma
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_TomaAsistencia_Sesion')
+BEGIN
+    ALTER TABLE [dbo].[TomaAsistencia] ADD CONSTRAINT [FK_TomaAsistencia_Sesion] FOREIGN KEY ([sesion]) REFERENCES [dbo].[Sesion] ([id]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_TomaAsistencia_ModoTomaAsistencia')
+BEGIN
+    ALTER TABLE [dbo].[TomaAsistencia] ADD CONSTRAINT [FK_TomaAsistencia_ModoTomaAsistencia] FOREIGN KEY ([modo]) REFERENCES [dbo].[ModoTomaAsistencia] ([id]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_TomaAsistencia_EstadoTomaAsistencia')
+BEGIN
+    ALTER TABLE [dbo].[TomaAsistencia] ADD CONSTRAINT [FK_TomaAsistencia_EstadoTomaAsistencia] FOREIGN KEY ([estado]) REFERENCES [dbo].[EstadoTomaAsistencia] ([id]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_TomaAsistencia_Docente')
+BEGIN
+    ALTER TABLE [dbo].[TomaAsistencia] ADD CONSTRAINT [FK_TomaAsistencia_Docente] FOREIGN KEY ([docenteApertura]) REFERENCES [dbo].[Docente] ([id]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_TokenAsistenciaToma_TomaAsistencia')
+BEGIN
+    ALTER TABLE [dbo].[TokenAsistenciaToma] ADD CONSTRAINT [FK_TokenAsistenciaToma_TomaAsistencia] FOREIGN KEY ([toma]) REFERENCES [dbo].[TomaAsistencia] ([id]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_TokenAsistenciaToma_Docente')
+BEGIN
+    ALTER TABLE [dbo].[TokenAsistenciaToma] ADD CONSTRAINT [FK_TokenAsistenciaToma_Docente] FOREIGN KEY ([docenteEmisor]) REFERENCES [dbo].[Docente] ([id]);
+END
+GO
+-- Dependiente de DetalleAsistencia.toma: solo cuando la columna ya es NOT NULL (B-1: evita el error 4922 en el ALTER COLUMN)
+IF COLUMNPROPERTY(OBJECT_ID('dbo.DetalleAsistencia'), 'toma', 'AllowsNull') = 0
+   AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_DetalleAsistencia_TomaAsistencia')
+BEGIN
+    ALTER TABLE [dbo].[DetalleAsistencia] ADD CONSTRAINT [FK_DetalleAsistencia_TomaAsistencia] FOREIGN KEY ([toma]) REFERENCES [dbo].[TomaAsistencia] ([id]);
+END
+GO

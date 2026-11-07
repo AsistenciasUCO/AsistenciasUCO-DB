@@ -51,7 +51,9 @@ CREATE TABLE #historial (
     codigoPeriodoAcademico NVARCHAR(50), nombrePeriodoAcademico NVARCHAR(100), idGrupo UNIQUEIDENTIFIER, codigoGrupo INT,
     idAsignatura UNIQUEIDENTIFIER, nombreAsignatura NVARCHAR(100), codigoEstadoEstudiante NVARCHAR(50), nombreEstadoEstudiante NVARCHAR(100),
     sesionesEjecutadas INT, asistencias INT, faltasSinJustaCausa INT, excusas INT, porcentajeInasistencia DECIMAL(5,2),
-    codigoPermanencia NVARCHAR(50));
+    codigoPermanencia NVARCHAR(50),
+    -- CULM-001 B.2 (CONTRACT §2.9, NB-2): columnas nuevas al final del resultset (forma del contrato, sin cambio de asercion).
+    tomasDictadas INT, horasDictadas DECIMAL(12,6), horasFalta DECIMAL(12,6));
 
 BEGIN TRANSACTION;
 BEGIN TRY

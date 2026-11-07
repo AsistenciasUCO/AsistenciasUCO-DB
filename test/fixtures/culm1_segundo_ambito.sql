@@ -133,8 +133,15 @@ WHERE NOT EXISTS (SELECT 1 FROM dbo.Asistencia x WHERE x.id = CAST(@p + v.k AS U
 DECLARE @inicioSesion DATETIME2 = (SELECT fechaHoraInicio FROM dbo.Sesion WHERE id = @sesion);
 DECLARE @finSesion DATETIME2 = (SELECT fechaHoraFin FROM dbo.Sesion WHERE id = @sesion);
 DECLARE @codigoDetalle INT = 1 + (SELECT ISNULL(MAX(codigo), 0) FROM dbo.DetalleAsistencia);
-INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin)
-SELECT CAST(@p + v.k AS UNIQUEIDENTIFIER), @codigoDetalle + v.n, CAST(@p + v.a AS UNIQUEIDENTIFIER), v.asistio, IIF(v.asistio = 1, @an, @sjc), @inicioSesion, @finSesion
+-- CULM-001 B.2 ([SUPUESTO-B-20], CONTRACT §2.3): la columna obligatoria DetalleAsistencia.toma exige la toma 1 de la sesion.
+INSERT INTO dbo.TomaAsistencia (id, sesion, numero, modo, estado, esImplicita, docenteApertura, fechaAperturaUtc, fechaCierreUtc, idCorrelacionApertura)
+SELECT NEWID(), s.id, 1, (SELECT m.id FROM dbo.ModoTomaAsistencia m WHERE m.usaCodigoQr = 0), (SELECT e.id FROM dbo.EstadoTomaAsistencia e WHERE e.estaAbierta = 0),
+       1, g.docente, CAST(s.fechaHoraInicio AS DATETIME2(0)), CAST(IIF(s.fechaHoraFin > s.fechaHoraInicio, s.fechaHoraFin, s.fechaHoraInicio) AS DATETIME2(0)), NEWID()
+FROM dbo.Sesion s INNER JOIN dbo.Grupo g ON g.id = s.grupo
+WHERE s.id IN (@sesion) AND NOT EXISTS (SELECT 1 FROM dbo.TomaAsistencia t WHERE t.sesion = s.id AND t.numero = 1);
+INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin, toma)
+SELECT CAST(@p + v.k AS UNIQUEIDENTIFIER), @codigoDetalle + v.n, CAST(@p + v.a AS UNIQUEIDENTIFIER), v.asistio, IIF(v.asistio = 1, @an, @sjc), @inicioSesion, @finSesion,
+       (SELECT t.id FROM dbo.TomaAsistencia t WHERE t.sesion = @sesion AND t.numero = 1)
 FROM (VALUES ('71', '61', 0, 1), ('72', '62', 1, 1), ('73', '63', 2, 0)) v (k, a, n, asistio)
 WHERE NOT EXISTS (SELECT 1 FROM dbo.DetalleAsistencia x WHERE x.id = CAST(@p + v.k AS UNIQUEIDENTIFIER));
 IF NOT EXISTS (SELECT 1 FROM dbo.SolicitudRevisionAsistencia WHERE id = @reclamo)

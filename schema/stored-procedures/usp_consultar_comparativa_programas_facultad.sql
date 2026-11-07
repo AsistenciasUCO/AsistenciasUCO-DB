@@ -47,7 +47,8 @@ BEGIN
     asistencia AS (
         SELECT  r.idPrograma,
                 sesiones = SUM(r.sesionesEjecutadas),
-                faltas = SUM(r.faltasSinJustaCausa)
+                -- CULM-001 B.2 (diferido a D: debe pasar a horas): faltas en unidades de sesion para no mezclar unidades
+                faltas = SUM(r.sesionesConFaltaSinJustaCausa)
         FROM    dbo.uv_resumen_asistencia_estudiante_grupo r
         INNER JOIN dbo.uv_programa p ON p.id = r.idPrograma
         WHERE   p.idFacultad = @idFacultad AND r.idPeriodoAcademico = @idPeriodo AND r.codigoEstadoEstudiante = N'A'

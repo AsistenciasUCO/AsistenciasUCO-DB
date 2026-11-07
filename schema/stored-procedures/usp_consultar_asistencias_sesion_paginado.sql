@@ -94,9 +94,12 @@ BEGIN
         EXEC dbo.usp_establecer_contexto_usuario_ejecutor @p_idUsuario = @idUsuarioDefecto;
 
         -- Paso 5: Consulta optimizada de asistencia de la sesión
+        -- CULM-001 B.2 (CONTRACT §2.9): una fila por estudiante y sesion con el estado consolidado de sus tomas
+        -- (uv_asistencia_sesion_horas); idDetalleAsistencia/codigoDetalleAsistencia/fechas son los de la ULTIMA toma
+        -- (compatibilidad) y se agregan totalTomas, horasAsistidas, horasFalta y horasExcusa al final.
         SELECT
-            da.id                       AS idDetalleAsistencia,
-            da.codigo                   AS codigoDetalleAsistencia,
+            ud.id                       AS idDetalleAsistencia,
+            ud.codigo                   AS codigoDetalleAsistencia,
             asi.id                      AS idAsistencia,
             se.id                       AS idSesion,
             se.nombre                   AS nombreSesion,
@@ -111,23 +114,35 @@ BEGIN
             u.primerNombre              AS primerNombre,
             u.segundoNombre             AS segundoNombre,
             u.nombreCompleto            AS nombreCompleto,
-            da.asistio                  AS asistio,
-            da.idRazonCausa             AS idRazonCausa,
-            da.codigoRazonCausa         AS codigoRazonCausa,
-            da.nombreRazonCausa         AS nombreRazonCausa,
-            da.fechaHoraInicio          AS fechaHoraInicio,
-            da.fechaHoraFin             AS fechaHoraFin,
-            COUNT(1) OVER()             AS totalRegistros
+            co.asistio                  AS asistio,
+            rc.id                       AS idRazonCausa,
+            rc.codigo                   AS codigoRazonCausa,
+            rc.nombre                   AS nombreRazonCausa,
+            ud.fechaHoraInicio          AS fechaHoraInicio,
+            ud.fechaHoraFin             AS fechaHoraFin,
+            COUNT(1) OVER()             AS totalRegistros,
+            h.totalTomasSesion          AS totalTomas,
+            h.horasAsistidas            AS horasAsistidas,
+            h.horasFalta                AS horasFalta,
+            h.horasExcusa               AS horasExcusa
         FROM dbo.uv_auth_sesion se
         INNER JOIN dbo.uv_asistencia asi ON se.id = asi.idSesion
-        INNER JOIN dbo.uv_detalle_asistencia da ON asi.id = da.idAsistencia
+        INNER JOIN dbo.uv_asistencia_sesion_horas h ON h.idAsistencia = asi.id AND h.codigoRazonCausaConsolidado IS NOT NULL
+        INNER JOIN dbo.uv_razon_causa rc ON rc.codigo = h.codigoRazonCausaConsolidado
+        CROSS APPLY (SELECT asistio = CAST(IIF(h.codigoRazonCausaConsolidado = N'AN', 1, 0) AS BIT)) co
+        CROSS APPLY (
+            SELECT TOP 1 v.id, v.codigo, v.fechaHoraInicio, v.fechaHoraFin
+            FROM dbo.uv_detalle_asistencia_v2 v
+            WHERE v.idAsistencia = asi.id
+            ORDER BY v.numeroToma DESC
+        ) ud
         INNER JOIN dbo.uv_estudiante_grupo eg ON asi.idEstudianteGrupo = eg.id
         INNER JOIN dbo.uv_estudiante_identidad ei ON eg.idEstudiante = ei.id
         INNER JOIN dbo.uv_usuario u ON ei.idUsuario = u.id
         WHERE se.id = @idSesionDefecto
-          AND (@filtroRazonCausaId IS NULL OR da.idRazonCausa = @filtroRazonCausaId)
-          AND (@filtroAsistio IS NULL OR da.asistio = @filtroAsistio)
-        ORDER BY u.primerApellido ASC, u.primerNombre ASC, u.numeroIdentificacion ASC, da.id ASC
+          AND (@filtroRazonCausaId IS NULL OR rc.id = @filtroRazonCausaId)
+          AND (@filtroAsistio IS NULL OR co.asistio = @filtroAsistio)
+        ORDER BY u.primerApellido ASC, u.primerNombre ASC, u.numeroIdentificacion ASC, ud.id ASC
         OFFSET @offset ROWS
         FETCH NEXT @tamano ROWS ONLY;
 

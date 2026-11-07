@@ -62,11 +62,12 @@ BEGIN
         SELECT idGrupo, n = COUNT(*) FROM dbo.uv_estudiante_grupo WHERE codigoEstadoEstudiante = N'A' GROUP BY idGrupo
     ),
     faltas AS (
-        SELECT  a.idSesion, f = SUM(IIF(da.asistio = 0 AND da.codigoRazonCausa = N'SJC', 1, 0))
-        FROM    dbo.uv_asistencia a
-        INNER JOIN dbo.uv_detalle_asistencia da ON da.idAsistencia = a.id
-        INNER JOIN dbo.uv_estudiante_grupo eg ON eg.id = a.idEstudianteGrupo AND eg.codigoEstadoEstudiante = N'A'
-        GROUP BY a.idSesion
+        -- CULM-001 B.2 (CONTRACT §2.9; diferido a D: debe pasar a horas): una falta por estudiante y sesion segun el estado
+        -- consolidado (uv_asistencia_sesion_horas); con una toma por sesion, identico al conteo anterior.
+        SELECT  h.idSesion, f = SUM(IIF(h.tieneFaltaSinJustaCausa = 1, 1, 0))
+        FROM    dbo.uv_asistencia_sesion_horas h
+        INNER JOIN dbo.uv_estudiante_grupo eg ON eg.id = h.idEstudianteGrupo AND eg.codigoEstadoEstudiante = N'A'
+        GROUP BY h.idSesion
     ),
     intervalo AS (
         SELECT  e.idSesion,

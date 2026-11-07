@@ -395,8 +395,11 @@ BEGIN TRY
         THROW 53037, 'TEST FAILED: UTC_D06_DETALLE_SNAPSHOT fixture EstudianteGrupo/RazonCausa ausente.', 1;
     DECLARE @asis UNIQUEIDENTIFIER = NEWID();
     INSERT INTO dbo.Asistencia (id, estudianteGrupo, sesion) VALUES (@asis, @eg, @sesionV2);
-    INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin)
-    VALUES (NEWID(), 990000 + ABS(CHECKSUM(NEWID()) % 9999), @asis, 1, @razon, @inicioV2, @finV2);
+    -- CULM-001 B.2 ([SUPUESTO-B-20]): la columna obligatoria DetalleAsistencia.toma exige la toma 1 de la sesion (helper culm001_b2_toma_fixture.sql).
+    DECLARE @culmb2Toma UNIQUEIDENTIFIER;
+    EXEC #culm001_b2_crear_toma @idSesion = @sesionV2, @idToma = @culmb2Toma OUTPUT;
+    INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin, toma)
+    VALUES (NEWID(), 990000 + ABS(CHECKSUM(NEWID()) % 9999), @asis, 1, @razon, @inicioV2, @finV2, @culmb2Toma);
     TRUNCATE TABLE #r;
     SET @corr = NEWID();
     INSERT INTO #r EXEC dbo.usp_actualizar_sesion_v2
@@ -528,6 +531,9 @@ BEGIN CATCH
     IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
     SET @falla = CONCAT(N'error inesperado ', ERROR_NUMBER(), N': ', ERROR_MESSAGE());
 END CATCH;
+-- CULM-001 B.2 ([SUPUESTO-B-20]): tomas, tokens y cancelacion de la sesion antes de borrarla
+DECLARE @culmb2Limpieza NVARCHAR(MAX) = (SELECT idSesion = @sesion FOR JSON PATH);
+EXEC #culm001_b2_limpiar_sesiones @sesionesJSON = @culmb2Limpieza;
 DELETE FROM dbo.Sesion WHERE id = @sesion;
 DROP TABLE #r2;
 IF @falla IS NOT NULL

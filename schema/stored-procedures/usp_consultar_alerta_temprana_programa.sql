@@ -66,6 +66,9 @@ BEGIN
                 totalMatriculasActivas = COUNT(*),
                 porcentajeInasistencia = MAX(r.porcentajeInasistencia),
                 faltasSinJustaCausa = SUM(r.faltasSinJustaCausa),
+                tomasDictadas = SUM(r.tomasDictadas),
+                horasDictadas = SUM(r.horasDictadas),
+                horasFalta = SUM(r.horasFalta),
                 peor = MAX(CASE r.codigoPermanencia WHEN N'PERDIDA' THEN 3 WHEN N'RIESGO' THEN 2 ELSE 1 END)
         FROM    dbo.uv_resumen_asistencia_estudiante_grupo r
         WHERE   r.idPrograma = @idPrograma AND r.idPeriodoAcademico = @idPeriodo AND r.codigoEstadoEstudiante = N'A'
@@ -82,7 +85,11 @@ BEGIN
         faltasSinJustaCausa = pe.faltasSinJustaCausa,
         codigoPermanencia = CASE pe.peor WHEN 3 THEN N'PERDIDA' WHEN 2 THEN N'RIESGO' ELSE N'REGULAR' END,
         semaforo = CASE pe.peor WHEN 3 THEN N'ROJO' WHEN 2 THEN N'AMBAR' ELSE N'VERDE' END,
-        totalRegistros = COUNT(*) OVER()
+        totalRegistros = COUNT(*) OVER(),
+        -- CULM-001 B.2 (NB-2): unidades de la inasistencia por horas
+        tomasDictadas = pe.tomasDictadas,
+        horasDictadas = pe.horasDictadas,
+        horasFalta = pe.horasFalta
     FROM persona pe
     INNER JOIN dbo.uv_estudiante_identidad ei ON ei.id = pe.idEstudiante
     INNER JOIN dbo.uv_usuario u ON u.id = ei.idUsuario

@@ -157,3 +157,43 @@ IF EXISTS (
     THROW 51918, 'TEST FAILED: CULM001_B1_SEG_01 una vista de B.1 no tiene SELECT para el rol runtime.', 1;
 PRINT 'TEST_PASS:CULM001_B1_SEG_01_PERMISOS';
 GO
+
+-- CULM-001 B.2 (CONTRACT §2.13, B2-SEG-01): los SP publicos de B.2 tienen EXECUTE para rol_asistencias_runtime; los nucleos
+-- usp_internal_* no; las vistas nuevas de B.2 tienen SELECT; usp_registrar_asistencia_estudiante_autonomo CONSERVA su
+-- EXECUTE (B no lo revoca: el REVOKE/DROP pasa al paquete D, [SUPUESTO-B-18]).
+DECLARE @b2Faltantes NVARCHAR(MAX) = (
+    SELECT STRING_AGG(o.nombre, N',')
+    FROM (VALUES (N'usp_abrir_toma_asistencia'), (N'usp_cerrar_toma_asistencia'), (N'usp_cerrar_tomas_vencidas'), (N'usp_registrar_asistencias_toma'),
+                 (N'usp_abrir_qr_toma'), (N'usp_rotar_token_asistencia_toma'), (N'usp_rotar_token_asistencia_automatico'),
+                 (N'usp_consultar_tomas_qr_por_rotar'), (N'usp_cerrar_qr_toma'), (N'usp_registrar_asistencia_por_token'),
+                 (N'usp_consultar_tomas_sesion'), (N'usp_consultar_faltantes_toma_paginado'), (N'usp_consultar_asistencias_toma_paginado'),
+                 (N'usp_consultar_resumen_asistencia_grupo_docente_paginado'), (N'usp_consultar_resumen_asistencia_estudiante'),
+                 (N'usp_registrar_asistencia_estudiante_autonomo')) o(nombre)
+    WHERE NOT EXISTS (
+        SELECT 1 FROM sys.database_permissions dp
+        WHERE dp.major_id = OBJECT_ID(N'dbo.' + o.nombre) AND dp.permission_name = N'EXECUTE' AND dp.state IN ('G', 'W')
+          AND dp.grantee_principal_id = DATABASE_PRINCIPAL_ID(N'rol_asistencias_runtime')));
+IF @b2Faltantes IS NOT NULL
+BEGIN
+    DECLARE @b2Fallo NVARCHAR(2048) = CONCAT('TEST FAILED: CULM001_B2_SEG_01 SP publicos sin EXECUTE: ', @b2Faltantes);
+    THROW 51919, @b2Fallo, 1;
+END
+IF EXISTS (
+    SELECT 1 FROM sys.database_permissions dp
+    WHERE dp.major_id IN (OBJECT_ID(N'dbo.usp_internal_marcar_ausentes_toma'), OBJECT_ID(N'dbo.usp_internal_rotar_token_asistencia'),
+                          OBJECT_ID(N'dbo.usp_internal_resolver_token_asistencia'), OBJECT_ID(N'dbo.usp_sincronizar_asistencia_estudiante_interno'))
+      AND dp.permission_name = N'EXECUTE' AND dp.state IN ('G', 'W')
+      AND dp.grantee_principal_id = DATABASE_PRINCIPAL_ID(N'rol_asistencias_runtime'))
+   OR OBJECT_ID(N'dbo.usp_internal_marcar_ausentes_toma', N'P') IS NULL OR OBJECT_ID(N'dbo.usp_internal_rotar_token_asistencia', N'P') IS NULL
+   OR OBJECT_ID(N'dbo.usp_internal_resolver_token_asistencia', N'P') IS NULL
+    THROW 51920, 'TEST FAILED: CULM001_B2_SEG_01 un nucleo usp_internal_* de B.2 falta o tiene EXECUTE para el rol runtime.', 1;
+IF EXISTS (
+    SELECT 1 FROM (VALUES (N'uv_toma_asistencia'), (N'uv_token_asistencia_toma'), (N'uv_detalle_asistencia_v2'), (N'uv_asistencia_sesion_horas'),
+                          (N'uv_faltantes_toma'), (N'uv_modo_toma_asistencia'), (N'uv_estado_toma_asistencia')) v(nombre)
+    WHERE NOT EXISTS (
+        SELECT 1 FROM sys.database_permissions dp
+        WHERE dp.major_id = OBJECT_ID(N'dbo.' + v.nombre) AND dp.permission_name = N'SELECT' AND dp.state IN ('G', 'W')
+          AND dp.grantee_principal_id = DATABASE_PRINCIPAL_ID(N'rol_asistencias_runtime')))
+    THROW 51921, 'TEST FAILED: CULM001_B2_SEG_01 una vista de B.2 no tiene SELECT para el rol runtime.', 1;
+PRINT 'TEST_PASS:CULM001_B2_SEG_01_PERMISOS';
+GO

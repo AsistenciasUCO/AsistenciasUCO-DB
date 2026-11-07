@@ -12,7 +12,25 @@ generated-by: scripts/generar-catalogo-mensajes.ps1
 
 Uso en SP: `EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = '<CODIGO>', @p_param1 = ...`. Los marcadores `{}` / `{0}` se reemplazan con los parámetros. El mensaje técnico se entrega como `DBCODE=<CODIGO>|<texto>` (ver `docs/contracts/DB_BASELINE_CONTRACT.md`).
 
-Total de códigos: **175**.
+Total de códigos: **196**.
+
+## AQR
+
+| Código | Tipo | Severidad | Mensaje usuario | Mensaje técnico | Seed |
+|---|---|---|---|---|---|
+| `AQR_001` | BUSINESS_ERROR | BAJO | El código QR o el PIN no es válido o ya venció. Pide el PIN vigente al docente. | Token/PIN sin coincidencia vigente. | `35_mensajes_toma_asistencia_qr.sql` |
+| `AQR_002` | SECURITY_ERROR | MEDIO | Debes estar conectado a la red Wi-Fi del campus para registrar tu asistencia. | IP [{}] fuera de RED/CIDRS_CAMPUS. | `35_mensajes_toma_asistencia_qr.sql` |
+| `AQR_003` | BUSINESS_ERROR | BAJO | Esta toma es manual; no admite código QR. | Toma [{}] con usaCodigoQr = 0. | `35_mensajes_toma_asistencia_qr.sql` |
+| `AQR_004` | BUSINESS_ERROR | BAJO | No estás matriculado en el grupo de esta clase. | Estudiante [{}] sin matrícula A en grupo [{}]. | `35_mensajes_toma_asistencia_qr.sql` |
+| `AQR_005` | BUSINESS_ERROR | BAJO | La toma de asistencia ya se cerró. | Toma/token [{}] cerrado o expirado. | `35_mensajes_toma_asistencia_qr.sql` |
+| `AQR_006` | TECHNICAL_ERROR | BAJO | No fue posible generar el código. Intenta de nuevo. | PIN [{}] repetido entre activos/anteriores vigentes; reintentar. | `35_mensajes_toma_asistencia_qr.sql` |
+| `AQR_007` | VALIDATION_ERROR | BAJO | Escanea el código QR o digita el PIN. | Se requiere exactamente uno de @tokenHash o @pin. | `35_mensajes_toma_asistencia_qr.sql` |
+| `AQR_008` | SUCCESS | BAJO | Tu asistencia a esta toma ya estaba registrada. | Detalle existente para estudiante [{}] toma [{}]; sin cambios. | `35_mensajes_toma_asistencia_qr.sql` |
+| `AQR_009` | SUCCESS | BAJO | ¡Listo! Tu asistencia quedó registrada. | Asistencia AN por token: estudiante [{}] toma [{}]. | `35_mensajes_toma_asistencia_qr.sql` |
+| `AQR_010` | BUSINESS_ERROR | BAJO | El registro de asistencia por QR no está disponible. | ASISTENCIA_QR/HABILITADA != true. | `35_mensajes_toma_asistencia_qr.sql` |
+| `AQR_011` | SECURITY_ERROR | BAJO | Hiciste demasiados intentos. Espera un minuto e intenta de nuevo. | Límite [{}] superado para clave [{}]. | `35_mensajes_toma_asistencia_qr.sql` |
+| `AQR_012` | SUCCESS | BAJO | Código QR listo para proyectar. | Token de asistencia [{}] emitido para toma [{}]. | `35_mensajes_toma_asistencia_qr.sql` |
+| `AQR_013` | SUCCESS | BAJO | Se dejó de proyectar el código QR. | Token de la toma [{}] cerrado. | `35_mensajes_toma_asistencia_qr.sql` |
 
 ## ARC
 
@@ -330,6 +348,19 @@ Total de códigos: **175**.
 | Código | Tipo | Severidad | Mensaje usuario | Mensaje técnico | Seed |
 |---|---|---|---|---|---|
 | `SYS_001` | SYSTEM_ERROR | CRITICO | Ocurrió un error inesperado al procesar la solicitud. | Excepción de sistema no controlada capturada en bloque CATCH: {}. | `04_mensaje.sql` |
+
+## TOM
+
+| Código | Tipo | Severidad | Mensaje usuario | Mensaje técnico | Seed |
+|---|---|---|---|---|---|
+| `TOM_001` | BUSINESS_ERROR | BAJO | La toma de asistencia no existe. | Toma [{}] inexistente o de otra sesión. | `35_mensajes_toma_asistencia_qr.sql` |
+| `TOM_002` | VALIDATION_ERROR | BAJO | El modo de la toma no es válido. | @codigoModo [{}] no existe en ModoTomaAsistencia. | `35_mensajes_toma_asistencia_qr.sql` |
+| `TOM_003` | BUSINESS_ERROR | BAJO | Ya hay una toma abierta en esta sesión; ciérrala antes de abrir otra. | Sesión [{}] con toma abierta [{}]. | `35_mensajes_toma_asistencia_qr.sql` |
+| `TOM_004` | BUSINESS_ERROR | BAJO | La sesión ya tiene el máximo de {} tomas. | TOMA_ASISTENCIA/MAXIMO_TOMAS_POR_SESION alcanzado en [{}]. | `35_mensajes_toma_asistencia_qr.sql` |
+| `TOM_008` | SUCCESS | BAJO | Toma {} abierta. | TomaAsistencia [{}] abierta modo [{}]. | `35_mensajes_toma_asistencia_qr.sql` |
+| `TOM_009` | SUCCESS | BAJO | Toma cerrada. {} estudiantes quedaron como ausentes. | TomaAsistencia [{}] cerrada; ausentes marcados {}. | `35_mensajes_toma_asistencia_qr.sql` |
+| `TOM_010` | SUCCESS | BAJO | Asistencia de la toma guardada. | Lote de toma [{}] con {} registros. | `35_mensajes_toma_asistencia_qr.sql` |
+| `TOM_011` | SUCCESS | BAJO | La toma ya estaba cerrada. | TomaAsistencia [{}] ya cerrada; sin escrituras. | `35_mensajes_toma_asistencia_qr.sql` |
 
 ## TPR
 

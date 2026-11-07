@@ -11,7 +11,8 @@ GO
 --   ventanaCierreUtc   = fin + ASISTENCIA/MARGEN_RETARDO_MINUTOS
 --   ventanaAbierta     = no cancelada, procedencia confirmada y apertura <= SYSUTCDATETIME() < cierre
 -- Los dos parametros se leen una sola vez (CROSS APPLY); un parametro ausente o negativo vale 0 (regla estricta).
--- horasSesion = minutos de la sesion / 60 (0 si fin <= inicio). B.2 agrega totalTomas, tieneTomaAbierta, idTomaAbierta.
+-- horasSesion = minutos de la sesion / 60 (0 si fin <= inicio).
+-- CULM-001 B.2 (CONTRACT §2.5): totalTomas (tomas de la sesion), tieneTomaAbierta e idTomaAbierta (la toma sin fechaCierreUtc).
 CREATE OR ALTER VIEW [dbo].[uv_sesion_estado]
 AS
 SELECT  idSesion = s.id,
@@ -38,7 +39,10 @@ SELECT  idSesion = s.id,
                                   AND DATEADD(MINUTE, -p.toleranciaMinutos, s.fechaHoraInicio) <= SYSUTCDATETIME()
                                   AND SYSUTCDATETIME() < DATEADD(MINUTE, p.margenMinutos, s.fechaHoraFin), 1, 0) AS BIT),
         horasSesion = CAST(IIF(s.fechaHoraFin > s.fechaHoraInicio,
-                               CAST(DATEDIFF(MINUTE, s.fechaHoraInicio, s.fechaHoraFin) AS DECIMAL(12,6)) / 60, 0) AS DECIMAL(12,6))
+                               CAST(DATEDIFF(MINUTE, s.fechaHoraInicio, s.fechaHoraFin) AS DECIMAL(12,6)) / 60, 0) AS DECIMAL(12,6)),
+        totalTomas = tm.totalTomas,
+        tieneTomaAbierta = CAST(IIF(tm.idTomaAbierta IS NULL, 0, 1) AS BIT),
+        idTomaAbierta = tm.idTomaAbierta
 FROM    dbo.uv_sesion_v2 s
 CROSS APPLY (
         SELECT  toleranciaMinutos = IIF(t.valor IS NULL OR t.valor < 0, 0, t.valor),
@@ -51,5 +55,12 @@ ON      sc.sesion = s.id
 LEFT JOIN dbo.uv_tipo_cancelacion_sesion tc
 ON      tc.id = sc.tipoCancelacion
 LEFT JOIN dbo.DiaFestivo df
-ON      df.id = sc.diaFestivo;
+ON      df.id = sc.diaFestivo
+OUTER APPLY (
+        SELECT  totalTomas = COUNT(1),
+                idTomaAbierta = MAX(IIF(t.fechaCierreUtc IS NULL, CAST(t.id AS NVARCHAR(36)), NULL))
+        FROM    dbo.TomaAsistencia t
+        WHERE   t.sesion = s.id
+) tm0
+CROSS APPLY (SELECT totalTomas = ISNULL(tm0.totalTomas, 0), idTomaAbierta = CAST(tm0.idTomaAbierta AS UNIQUEIDENTIFIER)) tm;
 GO

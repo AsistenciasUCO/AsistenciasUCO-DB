@@ -17,6 +17,11 @@ DECLARE @p CHAR(34) = 'C1B00000-0000-4000-8000-0000000000';
 DELETE FROM dbo.SolicitudRevisionAsistencia WHERE id = CAST(@p + '81' AS UNIQUEIDENTIFIER);
 DELETE FROM dbo.DetalleAsistencia WHERE id IN (CAST(@p + '71' AS UNIQUEIDENTIFIER), CAST(@p + '72' AS UNIQUEIDENTIFIER), CAST(@p + '73' AS UNIQUEIDENTIFIER));
 DELETE FROM dbo.Asistencia WHERE id IN (CAST(@p + '61' AS UNIQUEIDENTIFIER), CAST(@p + '62' AS UNIQUEIDENTIFIER), CAST(@p + '63' AS UNIQUEIDENTIFIER));
+-- CULM-001 B.2 ([SUPUESTO-B-20]): orden DetalleAsistencia -> TokenAsistenciaToma -> TomaAsistencia -> SesionCancelacion -> Sesion
+DELETE tk FROM dbo.TokenAsistenciaToma tk INNER JOIN dbo.TomaAsistencia t ON t.id = tk.toma WHERE t.sesion = CAST(@p + '51' AS UNIQUEIDENTIFIER);
+DELETE FROM dbo.DetalleAsistencia WHERE toma IN (SELECT t.id FROM dbo.TomaAsistencia t WHERE t.sesion = CAST(@p + '51' AS UNIQUEIDENTIFIER));
+DELETE FROM dbo.TomaAsistencia WHERE sesion = CAST(@p + '51' AS UNIQUEIDENTIFIER);
+DELETE FROM dbo.SesionCancelacion WHERE sesion = CAST(@p + '51' AS UNIQUEIDENTIFIER);
 DELETE FROM dbo.Sesion WHERE id = CAST(@p + '51' AS UNIQUEIDENTIFIER);
 DELETE FROM dbo.EstudiantePrograma WHERE id IN (CAST(@p + '41' AS UNIQUEIDENTIFIER), CAST(@p + '42' AS UNIQUEIDENTIFIER), CAST(@p + '43' AS UNIQUEIDENTIFIER));
 DELETE FROM dbo.EstudianteGrupo WHERE id IN (CAST(@p + '31' AS UNIQUEIDENTIFIER), CAST(@p + '32' AS UNIQUEIDENTIFIER), CAST(@p + '33' AS UNIQUEIDENTIFIER));

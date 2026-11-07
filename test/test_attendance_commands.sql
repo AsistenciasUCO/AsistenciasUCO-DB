@@ -199,7 +199,8 @@ BEGIN TRY
 
     IF EXISTS (SELECT 1 FROM dbo.Asistencia GROUP BY estudianteGrupo, sesion HAVING COUNT(*) > 1)
         THROW 51875, 'TEST FAILED: ATTENDANCE_NO_DUPLICATE_HEADER found duplicate headers.', 1;
-    IF EXISTS (SELECT 1 FROM dbo.DetalleAsistencia GROUP BY asistencia HAVING COUNT(*) > 1)
+    -- CULM-001 B.2 (DEC-011, cambio formal B-4a): con varias tomas por sesion el detalle es unico por (asistencia, toma)
+    IF EXISTS (SELECT 1 FROM dbo.DetalleAsistencia GROUP BY asistencia, toma HAVING COUNT(*) > 1)
         THROW 51876, 'TEST FAILED: ATTENDANCE_NO_DUPLICATE_DETAIL found duplicate details.', 1;
     IF EXISTS (SELECT 1 FROM dbo.uv_asistencia WHERE idSesion = @sessionPartial AND idEstudianteGrupo = @enrollment2)
         THROW 51877, 'TEST FAILED: ATTENDANCE_READ_ONLY_PERSISTED_ROWS returned omitted student.', 1;

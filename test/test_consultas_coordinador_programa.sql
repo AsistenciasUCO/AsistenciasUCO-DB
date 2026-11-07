@@ -41,7 +41,9 @@ CREATE TABLE #asistencias (
     idEstudiante UNIQUEIDENTIFIER, idUsuario UNIQUEIDENTIFIER, numeroIdentificacion NVARCHAR(50), primerApellido NVARCHAR(50),
     segundoApellido NVARCHAR(50), primerNombre NVARCHAR(50), segundoNombre NVARCHAR(50), nombreCompleto NVARCHAR(250),
     asistio BIT, idRazonCausa UNIQUEIDENTIFIER, codigoRazonCausa VARCHAR(10), nombreRazonCausa NVARCHAR(100),
-    fechaHoraInicio DATETIME2, fechaHoraFin DATETIME2, totalRegistros INT);
+    fechaHoraInicio DATETIME2, fechaHoraFin DATETIME2, totalRegistros INT,
+    -- CULM-001 B.2 (CONTRACT §2.9, NB-2): columnas nuevas al final del resultset (forma del contrato, sin cambio de asercion).
+    totalTomas INT, horasAsistidas DECIMAL(12,6), horasFalta DECIMAL(12,6), horasExcusa DECIMAL(12,6));
 
 BEGIN TRANSACTION;
 BEGIN TRY

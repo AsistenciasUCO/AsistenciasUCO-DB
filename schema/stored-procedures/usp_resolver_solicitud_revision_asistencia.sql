@@ -167,13 +167,16 @@ BEGIN
                 ELSE
                 BEGIN
                     -- 2.4: detalle de la asistencia (bloqueado). Sin detalle no se simula una justificacion.
+                    -- CULM-001 B.2 (CONTRACT §2.9): con varias tomas se bloquean todos los detalles de la asistencia y el
+                    -- representativo es el de estado consolidado (SJC antes que EX antes que AN): con una toma, el mismo de antes.
                     SELECT TOP 1
                         @idDetalle = d.id,
                         @asistioAnterior = d.asistio,
                         @codigoCausaAnterior = rc.codigo
                     FROM dbo.DetalleAsistencia d WITH (UPDLOCK, HOLDLOCK)
                     INNER JOIN dbo.RazonCausa rc ON rc.id = d.razonCausa
-                    WHERE d.asistencia = @idAsistencia;
+                    WHERE d.asistencia = @idAsistencia
+                    ORDER BY CASE rc.codigo WHEN N'SJC' THEN 0 WHEN N'EX' THEN 1 ELSE 2 END, d.id;
 
                     IF @idDetalle IS NULL
                     BEGIN
@@ -218,10 +221,13 @@ BEGIN
                         -- 2.8: aprobacion => JUSTIFICADA (EX, asistio = 0). El rechazo no toca DetalleAsistencia.
                         IF @modificaDetalle = 1
                         BEGIN
-                            UPDATE dbo.DetalleAsistencia
+                            UPDATE d
                             SET razonCausa = @idRazonJustificada,
                                 asistio = 0
-                            WHERE id = @idDetalle;
+                            FROM dbo.DetalleAsistencia d
+                            INNER JOIN dbo.RazonCausa rc ON rc.id = d.razonCausa
+                            WHERE d.asistencia = @idAsistencia
+                              AND (d.id = @idDetalle OR rc.codigo = N'SJC');
                         END
 
                         -- 2.9: auditoria oficial con estado previo y nuevo, en la misma transaccion
