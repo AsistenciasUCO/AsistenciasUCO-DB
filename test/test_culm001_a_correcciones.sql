@@ -532,6 +532,19 @@ BEGIN TRY
        OR NOT EXISTS (SELECT 1 FROM #dec WHERE estadoResultado = 0 AND mensajeTecnicoResultado LIKE N'DBCODE=SEC[_]001|%')
        OR NOT EXISTS (SELECT 1 FROM dbo.Decano WHERE id = @kD AND estado = 1)
         THROW 58151, 'TEST FAILED: A2-T-12 administrador de otra institucion => DEC_001; no administrador => SEC_001.', 1;
+    -- F-A-S03 (auditoria en pantalla): un decano creado sin facultad (usp_crear_decano con @idFacultad NULL) no pertenece a
+    -- ninguna institucion todavia; el administrador lo ve en su listado y debe poder desactivarlo y reactivarlo (antes DEC_001).
+    DECLARE @kF UNIQUEIDENTIFIER = CAST(@p + '4F' AS UNIQUEIDENTIFIER);
+    INSERT INTO dbo.Decano (id, usuario) VALUES (@kF, CAST(@p + '13' AS UNIQUEIDENTIFIER));
+    TRUNCATE TABLE #dec;
+    INSERT INTO #dec EXEC dbo.usp_cambiar_estado_decano @idDecano = @kF, @estaActivo = NULL, @idCorrelacion = @c, @idUsuarioEjecutor = @uAdmin1;
+    IF NOT EXISTS (SELECT 1 FROM #dec WHERE estadoResultado = 1 AND estaActivoDecano = 0 AND personaSinRolesActivos = 0)
+       OR NOT EXISTS (SELECT 1 FROM dbo.Decano WHERE id = @kF AND estado = 0)
+        THROW 58152, 'TEST FAILED: A2-T-12 el administrador desactiva a un decano sin facultad asignada (F-A-S03).', 1;
+    TRUNCATE TABLE #dec;
+    INSERT INTO #dec EXEC dbo.usp_cambiar_estado_decano @idDecano = @kF, @estaActivo = NULL, @idCorrelacion = @c, @idUsuarioEjecutor = @uAdmin1;
+    IF NOT EXISTS (SELECT 1 FROM #dec WHERE estadoResultado = 1 AND estaActivoDecano = 1)
+        THROW 58153, 'TEST FAILED: A2-T-12 el administrador reactiva a un decano sin facultad asignada (F-A-S03).', 1;
     PRINT 'TEST_PASS:CULM001A2_T12_ESTADO_DECANO';
 
     -- ======================================================= A2-T-13: semillas 33

@@ -1638,7 +1638,7 @@ GO
 -- (igual que usp_cambiar_estado_coordinador) para que el backend sincronice la cuenta de identidad.
 -- El ADMINISTRADOR activa o desactiva el rol de decano (Decano.estado, A2-C5) de una facultad de SU institucion:
 --   * RBAC ADMINISTRADOR (SEC_001). Ambito dentro del SP: la facultad del decano es de la institucion del
---     administrador; si no (o el decano no existe), DEC_001 (404).
+--     administrador; si no (o el decano no existe), DEC_001 (404). Un decano sin facultad asignada se gestiona (F-A-S03).
 --   * @estaActivo NULL invierte el estado actual (la ruta HTTP es un toggle). Idempotente.
 --   * DEC_002 (409): no se desactiva al decano de una facultad con algun Programa activo (lectura con bloqueo).
 --   * Regla D1: personaSinRolesActivos se calcula DESPUES de actualizar Decano.estado (uv_usuario_perfil ya filtrada);
@@ -1720,9 +1720,12 @@ BEGIN
             SELECT @idUsuarioDecano = d.usuario, @estadoActual = d.estado
             FROM dbo.Decano d WITH (UPDLOCK, HOLDLOCK)
             WHERE d.id = @idDecano
-              AND EXISTS (SELECT 1 FROM dbo.Facultad f
-                          INNER JOIN dbo.Administrador ad ON ad.institucion = f.institucion
-                          WHERE f.decano = d.id AND ad.usuario = @idUsuarioEjecutor);
+              -- F-A-S03: un decano creado sin facultad aun no pertenece a ninguna institucion y figura en el listado
+              -- del administrador; se gestiona igual. Con facultad, alguna debe ser de la institucion del administrador.
+              AND (EXISTS (SELECT 1 FROM dbo.Facultad f
+                           INNER JOIN dbo.Administrador ad ON ad.institucion = f.institucion
+                           WHERE f.decano = d.id AND ad.usuario = @idUsuarioEjecutor)
+                   OR NOT EXISTS (SELECT 1 FROM dbo.Facultad f WHERE f.decano = d.id));
 
             IF @idUsuarioDecano IS NULL
                 SET @codigoRechazo = 'DEC_001';
