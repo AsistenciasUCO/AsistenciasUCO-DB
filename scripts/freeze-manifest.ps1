@@ -12,18 +12,26 @@
 # Verify accepts a frozen file's new hash ONLY when the supersession names the exact DB-GP-001C hash.
 #   ./scripts/freeze-manifest.ps1 -Mode GeneratePostFreeze   (only after the post-freeze work item is approved)
 #
+# CULM-001 paquete D (DEC-044 (11)): docs/contracts/DB_CULM001_D_POST_FREEZE_MANIFEST.sha256 registra, solo con lineas WORK_ITEM,
+# los archivos que crean los subpaquetes D.x (tablas, vistas, SP, permisos y migraciones). Cada D.x agrega sus lineas en el mismo
+# commit que cambia el archivo; Verify comprueba el hash de cada linea (sin lista en este script, para que las D.x se mezclen en
+# cualquier orden):
+#   ./scripts/freeze-manifest.ps1 -Mode UpdateCulm001D -Paths schema/tables/X.sql,schema/views/uv_x.sql   (alta o actualizacion)
+#
 # The addendum is intentionally NOT hashed: it records the final commit SHA, which cannot include itself.
 # Hashes are SHA-256 over the file content with CRLF normalized to LF, so the manifest is identical
 # on Windows (core.autocrlf=true) and Linux checkouts. The result is sha256sum-compatible for LF files:
 #   sha256sum <path>   ==   the hash recorded here for that path.
 param (
-    [ValidateSet('Generate', 'Verify', 'GeneratePostFreeze')][string]$Mode = 'Verify',
-    [string]$Root = (Split-Path -Parent $PSScriptRoot)
+    [ValidateSet('Generate', 'Verify', 'GeneratePostFreeze', 'UpdateCulm001D')][string]$Mode = 'Verify',
+    [string]$Root = (Split-Path -Parent $PSScriptRoot),
+    [string[]]$Paths = @()
 )
 
 $ErrorActionPreference = 'Stop'
 $manifestRel = 'docs/contracts/DB_DEVELOP_FREEZE_MANIFEST.sha256'
 $postFreezeManifestRel = 'docs/contracts/DB_UTC_D06_POST_FREEZE_MANIFEST.sha256'
+$culm001DManifestRel = 'docs/contracts/DB_CULM001_D_POST_FREEZE_MANIFEST.sha256'
 $frozenFiles = @(
     'docs/contracts/DB_BASELINE_CONTRACT.md',
     'schema/views/uv_horario_docente.sql',
@@ -81,6 +89,7 @@ function Read-BaseManifest {
 }
 
 $manifestPath = Join-Path $Root $manifestRel
+$culm001DManifestPath = Join-Path $Root $culm001DManifestRel
 $postFreezeManifestPath = Join-Path $Root $postFreezeManifestRel
 if ($Mode -eq 'Generate') {
     $lines = foreach ($f in $frozenFiles) { "$(Get-NormalizedSha256 -Path (Join-Path $Root $f))  $f" }
@@ -102,7 +111,25 @@ if ($Mode -eq 'GeneratePostFreeze') {
     exit 0
 }
 
+if ($Mode -eq 'UpdateCulm001D') {
+    $entries = @{}
+    if (Test-Path $culm001DManifestPath) {
+        foreach ($line in [System.IO.File]::ReadAllLines($culm001DManifestPath)) {
+            if ($line -match '^([0-9a-f]{64})  (\S+)  WORK_ITEM$') { $entries[$Matches[2]] = $Matches[1] }
+        }
+    }
+    foreach ($f in @($Paths | ForEach-Object { $_ -split ',' } | Where-Object { $_ })) {
+        $rel = $f.Replace('\', '/')
+        $entries[$rel] = Get-NormalizedSha256 -Path (Join-Path $Root $rel)
+    }
+    $lines = foreach ($k in ($entries.Keys | Sort-Object)) { "$($entries[$k])  $k  WORK_ITEM" }
+    [System.IO.File]::WriteAllText($culm001DManifestPath, (($lines -join "`n") + "`n"), [System.Text.UTF8Encoding]::new($false))
+    Write-Host "CULM-001 D manifest written: $culm001DManifestRel ($(@($lines).Count) entries)"
+    exit 0
+}
+
 $problems = @()
+$culm001DEntries = 0
 $superseded = @{}
 $postNew = @{}
 if (Test-Path $postFreezeManifestPath) {
@@ -134,8 +161,19 @@ else {
         if (-not (Test-Path $full)) { $problems += "FILE_MISSING:$f"; continue }
         if ((Get-NormalizedSha256 -Path $full) -ne $postNew[$f]) { $problems += "HASH_MISMATCH:$f" }
     }
+    if (Test-Path $culm001DManifestPath) {
+        foreach ($line in [System.IO.File]::ReadAllLines($culm001DManifestPath)) {
+            if ($line -match '^([0-9a-f]{64})  (\S+)  WORK_ITEM$') {
+                $full = Join-Path $Root $Matches[2]
+                $culm001DEntries++
+                if (-not (Test-Path $full)) { $problems += "FILE_MISSING:$($Matches[2])"; continue }
+                if ((Get-NormalizedSha256 -Path $full) -ne $Matches[1]) { $problems += "HASH_MISMATCH:$($Matches[2])" }
+            }
+            elseif ($line.Trim()) { $problems += "CULM001_D_MANIFEST_INVALID_LINE:$line" }
+        }
+    }
     if ($recorded['docs/contracts/DB_BASELINE_CONTRACT.md'] -ne $expectedContractSha) { $problems += 'CONTRACT_SHA_NOT_BASELINE' }
 }
 if ($problems.Count -gt 0) { $problems | ForEach-Object { Write-Host $_ }; exit 1 }
-Write-Host "FREEZE_MANIFEST_OK entries=$($frozenFiles.Count) post_freeze_superseded=$($superseded.Count) post_freeze_work_item=$($postNew.Count)"
+Write-Host "FREEZE_MANIFEST_OK entries=$($frozenFiles.Count) post_freeze_superseded=$($superseded.Count) post_freeze_work_item=$($postNew.Count) culm001_d=$culm001DEntries"
 exit 0

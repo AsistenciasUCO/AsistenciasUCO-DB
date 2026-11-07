@@ -428,3 +428,25 @@ BEGIN
     ALTER TABLE [dbo].[DetalleAsistencia] ADD CONSTRAINT [FK_DetalleAsistencia_TomaAsistencia] FOREIGN KEY ([toma]) REFERENCES [dbo].[TomaAsistencia] ([id]);
 END
 GO
+
+-- CULM-001 D.3 (CONTRACT v2 §4.2): edicion de parametros por el administrador (HU168).
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_CatalogoParametroEdicion_CatalogoParametro')
+BEGIN
+    ALTER TABLE [dbo].[CatalogoParametroEdicion] ADD CONSTRAINT [FK_CatalogoParametroEdicion_CatalogoParametro] FOREIGN KEY ([parametro]) REFERENCES [dbo].[CatalogoParametro] ([id]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_CatalogoParametroEdicion_MenorQue')
+BEGIN
+    ALTER TABLE [dbo].[CatalogoParametroEdicion] ADD CONSTRAINT [FK_CatalogoParametroEdicion_MenorQue] FOREIGN KEY ([parametroDebeSerMenorQue]) REFERENCES [dbo].[CatalogoParametro] ([id]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_CambioParametro_CatalogoParametro')
+BEGIN
+    ALTER TABLE [dbo].[CambioParametro] ADD CONSTRAINT [FK_CambioParametro_CatalogoParametro] FOREIGN KEY ([parametro]) REFERENCES [dbo].[CatalogoParametro] ([id]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_CambioParametro_Usuario')
+BEGIN
+    ALTER TABLE [dbo].[CambioParametro] ADD CONSTRAINT [FK_CambioParametro_Usuario] FOREIGN KEY ([idUsuarioEjecutor]) REFERENCES [dbo].[Usuario] ([id]);
+END
+GO
