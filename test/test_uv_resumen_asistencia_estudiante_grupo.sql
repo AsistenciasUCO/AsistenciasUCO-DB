@@ -191,6 +191,8 @@ BEGIN TRY
     -- T-DB-12: grupo sin sesiones ejecutadas => 0.00 sin division por cero
     DELETE FROM dbo.DetalleAsistencia WHERE asistencia IN (SELECT id FROM dbo.Asistencia WHERE sesion IN (SELECT id FROM #s WHERE k = N'G3'));
     DELETE FROM dbo.Asistencia WHERE sesion IN (SELECT id FROM #s WHERE k = N'G3');
+    -- CULM-001 B.2 ([SUPUESTO-B-20], [SUPUESTO-B-06]): sin registros tambien es sin tomas (la toma 1 la creo el helper del fixture)
+    DELETE FROM dbo.TomaAsistencia WHERE sesion IN (SELECT id FROM #s WHERE k = N'G3');
     IF NOT EXISTS (SELECT 1 FROM dbo.uv_resumen_asistencia_estudiante_grupo v INNER JOIN #eg x ON x.id = v.idEstudianteGrupo WHERE x.k = N'E7' AND v.sesionesEjecutadas = 0 AND v.porcentajeInasistencia = 0 AND v.faltasSinJustaCausa = 0)
         THROW 53046, 'TEST FAILED T-DB-12: grupo sin ejecutadas debia dar 0.00.', 1;
     PRINT 'TEST_PASS:HU070_DIVISOR_CERO';

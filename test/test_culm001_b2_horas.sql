@@ -378,7 +378,7 @@ BEGIN TRY
     IF (SELECT COUNT(*) FROM #b2hR) <> 1 OR NOT EXISTS (SELECT 1 FROM #b2hR WHERE codigoRazonCausa = N'SJC' AND asistio = 0)
         THROW 57640, 'TEST FAILED CULM001_B2_HOR_08: el detalle del reclamo debe devolver una sola fila con el estado consolidado (SJC).', 1;
     TRUNCATE TABLE #b2hR;
-    EXEC dbo.usp_resolver_solicitud_revision_asistencia @idSolicitud = @sol, @idDocente = @d, @accion = N'APROBAR', @respuestaDocente = N'Aprobado CULMB2',
+    EXEC dbo.usp_resolver_solicitud_revision_asistencia @idSolicitud = @sol, @idDocente = @d, @accion = N'APROBADA', @respuestaDocente = N'Aprobado CULMB2',
         @idCorrelacion = @corr, @idUsuarioEjecutor = @uD;
     IF EXISTS (SELECT 1 FROM dbo.DetalleAsistencia da INNER JOIN dbo.RazonCausa rc ON rc.id = da.razonCausa WHERE da.asistencia = @aH4 AND rc.codigo = N'SJC')
        OR (SELECT COUNT(*) FROM dbo.DetalleAsistencia da INNER JOIN dbo.RazonCausa rc ON rc.id = da.razonCausa WHERE da.asistencia = @aH4 AND rc.codigo = N'EX' AND da.asistio = 0) <> 3
@@ -394,15 +394,19 @@ BEGIN TRY
     -- B2-HOR-11 (NB-2): tomasDictadas junto a sesionesEjecutadas en los SP de §2.9 que exponen conteos
     -- --------------------------------------------------------------------------------------------------------
     IF EXISTS (
-        SELECT 1 FROM (VALUES (N'usp_consultar_historial_estudiante'), (N'usp_consultar_resumen_asistencia_estudiante_programa'),
+        SELECT 1 FROM (VALUES (N'usp_consultar_resumen_asistencia_estudiante_programa'),
                               (N'usp_consultar_kpis_decano'), (N'usp_consultar_kpis_institucion'),
                               (N'usp_consultar_resumen_asistencia_grupo_docente_paginado'), (N'usp_consultar_resumen_asistencia_estudiante')) p(nombre)
         WHERE (SELECT COUNT(*) FROM sys.dm_exec_describe_first_result_set_for_object(OBJECT_ID(N'dbo.' + p.nombre), 0) d
                WHERE d.name IN (N'sesionesEjecutadas', N'tomasDictadas', N'horasDictadas', N'horasFalta')) <> 4)
        OR (SELECT COUNT(*) FROM sys.dm_exec_describe_first_result_set_for_object(OBJECT_ID(N'dbo.usp_consultar_alerta_temprana_programa'), 0) d
            WHERE d.name IN (N'tomasDictadas', N'horasDictadas', N'horasFalta')) <> 3
-       OR (SELECT COUNT(*) FROM sys.dm_exec_describe_first_result_set_for_object(OBJECT_ID(N'dbo.usp_consultar_asistencias_sesion_paginado'), 0) d
-           WHERE d.name IN (N'totalTomas', N'horasAsistidas', N'horasFalta', N'horasExcusa')) <> 4
+       -- historial y asistencias por sesion fijan SESSION_CONTEXT (sys.sp_set_session_context): su metadata no se puede describir,
+       -- se verifica el texto del modulo
+       OR EXISTS (SELECT 1 FROM (VALUES (N'tomasDictadas             = r.tomasDictadas'), (N'horasDictadas             = r.horasDictadas'), (N'horasFalta                = r.horasFalta')) c(t)
+                  WHERE NOT EXISTS (SELECT 1 FROM sys.sql_modules m WHERE m.object_id = OBJECT_ID(N'dbo.usp_consultar_historial_estudiante') AND m.definition LIKE N'%' + c.t + N'%'))
+       OR EXISTS (SELECT 1 FROM (VALUES (N'AS totalTomas'), (N'AS horasAsistidas'), (N'AS horasFalta'), (N'AS horasExcusa')) c(t)
+                  WHERE NOT EXISTS (SELECT 1 FROM sys.sql_modules m WHERE m.object_id = OBJECT_ID(N'dbo.usp_consultar_asistencias_sesion_paginado') AND m.definition LIKE N'%' + c.t + N'%'))
         THROW 57650, 'TEST FAILED CULM001_B2_HOR_11: los SP que exponen conteos deben exponer tomasDictadas/horas junto a sesionesEjecutadas (NB-2).', 1;
     PRINT 'TEST_PASS:CULM001_B2_HOR_11_UNIDADES';
 

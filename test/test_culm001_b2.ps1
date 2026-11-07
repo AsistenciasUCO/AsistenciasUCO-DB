@@ -192,9 +192,14 @@ GO
 GO
 :r $remoteDir/dev_pagination_fixture.sql
 GO
+DROP TABLE IF EXISTS #esc, #nom, #ape, #est;
+GO
 :r $remoteDir/dev_pagination_cleanup.sql
 GO
 :r $remoteDir/dev_pagination_fixture.sql
+GO
+-- el fixture de paginacion deja tablas temporales de sesion: se retiran para repetirlo en la misma conexion
+DROP TABLE IF EXISTS #esc, #nom, #ape, #est;
 GO
 IF NOT EXISTS (SELECT 1 FROM dbo.TomaAsistencia WHERE LEFT(CONVERT(CHAR(36), id), 8) = 'DE00000A')
     THROW 57771, 'SEG02_DEV_SIN_TOMA: el fixture de paginacion debe crear la toma 1 de sus sesiones.', 1;

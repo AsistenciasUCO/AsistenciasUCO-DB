@@ -10,6 +10,8 @@
 --              DetalleAsistencia vacia: sin 4922 ni 50002; NOT NULL, dependientes creados, UX antiguo borrado; la segunda
 --              pasada no cambia nada.
 --   B2-MIG-06  la secuencia queda por delante de MAX(codigo) tras el despliegue y tras 16_up
+-- zz_foreign_keys.sql se ejecuta con ':on error ignore': en la BD compartida pueden faltar tablas de otros paquetes (por
+-- ejemplo SolicitudIngresoGrupo retirada por el paquete A); el resultado de B.2 se verifica despues con consultas.
 :on error exit
 SET NOCOUNT ON;
 SET XACT_ABORT OFF;
@@ -52,13 +54,15 @@ IF OBJECT_ID(N'dbo.TomaAsistencia', N'U') IS NOT NULL OR OBJECT_ID(N'dbo.TokenAs
    OR COL_LENGTH(N'dbo.uv_cumplimiento_sesion_grupo', N'totalTomas') IS NOT NULL
    OR COL_LENGTH(N'dbo.uv_sesion_estado', N'totalTomas') IS NOT NULL
    OR NOT EXISTS (SELECT 1 FROM sys.sql_modules WHERE object_id = OBJECT_ID(N'dbo.usp_ejecutar_cierre_masivo_periodo') AND definition LIKE N'%COUNT(da.id)%')
-   OR EXISTS (SELECT 1 FROM sys.sql_modules WHERE object_id = OBJECT_ID(N'dbo.usp_cancelar_sesion') AND definition LIKE N'%TomaAsistencia%')
-   OR EXISTS (SELECT 1 FROM sys.sql_modules WHERE object_id = OBJECT_ID(N'dbo.usp_internal_aplicar_festivos_grupo') AND definition LIKE N'%TomaAsistencia%')
-   OR EXISTS (SELECT 1 FROM sys.sql_modules WHERE object_id = OBJECT_ID(N'dbo.usp_precargar_sesiones_grupo_interno') AND definition LIKE N'%TomaAsistencia%')
+   OR EXISTS (SELECT 1 FROM sys.sql_modules WHERE object_id = OBJECT_ID(N'dbo.usp_cancelar_sesion') AND definition LIKE N'%dbo.TomaAsistencia%')
+   OR EXISTS (SELECT 1 FROM sys.sql_modules WHERE object_id = OBJECT_ID(N'dbo.usp_internal_aplicar_festivos_grupo') AND definition LIKE N'%dbo.TomaAsistencia%')
+   OR EXISTS (SELECT 1 FROM sys.sql_modules WHERE object_id = OBJECT_ID(N'dbo.usp_precargar_sesiones_grupo_interno') AND definition LIKE N'%dbo.TomaAsistencia%')
    OR EXISTS (SELECT 1 FROM sys.sql_modules WHERE object_id = OBJECT_ID(N'dbo.usp_consultar_kpis_decano') AND definition LIKE N'%horas%')
    OR OBJECT_ID(N'dbo.usp_cancelar_sesion', N'P') IS NULL OR OBJECT_ID(N'dbo.uv_sesion_estado', N'V') IS NULL
    OR EXISTS (SELECT 1 FROM dbo.CatalogoMensajeUsuario WHERE codigo LIKE N'TOM[_]%' OR codigo LIKE N'AQR[_]%')
-   OR EXISTS (SELECT 1 FROM dbo.CatalogoParametro WHERE grupo IN (N'TOMA_ASISTENCIA', N'ASISTENCIA_QR') OR (grupo = N'ASISTENCIA' AND clave LIKE N'CODIGO_RAZON[_]%'))
+   -- (ASISTENCIA_QR/LIMITE_IP_POR_MINUTO y LIMITE_ESTUDIANTE_POR_MINUTO pertenecen a la semilla 29 anterior a B: se conservan)
+   OR EXISTS (SELECT 1 FROM dbo.CatalogoParametro WHERE (grupo IN (N'TOMA_ASISTENCIA', N'ASISTENCIA_QR') OR (grupo = N'ASISTENCIA' AND clave LIKE N'CODIGO_RAZON[_]%'))
+              AND NOT (grupo = N'ASISTENCIA_QR' AND clave IN (N'LIMITE_IP_POR_MINUTO', N'LIMITE_ESTUDIANTE_POR_MINUTO')))
     THROW 57710, 'MIG_CHECK_DOWN_FAILED: 16_down no restauro el esquema anterior a B.2.', 1;
 IF (SELECT CHECKSUM_AGG(CHECKSUM(id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin)) FROM dbo.DetalleAsistencia) <> (SELECT v FROM #b2mig WHERE k = N'detalle_checksum')
    OR (SELECT COUNT_BIG(*) FROM dbo.DetalleAsistencia) <> (SELECT v FROM #b2mig WHERE k = N'detalle_count')
@@ -133,7 +137,12 @@ GO
 :r $(SCHEMADIR)/tables/ModoTomaAsistencia.sql
 :r $(SCHEMADIR)/tables/TokenAsistenciaToma.sql
 :r $(SCHEMADIR)/tables/TomaAsistencia.sql
+GO
+SET XACT_ABORT OFF;
+GO
+:on error ignore
 :r $(SCHEMADIR)/tables/zz_foreign_keys.sql
+:on error exit
 :r $(SCHEMADIR)/seed/35_catalogos_toma_asistencia.sql
 :r $(SCHEMADIR)/seed/36_backfill_toma_asistencia.sql
 GO
@@ -146,7 +155,8 @@ IF COLUMNPROPERTY(OBJECT_ID(N'dbo.DetalleAsistencia'), N'toma', N'AllowsNull') <
    OR OBJECT_ID(N'dbo.seq_detalle_asistencia_codigo', N'SO') IS NULL
     THROW 57730, 'MIG_CHECK_DEPLOY1_FAILED: la primera pasada de tablas + semilla 36 debe dejar toma NOT NULL con sus dependientes (B2-MIG-05).', 1;
 IF OBJECT_ID(N'tempdb..#b2migObj') IS NOT NULL DROP TABLE #b2migObj;
-SELECT o.name, o.type, o.modify_date INTO #b2migObj FROM sys.objects o
+CREATE TABLE #b2migObj (name SYSNAME COLLATE DATABASE_DEFAULT NOT NULL, type CHAR(2) COLLATE DATABASE_DEFAULT NOT NULL, modify_date DATETIME NULL);
+INSERT INTO #b2migObj (name, type, modify_date) SELECT o.name, o.type, o.modify_date FROM sys.objects o
 WHERE o.parent_object_id = OBJECT_ID(N'dbo.DetalleAsistencia') OR o.object_id IN (OBJECT_ID(N'dbo.DetalleAsistencia'), OBJECT_ID(N'dbo.TomaAsistencia'), OBJECT_ID(N'dbo.seq_detalle_asistencia_codigo'));
 INSERT INTO #b2migObj (name, type, modify_date) SELECT i.name, 'IX', NULL FROM sys.indexes i WHERE i.object_id = OBJECT_ID(N'dbo.DetalleAsistencia') AND i.name IS NOT NULL;
 UPDATE #b2mig SET v = (SELECT COUNT_BIG(*) FROM dbo.TomaAsistencia) WHERE k = N'multitoma';
@@ -157,18 +167,23 @@ GO
 :r $(SCHEMADIR)/tables/ModoTomaAsistencia.sql
 :r $(SCHEMADIR)/tables/TokenAsistenciaToma.sql
 :r $(SCHEMADIR)/tables/TomaAsistencia.sql
+GO
+SET XACT_ABORT OFF;
+GO
+:on error ignore
 :r $(SCHEMADIR)/tables/zz_foreign_keys.sql
+:on error exit
 :r $(SCHEMADIR)/seed/35_catalogos_toma_asistencia.sql
 :r $(SCHEMADIR)/seed/36_backfill_toma_asistencia.sql
 GO
-IF EXISTS (SELECT name, type FROM #b2migObj EXCEPT (SELECT o.name, o.type FROM sys.objects o
+IF EXISTS (SELECT name, type FROM #b2migObj EXCEPT (SELECT o.name COLLATE DATABASE_DEFAULT, o.type COLLATE DATABASE_DEFAULT FROM sys.objects o
                WHERE o.parent_object_id = OBJECT_ID(N'dbo.DetalleAsistencia') OR o.object_id IN (OBJECT_ID(N'dbo.DetalleAsistencia'), OBJECT_ID(N'dbo.TomaAsistencia'), OBJECT_ID(N'dbo.seq_detalle_asistencia_codigo'))
-               UNION ALL SELECT i.name, 'IX' FROM sys.indexes i WHERE i.object_id = OBJECT_ID(N'dbo.DetalleAsistencia') AND i.name IS NOT NULL))
-   OR EXISTS ((SELECT o.name, o.type FROM sys.objects o
+               UNION ALL SELECT i.name COLLATE DATABASE_DEFAULT, 'IX' FROM sys.indexes i WHERE i.object_id = OBJECT_ID(N'dbo.DetalleAsistencia') AND i.name IS NOT NULL))
+   OR EXISTS ((SELECT o.name COLLATE DATABASE_DEFAULT, o.type COLLATE DATABASE_DEFAULT FROM sys.objects o
                WHERE o.parent_object_id = OBJECT_ID(N'dbo.DetalleAsistencia') OR o.object_id IN (OBJECT_ID(N'dbo.DetalleAsistencia'), OBJECT_ID(N'dbo.TomaAsistencia'), OBJECT_ID(N'dbo.seq_detalle_asistencia_codigo'))
-               UNION ALL SELECT i.name, 'IX' FROM sys.indexes i WHERE i.object_id = OBJECT_ID(N'dbo.DetalleAsistencia') AND i.name IS NOT NULL) EXCEPT SELECT name, type FROM #b2migObj)
+               UNION ALL SELECT i.name COLLATE DATABASE_DEFAULT, 'IX' FROM sys.indexes i WHERE i.object_id = OBJECT_ID(N'dbo.DetalleAsistencia') AND i.name IS NOT NULL) EXCEPT SELECT name, type FROM #b2migObj)
    OR (SELECT COUNT_BIG(*) FROM dbo.TomaAsistencia) <> (SELECT v FROM #b2mig WHERE k = N'multitoma')
-   OR EXISTS (SELECT 1 FROM #b2migObj b INNER JOIN sys.objects o ON o.name = b.name AND o.type = b.type WHERE b.modify_date IS NOT NULL AND o.modify_date <> b.modify_date)
+   OR EXISTS (SELECT 1 FROM #b2migObj b INNER JOIN sys.objects o ON o.name COLLATE DATABASE_DEFAULT = b.name AND o.type COLLATE DATABASE_DEFAULT = b.type WHERE b.modify_date IS NOT NULL AND o.modify_date <> b.modify_date)
     THROW 57731, 'MIG_CHECK_DEPLOY2_FAILED: la segunda pasada de tablas + semilla 36 no debe cambiar nada (B2-MIG-05).', 1;
 PRINT 'MIG_DEPLOY2_OK';
 GO
@@ -182,11 +197,21 @@ GO
 :r $(SCHEMADIR)/tables/ModoTomaAsistencia.sql
 :r $(SCHEMADIR)/tables/TokenAsistenciaToma.sql
 :r $(SCHEMADIR)/tables/TomaAsistencia.sql
+GO
+SET XACT_ABORT OFF;
+GO
+:on error ignore
 :r $(SCHEMADIR)/tables/zz_foreign_keys.sql
+:on error exit
 :r $(SCHEMADIR)/seed/35_catalogos_toma_asistencia.sql
 :r $(SCHEMADIR)/seed/36_backfill_toma_asistencia.sql
 :r $(SCHEMADIR)/tables/DetalleAsistencia.sql
+GO
+SET XACT_ABORT OFF;
+GO
+:on error ignore
 :r $(SCHEMADIR)/tables/zz_foreign_keys.sql
+:on error exit
 :r $(SCHEMADIR)/seed/36_backfill_toma_asistencia.sql
 GO
 IF COLUMNPROPERTY(OBJECT_ID(N'dbo.DetalleAsistencia'), N'toma', N'AllowsNull') <> 0
