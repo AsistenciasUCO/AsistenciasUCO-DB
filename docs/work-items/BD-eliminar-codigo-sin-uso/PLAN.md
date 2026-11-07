@@ -95,3 +95,5 @@ John (2026-10-29): **eliminar 18 objetos** que la aplicación no usa. Salen del 
 ## Validación
 
 Ver `VALIDATION.md`.
+
+> **Retirado en CULM-001 A (2026-11-07):** las solicitudes de ingreso (HU053-HU055) se descartaron; la reactivacion de la matricula retirada vive en `usp_internal_reactivar_matricula_retirada` (DEC-009). Ver `docs/arquitectura/DOCUMENTACION_PROCEDIMIENTOS_PUBLICOS.md`, addendum CULM-001 A.

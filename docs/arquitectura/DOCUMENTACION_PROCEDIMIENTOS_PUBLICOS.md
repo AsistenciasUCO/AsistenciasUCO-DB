@@ -298,20 +298,12 @@ Internos (sin permisos; encadenamiento de propietario):
 
 Permiso aditivo: `schema/security/rol_asistencias_runtime_hu159.sql`. Mensajes: `schema/seed/31_mensajes_correccion_identidad.sql` (`IDE_001`..`IDE_003`). Parámetro: `schema/seed/32_parametros_identidad.sql`. Prueba: `test/test_usp_corregir_identidad_usuario.sql` (9 marcadores críticos, incluidos el parámetro en 0 y en 1). Sin cambios de tablas ni de objetos congelados.
 
-## Addendum HU053/HU054/HU055 — solicitudes de ingreso a un grupo (2026-10-27)
+## Addendum HU053/HU054/HU055 — solicitudes de ingreso a un grupo (2026-10-27) — RETIRADO en CULM-001 A
 
-Work item: `docs/work-items/HU053-HU054-HU055-solicitudes-ingreso-grupo/` (tabla nueva `SolicitudIngresoGrupo` aprobada por John; análisis de impacto en el PLAN).
-
-| SP | Caso de uso | Ámbito | Códigos |
-|---|---|---|---|
-| `dbo.usp_registrar_solicitud_ingreso_grupo` | Comando: el estudiante solicita el ingreso (P) | estudiante ejecutor (`Estudiante.usuario`) | `GEN_002`, `SIG_001..SIG_006` |
-| `dbo.usp_resolver_solicitud_ingreso_grupo` | Comando + `codigoEstadoResultante`: ACEPTAR (con cupo A y matrícula vía `usp_registrar_estudiante_en_grupo_interno`; sin cupo E) o RECHAZAR con motivo (R); bloqueo `UPDLOCK, HOLDLOCK` del grupo | docente titular | `SIG_003`, `SIG_004`, `SIG_007..SIG_014` |
-| `dbo.usp_retirar_solicitud_ingreso_grupo` | Comando: el estudiante retira su solicitud abierta (X) | estudiante propietario | `SIG_007`, `SIG_008`, `SIG_015` |
-| `dbo.usp_consultar_solicitudes_ingreso_grupo_docente` | Lectura paginada: bandeja del grupo en orden de llegada con `posicionEspera` y cupo | docente titular | `VAL_001` (THROW) |
-| `dbo.usp_consultar_solicitudes_ingreso_estudiante` | Lectura paginada: mis solicitudes | estudiante | `VAL_001` (THROW) |
-| `dbo.usp_consultar_destinatarios_solicitud_ingreso_grupo` | Lectura: ESTUDIANTE y DOCENTE para los avisos | estudiante propietario o docente titular | `VAL_001` (THROW) |
-
-Permiso aditivo: `schema/security/rol_asistencias_runtime_hu053_hu055.sql`. Semillas: `22_estados_solicitud_ingreso_grupo.sql`, `23_mensajes_solicitud_ingreso_grupo.sql`. Prueba: `test/test_solicitud_ingreso_grupo.sql` (S-01..S-12).
+Retirado en CULM-001 A.1 (decision del responsable, 2026-11-06: HU026, HU053, HU054 y HU055 descartadas). La tabla
+`SolicitudIngresoGrupo`, sus 6 SP, sus grants, los estados `E` (en espera) y los mensajes `SIG_*` se eliminan con
+`migrations/13_culm001_a_retiro_solicitudes_up.sql`, que antes archiva el historial en `dbo.zz_archivo_*` (DEC-010).
+El estado `X` (retirada) de `dbo.Estado` se conserva (seed `33_culm001_a_catalogos.sql`) para el reclamo retirado.
 
 ## Addendum HU006 — perfil del usuario autenticado (2026-10-27)
 
@@ -347,6 +339,9 @@ Work item: `docs/work-items/HU008-oferta-grupos-estudiante/` (contrato HTTP en e
 Permiso aditivo: `schema/security/rol_asistencias_runtime_hu008.sql`. Seed: `24_parametro_oferta_grupos.sql`. Pruebas: `test/test_usp_consultar_oferta_grupos_estudiante.sql` (O-01..O-05) y `test/test_hu008_regla_inscripcion_programa.sql` (RI-01..RI-03).
 
 ## Addendum INT-HU-01 — reactivación de la matrícula retirada al aceptar una solicitud de ingreso (2026-10-28)
+
+> CULM-001 A.1 (DEC-009): la regla se mueve a `dbo.usp_internal_reactivar_matricula_retirada`, que llama
+> `usp_registrar_estudiante_en_grupo_interno` (matricula manual HU050 y QR/PIN HU176B). Ver el addendum CULM-001 A.
 
 `dbo.usp_resolver_solicitud_ingreso_grupo`, ACEPTAR con cupo: si el estudiante tiene una matrícula `I` (retirado, HU051) en el grupo, se reactiva (`I` → `A`), se enlaza en la solicitud y responde `SIG_011` (antes: 409 por duplicado desde la matrícula interna). Sin cambios de firma, resultset ni mensajes. Work item: `docs/work-items/INT-HU-01-reactivar-matricula-retirada/`. Prueba: `test/test_int_hu01_reactivar_matricula_retirada.sql` (RM-01..RM-03).
 
@@ -431,3 +426,30 @@ La auditoría BD 2026-10-28 encontró 48 SP públicos sin ficha aquí; 10 de ell
 - **Escritura:** la hace `usp_guardar_horarios_grupo_interno` (`DELETE` + `INSERT` sobre `dbo.Horario`); este SP controla la transacción: propia, o savepoint si ya hay una abierta, sin `XACT_ABORT ON`. Un rechazo después de escribir deshace todo lo escrito. El runtime solo tiene `EXECUTE` sobre el SP público (`DENY` sobre el interno) y no puede escribir `dbo.Horario` directamente (`rol_asistencias_runtime_f1_horario_grupo.sql`).
 - **Resultset:** canónico de 4 columnas (`GEN_005` en éxito).
 - **Pruebas:** `test/test_usp_guardar_horarios_grupo.sql`. Work item: `docs/work-items/F1-horario-grupo/`.
+
+---
+
+## Addendum CULM-001 A — retiro de solicitudes (A.1) y correcciones de la Fase 1 (A.2) (2026-11-07)
+
+Contrato: `AsistenciasUCO-Infra/docs/work-items/CULM-001-culminacion/paquetes/A-retiro-solicitudes/CONTRACT.md` (v5).
+Migraciones: `13_culm001_a_retiro_solicitudes_up/down.sql` y `14_culm001_a_correcciones_fase1_up/down.sql`.
+
+| SP | Caso de uso | Ámbito | Códigos |
+|---|---|---|---|
+| `dbo.usp_registrar_estudiante_en_grupo` (cambia) | Matrícula manual; firma y resultset sin cambio | solo DOCENTE titular (F-COO-004) | `SEC_001`, `SEC_002`, `GEN_004`, `ERR_CUPO_SUPERADO`, `ERR_MATRICULA_DUPLICADA` |
+| `dbo.usp_internal_reactivar_matricula_retirada` (interno) | Reactiva la matrícula `MATRICULA/ESTADO_RETIRADA` (misma fila) con cupo bajo bloqueo | interno | `GEN_001`, `ERR_CUPO_SUPERADO`, `SYS_001` |
+| `dbo.usp_consultar_oferta_grupos_estudiante` (cambia) | Oferta HU008 con 19 columnas (sin solicitud) | estudiante | `VAL_001` (THROW) |
+| `dbo.usp_consultar_directorio_estudiantes_paginado` | Directorio (listado 12 columnas; detalle 11 + 12 de contexto) | ADMINISTRADOR institución, COORDINADOR programas, DOCENTE grupos propios | `VAL_001` (THROW) |
+| `dbo.usp_consultar_estudiantes_grupo_ambito_paginado` | Estudiantes del grupo en todos los estados; `@tamanoPagina NULL` = todas | titular, administrador de la institución, coordinador (solo sus programas) | `VAL_001`, `SEC_002` (THROW) |
+| `dbo.usp_consultar_asistencias_grupo_ambito_paginado` | Asistencias registradas del grupo, filtro de sesión | igual | `VAL_001`, `SEC_002` (THROW) |
+| `dbo.usp_consultar_materias_estudiante` / `dbo.usp_consultar_horario_estudiante` | Solo matrícula `MATRICULA/ESTADO_INSCRITA` | estudiante del ejecutor | `VAL_001` (THROW) |
+| `dbo.usp_validar_solape_sesion_interno` (interno, DENY) | Rechazo de sesiones cruzadas del grupo o del docente | interno | `SES_017` |
+| `dbo.usp_retirar_solicitud_revision_asistencia` | Comando: el estudiante retira su reclamo `P` → `X` | estudiante propietario | `GEN_002`, `SEC_001`, `REV_006`, `REV_007`, `REV_008` |
+| `dbo.usp_cambiar_estado_decano` | Comando + `idUsuario`, `personaSinRolesActivos`, `estaActivoDecano` (toggle con `@estaActivo NULL`) | ADMINISTRADOR de la institución | `GEN_002`, `SEC_001`, `DEC_001`, `DEC_002`, `DEC_003` |
+| `dbo.usp_buscar_estudiante_por_documento_grupo` | Documento exacto, 0..1 fila, correo enmascarado (DEC-027) | DOCENTE titular del grupo | `VAL_001`, `SEC_002` (THROW) |
+
+Tabla: `Decano.estado BIT NOT NULL DEFAULT 1` (rama Decano de `uv_usuario_perfil` y `uv_decano` filtradas).
+Permisos: `schema/security/rol_asistencias_runtime_culm001_a.sql`. Seeds: `33_culm001_a_catalogos.sql`,
+`33_culm001_a_mensajes.sql`. Pruebas: `test_culm001_a_retiro_solicitudes.sql`, `test_culm001_a_correcciones.sql`,
+`test_culm001_a_fixture_segundo_ambito.sql` y la compuerta manual `scripts/tests/test_migracion_13_culm001_a.ps1`.
+Fixture fuera del despliegue: `test/fixtures/culm1_segundo_ambito.sql` (+ `_down`).

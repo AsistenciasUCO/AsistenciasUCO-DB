@@ -12,7 +12,7 @@ generated-by: scripts/generar-catalogo-mensajes.ps1
 
 Uso en SP: `EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = '<CODIGO>', @p_param1 = ...`. Los marcadores `{}` / `{0}` se reemplazan con los parámetros. El mensaje técnico se entrega como `DBCODE=<CODIGO>|<texto>` (ver `docs/contracts/DB_BASELINE_CONTRACT.md`).
 
-Total de códigos: **163**.
+Total de códigos: **159**.
 
 ## ARC
 
@@ -61,6 +61,8 @@ Total de códigos: **163**.
 | Código | Tipo | Severidad | Mensaje usuario | Mensaje técnico | Seed |
 |---|---|---|---|---|---|
 | `DEC_001` | BUSINESS_ERROR | MEDIO | El decano especificado no existe en el sistema. | Error de búsqueda: No se encontró el decano en uv_decano_identidad: {}. | `04_mensaje.sql` |
+| `DEC_002` | BUSINESS_ERROR | ALTO | No se puede desactivar al decano de una facultad con programas activos. | Regla: el decano [{}] dirige una facultad con el programa activo [{}]; no se desactiva. | `33_culm001_a_mensajes.sql` |
+| `DEC_003` | SUCCESS | BAJO | Se actualizó el estado del decano. | Actualizacion: Decano.estado del decano [{}] actualizado (regla D1 aplicada a Usuario.estado). | `33_culm001_a_mensajes.sql` |
 
 ## DOC
 
@@ -99,7 +101,6 @@ Total de códigos: **163**.
 | `ERR_PROGRAMA_FACULTAD_INCONSISTENTE` | BUSINESS_ERROR | CRITICO | El programa académico indicado no pertenece a la facultad especificada. | Programa {} no pertenece a la Facultad {} indicada en uv_programa.idFacultad. | `04_mensaje.sql` |
 | `ERR_PROGRAMA_GRUPO_NO_ENCONTRADO` | BUSINESS_ERROR | ALTO | No se encontro un programa academico asociado a este grupo. | Error: Trazabilidad rota para Grupo ID {}. | `04_mensaje.sql` |
 | `ERR_SESION_NO_EXISTE` | BUSINESS_ERROR | MEDIO | La sesion de clase no existe o no esta abierta. | Error: No se encontro una sesion activa para el ID especificado: {}. | `04_mensaje.sql` |
-| `ERR_SOLICITUD_MATRICULA_NO_IMPLEMENTADA` | BUSINESS_ERROR | MEDIO | La gestión de solicitudes de matrícula aún no se encuentra disponible. | Capability SolicitudMatricula is not implemented in the current schema. | `04_mensaje.sql` |
 | `ERR_TOKEN_VERIFICACION_INVALIDO` | BUSINESS_ERROR | MEDIO | El codigo de verificacion de asistencia es incorrecto o ha expirado. | Fallo: Codigo de verificacion incorrecto o expirado para Sesion: {}. | `04_mensaje.sql` |
 | `ERR_UNICIDAD_CORREO` | BUSINESS_ERROR | ALTO | El correo electronico ya se encuentra registrado. | Fallo unicidad: El correo [{}] ya existe en uv_usuario. | `04_mensaje.sql` |
 | `ERR_UNICIDAD_DOCUMENTO` | BUSINESS_ERROR | ALTO | El numero de documento ya esta registrado para este tipo de identificacion. | Fallo unicidad: Duplicado en idTipoIdentificacion y numeroIdentificacion [{}]. | `04_mensaje.sql` |
@@ -197,6 +198,12 @@ Total de códigos: **163**.
 | `NTF_001` | BUSINESS_ERROR | MEDIO | Los datos de la notificación no son válidos. | Datos de la notificación o parámetros de invocación no cumplen el contrato. | `04_mensaje.sql` |
 | `NTF_002` | BUSINESS_ERROR | MEDIO | La notificación especificada no existe en el sistema. | Notificación no encontrada por identificador. | `04_mensaje.sql` |
 | `NTF_003` | BUSINESS_ERROR | MEDIO | La notificación ya no está reservada por este proceso. | La notificación no está reservada por la instancia o la reserva ya venció. | `04_mensaje.sql` |
+| `NTF_004` | BUSINESS_ERROR | MEDIO | La plantilla de notificación no contiene todos los marcadores obligatorios o incluye marcadores no permitidos para este tipo. | Validación de plantilla fallida: marcadores obligatorios ausentes o marcadores no permitidos para el tipo. | `04_mensaje.sql` |
+| `NTF_005` | BUSINESS_ERROR | MEDIO | No existe la versión de plantilla solicitada para el tipo e idioma indicados. | No existe la versión de plantilla solicitada para el tipo e idioma indicados. | `04_mensaje.sql` |
+| `NTF_006` | SUCCESS | BAJO | La plantilla de correo se actualizó y activó correctamente en una nueva versión. | La plantilla de correo se actualizó y activó correctamente en una nueva versión. | `04_mensaje.sql` |
+| `NTF_007` | SUCCESS | BAJO | La notificación fallida fue reencolada exitosamente para un nuevo intento de envío. | La notificación fallida fue reencolada exitosamente para un nuevo intento de envío. | `04_mensaje.sql` |
+| `NTF_008` | BUSINESS_ERROR | MEDIO | Solo se pueden reencolar notificaciones en estado fallido definitivo o reintentable. | Solo se pueden reencolar notificaciones en estado fallido definitivo o reintentable. | `04_mensaje.sql` |
+| `NTF_009` | SUCCESS | BAJO | Correo de prueba encolado correctamente. | Correo de prueba encolado correctamente. | `04_mensaje.sql` |
 
 ## PAG
 
@@ -263,6 +270,9 @@ Total de códigos: **163**.
 | `REV_003` | BUSINESS_ERROR | MEDIO | La asistencia del reclamo no es una inasistencia justificable. | SES-04 resolución de reclamo: la solicitud [{}] apunta a una asistencia presente (AN / asistio = 1); sin escrituras. | `04_mensaje.sql` |
 | `REV_004` | BUSINESS_ERROR | MEDIO | El reclamo no tiene un registro de asistencia que se pueda justificar. | SES-04 resolución de reclamo: la solicitud [{}] no tiene DetalleAsistencia; no se simula la justificación. | `04_mensaje.sql` |
 | `REV_005` | BUSINESS_ERROR | MEDIO | El reclamo indicado no existe. | SES-04 resolución de reclamo: la solicitud [{}] no existe o no tiene asistencia, sesión y grupo válidos. | `04_mensaje.sql` |
+| `REV_006` | BUSINESS_ERROR | MEDIO | La solicitud de revisión no existe. | Ambito: la solicitud de revision [{}] no existe o no es del estudiante ejecutor; sin escrituras. | `33_culm001_a_mensajes.sql` |
+| `REV_007` | BUSINESS_ERROR | MEDIO | Solo se puede retirar una solicitud de revisión pendiente. | Regla: la solicitud de revision [{}] no esta en el estado de RECLAMO/ESTADO_PENDIENTE; sin escrituras. | `33_culm001_a_mensajes.sql` |
+| `REV_008` | SUCCESS | BAJO | La solicitud de revisión fue retirada. | Actualizacion: la solicitud de revision [{}] paso al estado de RECLAMO/ESTADO_RETIRADO. | `33_culm001_a_mensajes.sql` |
 
 ## SEC
 
@@ -284,26 +294,7 @@ Total de códigos: **163**.
 | `SES_007` | BUSINESS_ERROR | MEDIO | La sesión de clase aún no ha iniciado; la asistencia solo se registra durante la sesión. | SES-01 ventana de registro: la sesión [{}] no ha iniciado (SYSUTCDATETIME() < fechaHoraInicio); lote rechazado sin escrituras. | `04_mensaje.sql` |
 | `SES_008` | BUSINESS_ERROR | MEDIO | La sesión de clase ya finalizó; la asistencia solo puede modificarse mediante un reclamo. | SES-01 ventana de registro: la sesión [{}] está cerrada (SYSUTCDATETIME() >= fechaHoraFin); lote rechazado sin escrituras. | `04_mensaje.sql` |
 | `SES_009` | BUSINESS_ERROR | MEDIO | El horario de la sesión no está confirmado; no es posible registrar asistencia. | SES-01 ventana de registro: la sesión [{}] tiene procedencia temporal INDETERMINADA (procedenciaTemporal NULL); lote rechazado sin escrituras. | `04_mensaje.sql` |
-
-## SIG
-
-| Código | Tipo | Severidad | Mensaje usuario | Mensaje técnico | Seed |
-|---|---|---|---|---|---|
-| `SIG_001` | BUSINESS_ERROR | MEDIO | Solo un estudiante puede solicitar el ingreso a un grupo. | Ambito: el ejecutor no tiene dbo.Estudiante. | `23_mensajes_solicitud_ingreso_grupo.sql` |
-| `SIG_002` | BUSINESS_ERROR | MEDIO | El grupo indicado no existe. | Existencia: no hay dbo.Grupo con el id indicado. | `23_mensajes_solicitud_ingreso_grupo.sql` |
-| `SIG_003` | BUSINESS_ERROR | MEDIO | El período académico del grupo ya terminó. | Regla: PeriodoAcademico.fechaFin es anterior a la fecha local (TIEMPO.ZONA_HORARIA_SQLSERVER). | `23_mensajes_solicitud_ingreso_grupo.sql` |
-| `SIG_004` | BUSINESS_ERROR | MEDIO | El estudiante ya está matriculado en este grupo. | Regla: existe dbo.EstudianteGrupo activo (A) del estudiante en el grupo. | `23_mensajes_solicitud_ingreso_grupo.sql` |
-| `SIG_005` | BUSINESS_ERROR | MEDIO | Ya existe una solicitud abierta para este grupo. | Unicidad: existe dbo.SolicitudIngresoGrupo en estado P o E para el estudiante y el grupo. | `23_mensajes_solicitud_ingreso_grupo.sql` |
-| `SIG_006` | SUCCESS | BAJO | La solicitud de ingreso al grupo fue registrada. | Insercion: dbo.SolicitudIngresoGrupo en estado P. | `23_mensajes_solicitud_ingreso_grupo.sql` |
-| `SIG_007` | BUSINESS_ERROR | MEDIO | La solicitud indicada no existe o no está a su cargo. | Ambito: la solicitud no existe o el ejecutor no es el docente titular del grupo / el estudiante propietario. | `23_mensajes_solicitud_ingreso_grupo.sql` |
-| `SIG_008` | BUSINESS_ERROR | MEDIO | La solicitud ya fue resuelta o retirada. | Regla: la solicitud no esta en estado P o E. | `23_mensajes_solicitud_ingreso_grupo.sql` |
-| `SIG_009` | BUSINESS_ERROR | MEDIO | La acción indicada no es válida; use ACEPTAR o RECHAZAR. | Validacion: @accion distinta de ACEPTAR o RECHAZAR. | `23_mensajes_solicitud_ingreso_grupo.sql` |
-| `SIG_010` | BUSINESS_ERROR | MEDIO | El motivo del rechazo es obligatorio y no puede superar 500 caracteres. | Validacion: @motivo nulo, vacio o de mas de 500 caracteres al rechazar. | `23_mensajes_solicitud_ingreso_grupo.sql` |
-| `SIG_011` | SUCCESS | BAJO | La solicitud fue aceptada y el estudiante quedó matriculado en el grupo. | Actualizacion: solicitud A y dbo.EstudianteGrupo activo creado (usp_registrar_estudiante_en_grupo_interno). | `23_mensajes_solicitud_ingreso_grupo.sql` |
-| `SIG_012` | SUCCESS | BAJO | El grupo no tiene cupo: la solicitud quedó en lista de espera. | Actualizacion: sin cupo (capacidad - activos <= 0) bajo UPDLOCK; solicitud P pasa a E. | `23_mensajes_solicitud_ingreso_grupo.sql` |
-| `SIG_013` | BUSINESS_ERROR | MEDIO | El grupo sigue sin cupo; la solicitud permanece en lista de espera. | Regla: solicitud E sin cupo disponible bajo UPDLOCK. | `23_mensajes_solicitud_ingreso_grupo.sql` |
-| `SIG_014` | SUCCESS | BAJO | La solicitud fue rechazada. | Actualizacion: solicitud R con motivoRechazo. | `23_mensajes_solicitud_ingreso_grupo.sql` |
-| `SIG_015` | SUCCESS | BAJO | La solicitud fue retirada. | Actualizacion: solicitud X retirada por el estudiante propietario. | `23_mensajes_solicitud_ingreso_grupo.sql` |
+| `SES_017` | BUSINESS_ERROR | MEDIO | La sesión se cruza con otra sesión del grupo o del docente en ese horario. | Regla: la sesion se cruza con la sesion [{}] del mismo grupo o de otro grupo del mismo docente (inicio < fin y fin > inicio); sin escrituras. | `33_culm001_a_mensajes.sql` |
 
 ## SUC
 

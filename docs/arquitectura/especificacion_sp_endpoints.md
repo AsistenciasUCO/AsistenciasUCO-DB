@@ -529,15 +529,17 @@
 | `GET /api/v1/estudiante/reclamos` | `usp_consultar_solicitudes_revision_estudiante` | HU010/HU011 (consulta) |
 | `POST /api/v1/docente/grupos/{grupoId}/estudiantes/{estudianteId}/retiro` | `usp_retirar_estudiante_grupo` + `usp_consultar_destinatarios_retiro_estudiante_grupo` | HU051 |
 | `GET /api/v1/estudiante/oferta-academica` | `usp_consultar_oferta_grupos_estudiante` | HU008 |
-| `POST /api/v1/estudiante/solicitudes-matricula` | `usp_registrar_solicitud_ingreso_grupo` | HU053 |
-| `GET /api/v1/estudiante/solicitudes-matricula` | `usp_consultar_solicitudes_ingreso_estudiante` | HU053/HU055 |
-| `POST /api/v1/estudiante/solicitudes-matricula/{id}/retiro` | `usp_retirar_solicitud_ingreso_grupo` | HU055 |
-| `GET /api/v1/docente/grupos/{grupoId}/solicitudes-ingreso` | `usp_consultar_solicitudes_ingreso_grupo_docente` | HU053-HU055 |
-| `PATCH /api/v1/docente/solicitudes-ingreso/{id}` | `usp_resolver_solicitud_ingreso_grupo` (+ destinatarios) | HU053/HU054/HU055 |
+| `GET /api/v1/estudiantes` y `/{id}` | `usp_consultar_directorio_estudiantes_paginado` | CULM-001 A.2-1 |
+| `GET /api/v1/grupos/{grupoId}/estudiantes` | `usp_consultar_estudiantes_grupo_ambito_paginado` | CULM-001 A.2-2 |
+| `GET /api/v1/grupos/{grupoId}/asistencias` | `usp_consultar_asistencias_grupo_ambito_paginado` | CULM-001 A.2-2 |
+| `GET /api/v1/grupos/{grupoId}/estudiantes/busqueda` | `usp_buscar_estudiante_por_documento_grupo` | CULM-001 A.2-15 (DEC-027) |
+| `GET /api/v1/estudiante/materias` / `GET /api/v1/estudiante/horario` | `usp_consultar_materias_estudiante` / `usp_consultar_horario_estudiante` | CULM-001 A.2-11 |
+| `DELETE /api/v1/estudiante/reclamos/{id}` | `usp_retirar_solicitud_revision_asistencia` | CULM-001 A.2-7 |
+| `PATCH /api/v1/admin/decanos/{id}/toggle` | `usp_cambiar_estado_decano` | CULM-001 A.2-8 |
 | `GET /api/v1/coordinador/docentes/{idDocente}/ficha` | `usp_consultar_docentes_programa` (cabecera, `@idDocente`) + `usp_consultar_historial_grupos_docente_programa` | HU094 |
 | `GET /api/v1/coordinador/docentes/resumen` | `usp_consultar_resumen_docentes_programa` | HU095 |
 
-Firma de entrada/salida y códigos: `DOCUMENTACION_PROCEDIMIENTOS_PUBLICOS.md` (addendums 2026-10-25, HU010/HU011, HU051, HU053-HU055, HU008, HU094/HU095 y HU006) y el `CONTRACT.md` de cada work item del backend.
+Firma de entrada/salida y códigos: `DOCUMENTACION_PROCEDIMIENTOS_PUBLICOS.md` (addendums 2026-10-25, HU010/HU011, HU051, HU053-HU055 (retiradas en CULM-001 A), HU008, HU094/HU095 y HU006) y el `CONTRACT.md` de cada work item del backend.
 
 ---
 
@@ -586,7 +588,6 @@ Auditoría BD 2026-10-28: 53 de 102 SP públicos no figuraban aquí (10 de ellos
 | `Sesion` | `usp_actualizar_sesion_v2` | `PATCH /api/v2/sesiones/{sesionId}` | DOCENTE | `@idSesion, @nombre, @fechaHoraInicio, @fechaHoraFin, @idCorrelacion, @idUsuarioEjecutor` | UTC-D06-POST-FREEZE: actualizacion v2 (PATCH de reemplazo completo de horas). El backend solo invoca este SP con instantes normalizados a UTC desde RFC3339 con offset explicito (UTC-D02): horas y marca UTC_V2 se escriben en el MISMO UPDATE. Mismos parametros n… |
 | `Sesion` | `usp_clasificar_procedencia_sesion` | `Sin endpoint: mantenimiento UTC-D06, solo rol_asistencias_clasificador_temporal` | Rol temporal | `@idSesion, @ambiente, @idManifiesto, @hashEvidencia, @fechaHoraInicioVerificada, @fechaHoraFinVerificada, @fechaHoraInicioUtc, @fechaHoraFinUtc, @idUsuarioAprobador, @idCorrelacion, @idUsuarioEjecutor` | UTC-D06-POST-FREEZE: UNICO camino administrativo para marcar una sesion historica como UTC_OWNER. No es un endpoint del backend: lo ejecuta el owner funcional/DBA con un manifiesto aprobado, sesion por sesion y ambiente por ambiente. Fail-closed: * el ejecutor… |
 | `Sesion` | `usp_crear_sesion_v2` | `POST /api/v2/sesiones` | DOCENTE | `@idGrupo, @nombre, @fechaHoraInicio, @fechaHoraFin, @idCorrelacion, @idUsuarioEjecutor` | UTC-D06-POST-FREEZE: creacion v2. El backend solo invoca este SP despues de normalizar un RFC3339 con offset explicito (perfil UTC-D02) al instante UTC, por lo que las horas recibidas son instantes UTC confirmados: se marcan UTC_V2 en el MISMO INSERT (usp_crea… |
-| `SolicitudIngreso` | `usp_consultar_destinatarios_solicitud_ingreso_grupo` | `Sin endpoint propio: lo usa el backend para notificar tras registrar/resolver una solicitud (HU053-HU055)` | Interno backend | `@idSolicitud, @idCorrelacion, @idUsuarioEjecutor` | usp_consultar_destinatarios_solicitud_ingreso_grupo  (HU053/HU054/HU055) Clasificacion: NON_GOLDEN_PATH_EXTENSION, READ_QUERY_RESULTSET (THROW ante ejecutor nulo). Destinatarios de los avisos de una solicitud de ingreso: el ESTUDIANTE solicitante y el DOCENTE … |
 
 ### SP públicos legacy sin consumidor en el backend
 
