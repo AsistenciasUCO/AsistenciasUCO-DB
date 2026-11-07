@@ -390,3 +390,29 @@ BEGIN
     ALTER TABLE [dbo].[TokenMatriculaGrupo] ADD CONSTRAINT [FK_TokenMatriculaGrupo_Docente] FOREIGN KEY ([docenteEmisor]) REFERENCES [dbo].[Docente] ([id]);
 END
 GO
+-- CULM-001 B.1 (CONTRACT §2.2): sesion cancelada y dias festivos
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_SesionCancelacion_Sesion')
+BEGIN
+    ALTER TABLE [dbo].[SesionCancelacion] ADD CONSTRAINT [FK_SesionCancelacion_Sesion] FOREIGN KEY ([sesion]) REFERENCES [dbo].[Sesion] ([id]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_SesionCancelacion_TipoCancelacionSesion')
+BEGIN
+    ALTER TABLE [dbo].[SesionCancelacion] ADD CONSTRAINT [FK_SesionCancelacion_TipoCancelacionSesion] FOREIGN KEY ([tipoCancelacion]) REFERENCES [dbo].[TipoCancelacionSesion] ([id]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_SesionCancelacion_DiaFestivo')
+BEGIN
+    ALTER TABLE [dbo].[SesionCancelacion] ADD CONSTRAINT [FK_SesionCancelacion_DiaFestivo] FOREIGN KEY ([diaFestivo]) REFERENCES [dbo].[DiaFestivo] ([id]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_SesionCancelacion_Usuario')
+BEGIN
+    ALTER TABLE [dbo].[SesionCancelacion] ADD CONSTRAINT [FK_SesionCancelacion_Usuario] FOREIGN KEY ([usuarioEjecutor]) REFERENCES [dbo].[Usuario] ([id]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_CargaDiaFestivo_Usuario')
+BEGIN
+    ALTER TABLE [dbo].[CargaDiaFestivo] ADD CONSTRAINT [FK_CargaDiaFestivo_Usuario] FOREIGN KEY ([usuarioEjecutor]) REFERENCES [dbo].[Usuario] ([id]);
+END
+GO
