@@ -5,6 +5,13 @@ GO
 SET QUOTED_IDENTIFIER ON;
 GO
 
+-- CULM-001 B.2 (CONTRACT §2.8.1, DEC-013, [SUPUESTO-B-04], [SUPUESTO-B-14]): toma vigente.
+--   * @idToma (opcional): toma explicita (lote por toma, QR, cierre); debe pertenecer a @idSesion (TOM_001).
+--   * @idToma NULL (lote congelado y llamadores de 7 parametros): la toma ABIERTA de la sesion; si no hay, la de mayor numero;
+--     si la sesion no tiene tomas, crea la toma 1 implicita y CERRADA (MANUAL, docente del ejecutor o del grupo).
+--   * Detalle unico por (asistencia, toma); codigo desde dbo.seq_detalle_asistencia_codigo; registradoPorEstudiante y
+--     fechaRegistroUtc. @soloSiNoExiste = 1 no sobrescribe un detalle existente (QR idempotente y cierre): @detalleCreado = 0.
+--   * Orden de bloqueos: Sesion (lo toma el llamador) -> EstudianteGrupo -> TomaAsistencia -> Asistencia -> DetalleAsistencia.
 CREATE OR ALTER PROCEDURE [dbo].[usp_sincronizar_asistencia_estudiante_interno]
 (
     @idEstudiante            UNIQUEIDENTIFIER,
@@ -13,7 +20,12 @@ CREATE OR ALTER PROCEDURE [dbo].[usp_sincronizar_asistencia_estudiante_interno]
     @idCorrelacion           UNIQUEIDENTIFIER,
     @mensajeUsuarioResultado NVARCHAR(4000) OUTPUT,
     @mensajeTecnicoResultado NVARCHAR(4000) OUTPUT,
-    @estadoResultado         BIT OUTPUT
+    @estadoResultado         BIT OUTPUT,
+    @idToma                  UNIQUEIDENTIFIER = NULL,
+    @registradoPorEstudiante BIT = 0,
+    @soloSiNoExiste          BIT = 0,
+    @idUsuarioEjecutor       UNIQUEIDENTIFIER = NULL,
+    @detalleCreado           BIT = NULL OUTPUT
 )
 AS
     -- 1. Estandarización e inicialización de variables utilizando funciones de catálogo (Sin ISNULL)
@@ -31,13 +43,18 @@ AS
     DECLARE @asistio                 BIT;
     DECLARE @idAsistencia            UNIQUEIDENTIFIER;
     DECLARE @idDetalleAsistencia     UNIQUEIDENTIFIER;
-    DECLARE @nuevoCodigo             INT;
+    DECLARE @idTomaResuelta          UNIQUEIDENTIFIER;
+    DECLARE @idDocenteApertura       UNIQUEIDENTIFIER;
+    DECLARE @registradoPorEstudianteDefecto BIT = IIF(@registradoPorEstudiante IS NULL, 0, @registradoPorEstudiante);
+    DECLARE @soloSiNoExisteDefecto   BIT = IIF(@soloSiNoExiste IS NULL, 0, @soloSiNoExiste);
+    DECLARE @ahoraUtc                DATETIME2(0) = SYSUTCDATETIME();
 
     -- Inicialización de respuesta desde parámetros del catálogo
     SELECT 
         @mensajeUsuarioResultado = dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA'),
         @mensajeTecnicoResultado = dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA'),
-        @estadoResultado = 1;
+        @estadoResultado = 1,
+        @detalleCreado = 0;
 
 BEGIN
     SET NOCOUNT ON;
@@ -126,7 +143,56 @@ BEGIN
             END
         END
 
-        -- PASO 5: Sincronización de cabecera y detalle de asistencia
+        -- PASO 4.5 (CULM-001 B.2): toma explicita o toma vigente de la sesion
+        IF @estadoResultado = 1
+        BEGIN
+            IF @idToma IS NOT NULL
+            BEGIN
+                SELECT @idTomaResuelta = t.id
+                FROM dbo.TomaAsistencia t WITH (UPDLOCK, HOLDLOCK)
+                WHERE t.id = @idToma AND t.sesion = @idSesionDefecto;
+
+                IF @idTomaResuelta IS NULL
+                BEGIN
+                    EXEC dbo.usp_obtener_mensaje_catalogo
+                        @p_codigo = 'TOM_001',
+                        @p_param1 = @idToma,
+                        @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                        @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
+
+                    SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+                    SET @estadoResultado = 0;
+                END
+            END
+            ELSE
+            BEGIN
+                SELECT TOP 1 @idTomaResuelta = t.id
+                FROM dbo.TomaAsistencia t WITH (UPDLOCK, HOLDLOCK)
+                WHERE t.sesion = @idSesionDefecto
+                ORDER BY IIF(t.fechaCierreUtc IS NULL, 0, 1), t.numero DESC;
+
+                IF @idTomaResuelta IS NULL
+                BEGIN
+                    SELECT @idDocenteApertura = d.id FROM dbo.Docente d WHERE d.usuario = @idUsuarioEjecutor;
+                    IF @idDocenteApertura IS NULL
+                        SELECT @idDocenteApertura = g.docente FROM dbo.Grupo g WHERE g.id = @idGrupo;
+
+                    SET @idTomaResuelta = NEWID();
+                    INSERT INTO dbo.TomaAsistencia (id, sesion, numero, modo, estado, esImplicita, docenteApertura, fechaAperturaUtc,
+                                                    fechaCierreUtc, totalAusentesMarcados, idCorrelacionApertura, idCorrelacionCierre)
+                    SELECT @idTomaResuelta, @idSesionDefecto, 1, m.id, e.id, 1, @idDocenteApertura, @ahoraUtc, @ahoraUtc, 0,
+                           @idCorrelacionDefecto, @idCorrelacionDefecto
+                    FROM dbo.ModoTomaAsistencia m
+                    CROSS JOIN dbo.EstadoTomaAsistencia e
+                    WHERE m.usaCodigoQr = 0 AND e.estaAbierta = 0;
+
+                    IF @@ROWCOUNT <> 1
+                        THROW 52501, 'CULM001_B2_CATALOGO_INCONSISTENTE: faltan ModoTomaAsistencia(usaCodigoQr = 0) o EstadoTomaAsistencia(estaAbierta = 0).', 1;
+                END
+            END
+        END
+
+        -- PASO 5: Sincronización de cabecera y detalle de asistencia (por toma)
         IF @estadoResultado = 1
         BEGIN
             SELECT TOP 1 @idAsistencia = id
@@ -143,24 +209,27 @@ BEGIN
 
             SELECT TOP 1 @idDetalleAsistencia = id
             FROM dbo.DetalleAsistencia WITH (UPDLOCK, HOLDLOCK)
-            WHERE asistencia = @idAsistencia;
+            WHERE asistencia = @idAsistencia
+              AND toma = @idTomaResuelta;
 
             IF @idDetalleAsistencia IS NULL
             BEGIN
-                SELECT @nuevoCodigo = dbo.ufn_obtener_parametro_int(MAX(codigo), 'GENERAL', 'ENTERO_CERO') + 1
-                FROM dbo.DetalleAsistencia WITH (UPDLOCK, HOLDLOCK);
                 SET @idDetalleAsistencia = NEWID();
 
-                INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin)
-                VALUES (@idDetalleAsistencia, @nuevoCodigo, @idAsistencia, @asistio, @idRazonCausa, @fechaInicioSesion, @fechaFinSesion);
+                INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin,
+                                                   toma, registradoPorEstudiante, fechaRegistroUtc)
+                VALUES (@idDetalleAsistencia, NEXT VALUE FOR dbo.seq_detalle_asistencia_codigo, @idAsistencia, @asistio, @idRazonCausa,
+                        @fechaInicioSesion, @fechaFinSesion, @idTomaResuelta, @registradoPorEstudianteDefecto, @ahoraUtc);
+                SET @detalleCreado = 1;
             END
-            ELSE
+            ELSE IF @soloSiNoExisteDefecto = 0
             BEGIN
                 UPDATE dbo.DetalleAsistencia
                 SET asistio = @asistio,
                     razonCausa = @idRazonCausa,
                     fechaHoraInicio = @fechaInicioSesion,
-                    fechaHoraFin = @fechaFinSesion
+                    fechaHoraFin = @fechaFinSesion,
+                    fechaRegistroUtc = @ahoraUtc
                 WHERE id = @idDetalleAsistencia;
             END
 
