@@ -395,7 +395,7 @@ ROLLBACK TRANSACTION;
 GO
 IF @@TRANCOUNT <> 0 THROW 57603, 'MIG_TRANCOUNT', 1;
 IF OBJECT_ID(N'dbo.usp_cancelar_sesion', N'P') IS NULL OR OBJECT_ID(N'dbo.usp_generar_sesiones_grupo_v2', N'P') IS NULL
-   OR (SELECT COUNT(*) FROM sys.parameters WHERE object_id = OBJECT_ID(N'dbo.usp_validar_sesion_ventana_registro_interno')) <> 7
+   OR (SELECT COUNT(*) FROM sys.parameters WHERE object_id = OBJECT_ID(N'dbo.usp_validar_sesion_ventana_registro_interno')) <> 8
    OR NOT EXISTS (SELECT 1 FROM dbo.CatalogoMensajeUsuario WHERE codigo = 'SES_010')
     THROW 57604, 'MIG_ROLLBACK_DID_NOT_RESTORE', 1;
 PRINT 'MIG_RESTORED_OK';

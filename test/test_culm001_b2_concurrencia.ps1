@@ -132,7 +132,7 @@ i=0
 while read -r G H U; do
   i=$((i+1))
   /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P "$SQLPW" -C -I -h -1 -W -s '|' -w 65535 -t 30 -l 30 \
-    -v START="$2" H="$H" U="$U" G="$G" -i "$3/worker.sql" > "$3/out_$4_$i.txt" 2>&1 &
+    -v START="$2" H="$H" U="$U" G="$G" -i "$3/worker.sql" < /dev/null > "$3/out_$4_$i.txt" 2>&1 &
 done < "$1"
 wait
 echo DONE

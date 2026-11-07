@@ -50,6 +50,7 @@ IF OBJECT_ID(N'dbo.TomaAsistencia', N'U') IS NOT NULL OR OBJECT_ID(N'dbo.TokenAs
    OR OBJECT_ID(N'dbo.usp_abrir_toma_asistencia', N'P') IS NOT NULL OR OBJECT_ID(N'dbo.usp_registrar_asistencia_por_token', N'P') IS NOT NULL
    OR OBJECT_ID(N'dbo.usp_consultar_resumen_asistencia_estudiante', N'P') IS NOT NULL OR OBJECT_ID(N'dbo.ufn_horas_sesion', N'FN') IS NOT NULL
    OR (SELECT COUNT(*) FROM sys.parameters WHERE object_id = OBJECT_ID(N'dbo.usp_sincronizar_asistencia_estudiante_interno')) <> 7
+   OR (SELECT COUNT(*) FROM sys.parameters WHERE object_id = OBJECT_ID(N'dbo.usp_validar_sesion_ventana_registro_interno')) <> 7
    OR COL_LENGTH(N'dbo.uv_resumen_asistencia_estudiante_grupo', N'horasDictadas') IS NOT NULL
    OR COL_LENGTH(N'dbo.uv_cumplimiento_sesion_grupo', N'totalTomas') IS NOT NULL
    OR COL_LENGTH(N'dbo.uv_sesion_estado', N'totalTomas') IS NOT NULL
