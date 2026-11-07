@@ -107,6 +107,10 @@ PRINT '======================================================================';
 :r /tmp/test/test_usp_rotar_token_matricula_grupo.sql
 :r /tmp/test/test_usp_validar_token_matricula_publico.sql
 :r /tmp/test/test_usp_matricular_estudiante_por_token.sql
+-- CULM-001 B.1 (sesion cancelada, festivos y ventana con tolerancia): registro por nombre exacto (DEC-028)
+:r /tmp/test/test_culm001_b1_ventana_tolerancia.sql
+:r /tmp/test/test_culm001_b1_sesion_cancelada.sql
+:r /tmp/test/test_culm001_b1_festivos.sql
 
 IF @@TRANCOUNT <> 0
 BEGIN

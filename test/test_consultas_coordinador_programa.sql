@@ -32,7 +32,9 @@ CREATE TABLE #grupos (
     grupoEstaHablitado BIT, fechaInicioPeriodoAcademico DATETIME2, fechaFinPeriodoAcademico DATETIME2, totalRegistros INT);
 CREATE TABLE #sesiones (
     id UNIQUEIDENTIFIER, idGrupo UNIQUEIDENTIFIER, codigoGrupo INT, nombreGrupo NVARCHAR(100), nombre NVARCHAR(100),
-    numero INT, codigo NVARCHAR(50), numeroSemana INT, fechaHoraInicio DATETIME2, fechaHoraFin DATETIME2, totalRegistros INT);
+    numero INT, codigo NVARCHAR(50), numeroSemana INT, fechaHoraInicio DATETIME2, fechaHoraFin DATETIME2, totalRegistros INT,
+    -- CULM-001 B.1 (CONTRACT §2.7.7): estado de la sesion desde uv_sesion_estado
+    estaCancelada BIT, codigoTipoCancelacion NVARCHAR(20), motivoCancelacion NVARCHAR(500), nombreDiaFestivo NVARCHAR(120), fechaCancelacionUtc DATETIME2(0));
 CREATE TABLE #asistencias (
     idDetalleAsistencia UNIQUEIDENTIFIER, codigoDetalleAsistencia INT, idAsistencia UNIQUEIDENTIFIER, idSesion UNIQUEIDENTIFIER,
     nombreSesion NVARCHAR(100), codigoSesion NVARCHAR(50), numeroSemana INT, idEstudianteGrupo UNIQUEIDENTIFIER,
