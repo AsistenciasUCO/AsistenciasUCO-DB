@@ -12,7 +12,18 @@ generated-by: scripts/generar-catalogo-mensajes.ps1
 
 Uso en SP: `EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = '<CODIGO>', @p_param1 = ...`. Los marcadores `{}` / `{0}` se reemplazan con los parámetros. El mensaje técnico se entrega como `DBCODE=<CODIGO>|<texto>` (ver `docs/contracts/DB_BASELINE_CONTRACT.md`).
 
-Total de códigos: **196**.
+Total de códigos: **202**.
+
+## ADS
+
+| Código | Tipo | Severidad | Mensaje usuario | Mensaje técnico | Seed |
+|---|---|---|---|---|---|
+| `ADS_001` | SUCCESS | BAJO | Estudiante admitido. | HU156: estudiante admitido en el programa; Usuario, Estudiante y EstudiantePrograma confirmados. | `54_culm001_d4_mensajes.sql` |
+| `ADS_002` | BUSINESS_ERROR | BAJO | El estudiante ya está admitido en este programa. | HU156: EstudiantePrograma ya existe para el estudiante y el programa; sin escrituras. | `54_culm001_d4_mensajes.sql` |
+| `ADS_003` | BUSINESS_ERROR | MEDIO | El programa no existe o no pertenece a tu institución. | Ambito: el programa no existe, esta inactivo o no es de la institucion del administrador; sin escrituras. | `54_culm001_d4_mensajes.sql` |
+| `ADS_004` | BUSINESS_ERROR | MEDIO | El documento y el correo corresponden a personas distintas. | Regla: el documento y el correo no pertenecen al mismo Usuario (SUPUESTO-D-11); sin escrituras. | `54_culm001_d4_mensajes.sql` |
+| `ADS_005` | VALIDATION_ERROR | BAJO | El correo debe ser institucional ({}). | Regla: el correo de un alta nueva no cumple REGISTRO/DOMINIO_CORREO_ESTUDIANTE ({}); sin escrituras. | `54_culm001_d4_mensajes.sql` |
+| `ADS_006` | VALIDATION_ERROR | BAJO | Indica una contraseña inicial para el estudiante nuevo. | Regla: un alta nueva exige el hash de la contrasena inicial; sin escrituras. | `54_culm001_d4_mensajes.sql` |
 
 ## AQR
 
