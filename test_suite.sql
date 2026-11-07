@@ -107,6 +107,7 @@ PRINT '======================================================================';
 :r /tmp/test/test_usp_validar_token_matricula_publico.sql
 :r /tmp/test/test_usp_matricular_estudiante_por_token.sql
 :r /tmp/test/test_culm001_a_retiro_solicitudes.sql
+:r /tmp/test/test_culm001_a_correcciones.sql
 
 IF @@TRANCOUNT <> 0
 BEGIN

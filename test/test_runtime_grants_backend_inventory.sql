@@ -25,7 +25,11 @@ INSERT INTO @requeridos (nombre) VALUES
  (N'usp_consultar_programas_academicos'), (N'usp_consultar_resumen_asistencia_estudiante_programa'),
  (N'usp_consultar_resumen_docentes_programa'), (N'usp_consultar_historial_grupos_docente_programa'),
  (N'usp_consultar_tendencia_ausentismo'), (N'usp_crear_facultad'), (N'usp_crear_programa_academico'),
- (N'usp_vincular_docente_programa');
+ (N'usp_vincular_docente_programa'),
+ -- CULM-001 A.2: SP publicos nuevos que invoca el backend
+ (N'usp_consultar_directorio_estudiantes_paginado'), (N'usp_consultar_estudiantes_grupo_ambito_paginado'),
+ (N'usp_consultar_asistencias_grupo_ambito_paginado'), (N'usp_consultar_materias_estudiante'), (N'usp_consultar_horario_estudiante'),
+ (N'usp_retirar_solicitud_revision_asistencia'), (N'usp_cambiar_estado_decano'), (N'usp_buscar_estudiante_por_documento_grupo');
 
 DECLARE @sinConcesion NVARCHAR(MAX) = (
     SELECT STRING_AGG(r.nombre, ', ')
