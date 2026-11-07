@@ -109,3 +109,10 @@ NEXT AUTHORIZED PHASE:                 LB-002.1C-B1 - BACKEND AS-IS CONTRACT ANA
 - **Manifiesto:** `DB_UTC_D06_POST_FREEZE_MANIFEST.sha256` agrega la supersesión de ese archivo, de `a0372fd6…` (DB-GP-001C) a `7217604b…`; `scripts/freeze-manifest.ps1` lo incluye en `$postFreezeSuperseded`.
 - **Prueba:** `test/test_ses01_ventana_asistencia.sql` (12 IDs `SES01_*`).
 - **Work item:** `docs/work-items/SES-01-cierre-estricto-asistencia/PLAN.md`.
+
+## CULM-001 D.4 — admisión de estudiantes por el administrador (HU156) (2026-11-07)
+
+- **Objetos nuevos:** `usp_admitir_estudiante`, `usp_consultar_programas_institucion_paginado`, mensajes `ADS_001`..`ADS_006`, parámetros `IDENTIDAD/PERFILES_CORRECCION_ESTUDIANTE` y `_DECANO`, permisos `rol_asistencias_runtime_culm001_d4.sql` y la migración `23_culm001_d4_admision_estudiantes`. Ningún archivo congelado cambia; las fuentes nuevas se registran como `WORK_ITEM` en `DB_CULM001_D_POST_FREEZE_MANIFEST.sha256`.
+- **Cambio de comportamiento:** `usp_corregir_identidad_usuario` lee los perfiles permitidos de los parámetros; el `ADMINISTRADOR` ahora corrige estudiantes con `EstudiantePrograma` en un programa de su institución (antes solo el `COORDINADOR` del programa). Coordinador y decano conservan su regla.
+- **Desviación del contrato:** el vínculo con el programa se inserta en `usp_admitir_estudiante` y no con `usp_registrar_estudiante_en_programa_interno` (resuelve la institución desde `uv_estudiante`, que exige un programa previo); `Programa` no tiene columna `codigo`, por eso la consulta de programas no la devuelve.
+- **Pruebas:** `test/test_culm001_d4_admision.sql` (D4-01..D4-11) y `test/test_culm001_d4.ps1` (D4-12 up→down→up).
