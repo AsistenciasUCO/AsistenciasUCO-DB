@@ -28,6 +28,8 @@ FROM		Decano d
 INNER JOIN	Usuario u
 ON			d.usuario = u.id
 CROSS JOIN	(SELECT TOP 1 id, codigo, nombre FROM Perfil WHERE codigo = 'DE') p
+-- CULM-001 A.2 (D1, como HU121/HU122): un rol de decano inactivo deja de figurar como perfil (RBAC y roles activos)
+WHERE		d.estado = 1
 
 UNION
 

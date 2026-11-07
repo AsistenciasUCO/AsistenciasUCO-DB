@@ -19,10 +19,13 @@ SELECT		di.id,
 			idPerfil = p.id,
 			codigoPerfil = p.codigo,
 			nombrePerfil = p.nombre,
-			estaActivoDecano = IIF(di.estaActivoUsuario = 1 AND (f.id IS NULL OR f.estaActivaFacultad = 1), 1, 0),
-			estaActivoTextoDecano = IIF(di.estaActivoUsuario = 1 AND (f.id IS NULL OR f.estaActivaFacultad = 1), 'SI', 'NO')
+			-- CULM-001 A.2-8 (A2-C5): el estado propio del rol (Decano.estado) tambien cuenta.
+			estaActivoDecano = IIF(di.estaActivoUsuario = 1 AND d.estado = 1 AND (f.id IS NULL OR f.estaActivaFacultad = 1), 1, 0),
+			estaActivoTextoDecano = IIF(di.estaActivoUsuario = 1 AND d.estado = 1 AND (f.id IS NULL OR f.estaActivaFacultad = 1), 'SI', 'NO')
 
 FROM		uv_decano_identidad di
+INNER JOIN	Decano d
+ON			d.id = di.id
 LEFT JOIN   uv_facultad f 
 ON			di.id = f.idDecano
 CROSS JOIN	(SELECT TOP 1 id, codigo, nombre FROM uv_perfil WHERE codigo = 'DE') p
