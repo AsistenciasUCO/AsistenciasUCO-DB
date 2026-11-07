@@ -253,6 +253,8 @@ DECLARE @badResultSets TABLE (
 --   usp_consultar_asistencias_toma_paginado / usp_consultar_resumen_asistencia_grupo_docente_paginado /
 --   usp_consultar_resumen_asistencia_estudiante
 --                                            READ_QUERY_RESULTSET: tomas, faltantes, asistencias por toma y resumenes por horas.
+--   CULM-001 D.1 (CONTRACT §2.2): usp_consultar_sesiones_materia_estudiante
+--                                            READ_QUERY_RESULTSET: sesiones de la materia con la fecha limite de justificacion.
 -- El resultset canonico de 4 columnas es exclusivo de los SP de comando/mutacion del Golden Path.
 INSERT @badResultSets (procedureName, reason)
 SELECT sp.name, CONCAT('describe_error=', COALESCE(CONVERT(NVARCHAR(20), d.error_number), N'NULL'), ': ', COALESCE(d.error_message, N''))
@@ -273,6 +275,7 @@ WHERE SCHEMA_NAME(sp.schema_id) = 'dbo'
   AND sp.name NOT IN ('usp_consultar_directorio_estudiantes_paginado', 'usp_consultar_estudiantes_grupo_ambito_paginado', 'usp_consultar_asistencias_grupo_ambito_paginado', 'usp_consultar_materias_estudiante', 'usp_consultar_horario_estudiante', 'usp_buscar_estudiante_por_documento_grupo', 'usp_cambiar_estado_decano')
   AND sp.name NOT IN ('usp_establecer_contexto_usuario_ejecutor', 'usp_consultar_token_verificacion_correo', 'usp_consultar_reenvio_verificacion_correo', 'usp_abrir_ventana_matricula_grupo', 'usp_rotar_token_matricula_grupo', 'usp_rotar_token_matricula_automatico', 'usp_matricular_estudiante_por_token', 'usp_registrar_estudiante_por_token_publico', 'usp_consultar_ventanas_matricula_por_rotar', 'usp_validar_token_matricula_publico')
   AND sp.name NOT IN ('usp_abrir_toma_asistencia', 'usp_cerrar_toma_asistencia', 'usp_cerrar_tomas_vencidas', 'usp_registrar_asistencias_toma', 'usp_abrir_qr_toma', 'usp_rotar_token_asistencia_toma', 'usp_rotar_token_asistencia_automatico', 'usp_consultar_tomas_qr_por_rotar', 'usp_cerrar_qr_toma', 'usp_registrar_asistencia_por_token', 'usp_consultar_tomas_sesion', 'usp_consultar_faltantes_toma_paginado', 'usp_consultar_asistencias_toma_paginado', 'usp_consultar_resumen_asistencia_grupo_docente_paginado', 'usp_consultar_resumen_asistencia_estudiante')
+  AND sp.name <> 'usp_consultar_sesiones_materia_estudiante'
   AND d.error_number IS NOT NULL;
 
 INSERT @badResultSets (procedureName, reason)
@@ -295,6 +298,7 @@ WHERE SCHEMA_NAME(sp.schema_id) = 'dbo'
   AND sp.name NOT IN ('usp_establecer_contexto_usuario_ejecutor', 'usp_consultar_token_verificacion_correo', 'usp_consultar_reenvio_verificacion_correo', 'usp_abrir_ventana_matricula_grupo', 'usp_rotar_token_matricula_grupo', 'usp_rotar_token_matricula_automatico', 'usp_matricular_estudiante_por_token', 'usp_registrar_estudiante_por_token_publico', 'usp_consultar_ventanas_matricula_por_rotar', 'usp_validar_token_matricula_publico')
   AND sp.name NOT IN ('usp_cancelar_sesion', 'usp_cargar_dias_festivos', 'usp_cargar_dias_festivos_automatico', 'usp_aplicar_festivos_grupo', 'usp_aplicar_festivos_periodo', 'usp_aplicar_festivos_automatico', 'usp_generar_sesiones_grupo_v2', 'usp_consultar_destinatarios_sesion_cancelada', 'usp_consultar_sesiones_festivo_con_asistencia_paginado', 'usp_consultar_dias_festivos', 'usp_consultar_carga_festivos_anio')
   AND sp.name NOT IN ('usp_abrir_toma_asistencia', 'usp_cerrar_toma_asistencia', 'usp_cerrar_tomas_vencidas', 'usp_registrar_asistencias_toma', 'usp_abrir_qr_toma', 'usp_rotar_token_asistencia_toma', 'usp_rotar_token_asistencia_automatico', 'usp_consultar_tomas_qr_por_rotar', 'usp_cerrar_qr_toma', 'usp_registrar_asistencia_por_token', 'usp_consultar_tomas_sesion', 'usp_consultar_faltantes_toma_paginado', 'usp_consultar_asistencias_toma_paginado', 'usp_consultar_resumen_asistencia_grupo_docente_paginado', 'usp_consultar_resumen_asistencia_estudiante')
+  AND sp.name <> 'usp_consultar_sesiones_materia_estudiante'
   AND d.error_number IS NULL
 GROUP BY sp.name
 HAVING COUNT(d.column_ordinal) <> 4;
@@ -319,6 +323,7 @@ WHERE SCHEMA_NAME(sp.schema_id) = 'dbo'
   AND sp.name NOT IN ('usp_establecer_contexto_usuario_ejecutor', 'usp_consultar_token_verificacion_correo', 'usp_consultar_reenvio_verificacion_correo', 'usp_abrir_ventana_matricula_grupo', 'usp_rotar_token_matricula_grupo', 'usp_rotar_token_matricula_automatico', 'usp_matricular_estudiante_por_token', 'usp_registrar_estudiante_por_token_publico', 'usp_consultar_ventanas_matricula_por_rotar', 'usp_validar_token_matricula_publico')
   AND sp.name NOT IN ('usp_cancelar_sesion', 'usp_cargar_dias_festivos', 'usp_cargar_dias_festivos_automatico', 'usp_aplicar_festivos_grupo', 'usp_aplicar_festivos_periodo', 'usp_aplicar_festivos_automatico', 'usp_generar_sesiones_grupo_v2', 'usp_consultar_destinatarios_sesion_cancelada', 'usp_consultar_sesiones_festivo_con_asistencia_paginado', 'usp_consultar_dias_festivos', 'usp_consultar_carga_festivos_anio')
   AND sp.name NOT IN ('usp_abrir_toma_asistencia', 'usp_cerrar_toma_asistencia', 'usp_cerrar_tomas_vencidas', 'usp_registrar_asistencias_toma', 'usp_abrir_qr_toma', 'usp_rotar_token_asistencia_toma', 'usp_rotar_token_asistencia_automatico', 'usp_consultar_tomas_qr_por_rotar', 'usp_cerrar_qr_toma', 'usp_registrar_asistencia_por_token', 'usp_consultar_tomas_sesion', 'usp_consultar_faltantes_toma_paginado', 'usp_consultar_asistencias_toma_paginado', 'usp_consultar_resumen_asistencia_grupo_docente_paginado', 'usp_consultar_resumen_asistencia_estudiante')
+  AND sp.name <> 'usp_consultar_sesiones_materia_estudiante'
   AND d.error_number IS NULL
   AND (
        (d.column_ordinal = 1 AND (d.name <> 'idCorrelacion' OR d.system_type_name <> 'uniqueidentifier'))

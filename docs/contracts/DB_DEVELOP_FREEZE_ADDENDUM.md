@@ -109,3 +109,12 @@ NEXT AUTHORIZED PHASE:                 LB-002.1C-B1 - BACKEND AS-IS CONTRACT ANA
 - **Manifiesto:** `DB_UTC_D06_POST_FREEZE_MANIFEST.sha256` agrega la supersesión de ese archivo, de `a0372fd6…` (DB-GP-001C) a `7217604b…`; `scripts/freeze-manifest.ps1` lo incluye en `$postFreezeSuperseded`.
 - **Prueba:** `test/test_ses01_ventana_asistencia.sql` (12 IDs `SES01_*`).
 - **Work item:** `docs/work-items/SES-01-cierre-estricto-asistencia/PLAN.md`.
+
+## CULM-001 D.1 — plazo de excusas (HU026B) (2026-11-07)
+
+- **Objetos nuevos:** `ufn_calcular_fecha_limite_justificacion`, `usp_internal_validar_plazo_justificacion`, `uv_sesion_estudiante_reclamo`, `usp_consultar_sesiones_materia_estudiante` y la migración `20_culm001_d1_plazo_justificacion`. Ningún archivo congelado cambia (`uv_sesion` no se toca, DEC-044 (2)); las fuentes nuevas se registran como `WORK_ITEM` en `DB_CULM001_D_POST_FREEZE_MANIFEST.sha256`.
+- **Radicación:** `usp_radicar_solicitud_revision_asistencia` (v1) y `_v2` rechazan con `REV_020` cuando `SYSUTCDATETIME() >= límite` y con `REV_025` cuando faltan `ASISTENCIA/DIAS_LIMITE_JUSTIFICACION` o `TIEMPO/ZONA_HORARIA_SQLSERVER`. El límite es la medianoche local del día `fecha local de fin + N + 1`. En la v2 el plazo se valida **después** de la reejecución idempotente por correlación (un reintento legítimo tras el vencimiento sigue devolviendo el éxito original) y antes de cualquier escritura.
+- **Fecha de radicación (F-EST-S16):** `SolicitudRevisionAsistencia.fecha` pasa de `CAST(CURRENT_TIMESTAMP AS DATE)` (fecha del servidor, UTC) a la **fecha local** (`TIEMPO/ZONA_HORARIA_SQLSERVER`). Las filas anteriores conservan su fecha (sin migración de datos).
+- **Cambio de comportamiento de lectura (DEC-022 §3):** la lista de sesiones de la materia del estudiante solo devuelve grupos con la matrícula `MATRICULA/ESTADO_INSCRITA`; con `I`, `CI`, `CVP` o `F` devuelve 0 filas.
+- **LB-004D:** cambian `usp_radicar_solicitud_revision_asistencia_v2.sql`, `test_lb004d_support_binding.sql` (la fixture usa «ayer» en lugar de una fecha fija ya vencida) y `test_lb004d_concurrency.ps1` (crea y elimina una sesión reciente propia); sus líneas del manifiesto se regeneran en el mismo commit (DEC-044 (11)).
+- **Pruebas:** `test/test_culm001_d1_plazo_justificacion.sql` (D1-01…D1-10, D1-12), `test/test_culm001_d1.ps1` (D1-11 up→down→up y D-RB-01).

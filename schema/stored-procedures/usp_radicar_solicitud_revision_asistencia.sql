@@ -31,6 +31,8 @@ AS
     DECLARE @nuevaSolicitudId     UNIQUEIDENTIFIER = NEWID();
     DECLARE @nombreSolicitud      NVARCHAR(50);
     DECLARE @idEstadoPendiente    UNIQUEIDENTIFIER;
+    DECLARE @fechaLimiteUtc       DATETIME2(7);
+    DECLARE @zonaLocal            NVARCHAR(128);
 
     -- Variables locales de respuesta
     DECLARE @mensajeUsuarioResultado NVARCHAR(4000) = dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA');
@@ -107,9 +109,22 @@ BEGIN
                 @estadoResultado = @estadoResultado OUTPUT;
         END
 
+        -- PASO 4.5 (CULM-001 D.1, HU026B): plazo de excusas (REV_020 vencido, REV_025 sin parametros); antes de toda escritura.
+        IF @estadoResultado = 1
+        BEGIN
+            EXEC dbo.usp_internal_validar_plazo_justificacion
+                @idSesion = @idSesionDefecto,
+                @idCorrelacion = @idCorrelacionDefecto,
+                @fechaLimiteUtc = @fechaLimiteUtc OUTPUT,
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+                @estadoResultado = @estadoResultado OUTPUT;
+        END
+
         -- PASO 5: Radicación atómica transaccional de la solicitud
         IF @estadoResultado = 1
         BEGIN
+            SET @zonaLocal = CAST(dbo.ufn_obtener_parametro_texto(NULL, 'TIEMPO', 'ZONA_HORARIA_SQLSERVER') AS NVARCHAR(128));
             SELECT TOP 1 @idEstudianteGrupo = eg.id
             FROM dbo.Sesion s
             INNER JOIN dbo.EstudianteGrupo eg ON eg.grupo = s.grupo
@@ -144,7 +159,7 @@ BEGIN
                 @nuevaSolicitudId,
                 @nombreSolicitud,
                 @idAsistencia,
-                CAST(CURRENT_TIMESTAMP AS DATE),
+                CAST((SYSUTCDATETIME() AT TIME ZONE 'UTC') AT TIME ZONE @zonaLocal AS DATE),
                 @idEstadoPendiente,
                 CASE WHEN @justificacionDefecto IS NOT NULL AND @justificacionDefecto <> '' THEN @justificacionDefecto ELSE 'Solicitud de revisión de asistencia radicada por estudiante.' END,
                 ''
