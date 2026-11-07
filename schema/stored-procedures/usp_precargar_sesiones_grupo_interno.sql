@@ -11,6 +11,10 @@ GO
 --   * elimina las sesiones futuras GENERADAS (procedenciaTemporal = UTC_GENERADOR) que ya no encajan en el horario y no
 --     tienen asistencia ni clasificacion. Nunca toca sesiones del pasado ni las creadas a mano por el docente.
 -- No abre transaccion: la controla el SP publico (propia o savepoint). No modifica usp_generar_sesiones_grupo (congelado).
+-- CULM-001 B.1 (CONTRACT §2.7.6): al final aplica los festivos (usp_internal_aplicar_festivos_grupo, @soloFuturas = 0)
+-- en la misma transaccion del llamador: toda sesion creada en un dia festivo nace cancelada. Una sesion futura que se
+-- borra porque ya no encaja en el horario pierde antes su SesionCancelacion. Las canceladas que siguen encajando no se
+-- borran ni se recrean (idempotencia por grupo, inicio y fin). B.2 agrega la condicion NOT EXISTS TomaAsistencia.
 CREATE OR ALTER PROCEDURE [dbo].[usp_precargar_sesiones_grupo_interno]
 (
     @idGrupo                 UNIQUEIDENTIFIER,
@@ -33,6 +37,9 @@ AS
     DECLARE @fechaDesde           DATE;
     DECLARE @maxNumeroSesion      INT;
     DECLARE @fechaHoraLocalInexistente DATETIME2;
+    DECLARE @sesionesCanceladasFestivo INT = 0;
+    DECLARE @sesionesFestivoConAsistencia INT = 0;
+    DECLARE @sesionesEliminables TABLE (id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY);
 
     DECLARE @slots TABLE (
         fecha       DATE      NOT NULL,
@@ -134,8 +141,10 @@ BEGIN
             -- Solo lo que aun no empezo: el pasado no se genera ni se toca
             DELETE FROM @slots WHERE inicioUtc <= @ahoraUtc;
 
-            -- PASO 4: Sesiones futuras generadas que ya no encajan en el horario y no tienen asistencia ni clasificacion
-            DELETE s
+            -- PASO 4: Sesiones futuras generadas que ya no encajan en el horario y no tienen asistencia ni clasificacion.
+            --         CULM-001 B.1: antes se borra su SesionCancelacion (una sesion que deja de existir pierde su cancelacion).
+            INSERT INTO @sesionesEliminables (id)
+            SELECT s.id
             FROM dbo.Sesion s
             WHERE s.grupo = @idGrupoDefecto
               AND s.fechaHoraInicio > @ahoraUtc
@@ -143,6 +152,14 @@ BEGIN
               AND NOT EXISTS (SELECT 1 FROM @slots x WHERE x.inicioUtc = s.fechaHoraInicio AND x.finUtc = s.fechaHoraFin)
               AND NOT EXISTS (SELECT 1 FROM dbo.Asistencia a WHERE a.sesion = s.id)
               AND NOT EXISTS (SELECT 1 FROM dbo.SesionProcedenciaClasificacion c WHERE c.sesion = s.id);
+
+            DELETE sc
+            FROM dbo.SesionCancelacion sc
+            INNER JOIN @sesionesEliminables e ON e.id = sc.sesion;
+
+            DELETE s
+            FROM dbo.Sesion s
+            INNER JOIN @sesionesEliminables e ON e.id = s.id;
             SET @sesionesEliminadas = @@ROWCOUNT;
 
             -- PASO 5: Sesiones que faltan, con correlativo protegido contra carreras con usp_crear_sesion
@@ -167,6 +184,18 @@ BEGIN
                     WHERE e.grupo = @idGrupoDefecto AND e.fechaHoraInicio = x.inicioUtc AND e.fechaHoraFin = x.finUtc)
             ) n;
             SET @sesionesCreadas = @@ROWCOUNT;
+
+            -- PASO 6 (CULM-001 B.1): festivos de las sesiones del grupo, en la misma transaccion del llamador
+            EXEC dbo.usp_internal_aplicar_festivos_grupo
+                @idGrupo = @idGrupoDefecto,
+                @soloFuturas = 0,
+                @idCorrelacion = @idCorrelacionDefecto,
+                @idUsuarioEjecutor = NULL,
+                @sesionesCanceladas = @sesionesCanceladasFestivo OUTPUT,
+                @sesionesConAsistencia = @sesionesFestivoConAsistencia OUTPUT,
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+                @estadoResultado = @estadoResultado OUTPUT;
         END
     END TRY
     BEGIN CATCH
