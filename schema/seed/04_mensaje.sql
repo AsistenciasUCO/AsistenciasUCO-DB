@@ -114,9 +114,6 @@ USING (VALUES
     ('NTF_008', 'BUSINESS_ERROR', 'MEDIO', N'Solo se pueden reencolar notificaciones en estado fallido definitivo o reintentable.'),
     ('NTF_009', 'SUCCESS', 'BAJO', N'Correo de prueba encolado correctamente.'),
 
-    -- Capacidades no implementadas
-    ('ERR_SOLICITUD_MATRICULA_NO_IMPLEMENTADA', 'BUSINESS_ERROR', 'MEDIO', 'La gestión de solicitudes de matrícula aún no se encuentra disponible.'),
-
     -- Errores de Sistema
     ('SYS_001', 'SYSTEM_ERROR', 'CRITICO', 'Ocurrió un error inesperado al procesar la solicitud.'),
     ('ERR_INESPERADO_REGISTRO_ESTUDIANTE', 'SYSTEM_ERROR', 'CRITICO', 'Hubo un error inesperado al procesar el registro completo del estudiante.'),
@@ -249,9 +246,6 @@ USING (VALUES
     ('NTF_007', 'SUCCESS', 'BAJO', N'La notificación fallida fue reencolada exitosamente para un nuevo intento de envío.'),
     ('NTF_008', 'BUSINESS_ERROR', 'MEDIO', N'Solo se pueden reencolar notificaciones en estado fallido definitivo o reintentable.'),
     ('NTF_009', 'SUCCESS', 'BAJO', N'Correo de prueba encolado correctamente.'),
-
-    -- Capacidades no implementadas
-    ('ERR_SOLICITUD_MATRICULA_NO_IMPLEMENTADA', 'BUSINESS_ERROR', 'MEDIO', 'Capability SolicitudMatricula is not implemented in the current schema.'),
 
     -- Errores de Sistema
     ('SYS_001', 'SYSTEM_ERROR', 'CRITICO', 'Excepción de sistema no controlada capturada en bloque CATCH: {}.'),

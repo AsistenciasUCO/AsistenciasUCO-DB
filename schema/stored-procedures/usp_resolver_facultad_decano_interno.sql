@@ -48,6 +48,8 @@ BEGIN
     FROM dbo.uv_facultad f
     INNER JOIN dbo.uv_decano_identidad di ON di.id = f.idDecano
     WHERE di.idUsuario = @idUsuarioEjecutor
+      -- CULM-001 A.2-8 (A2-T-12): un rol de decano desactivado (Decano.estado = 0) no resuelve facultad (KPI_003).
+      AND EXISTS (SELECT 1 FROM dbo.Decano d WHERE d.id = di.id AND d.estado = 1)
     ORDER BY f.estaActivaFacultad DESC, f.nombreFacultad ASC, f.id ASC;
 
     IF @idFacultad IS NULL

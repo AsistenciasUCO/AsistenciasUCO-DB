@@ -34,7 +34,6 @@ PRINT '======================================================================';
 :r /tmp/test/test_consolidado_auditoria_catalogos.sql
 :r /tmp/test/test_consultas_reclamos_estudiante.sql
 :r /tmp/test/test_usp_retirar_estudiante_grupo.sql
-:r /tmp/test/test_solicitud_ingreso_grupo.sql
 :r /tmp/test/test_usp_consultar_perfil_usuario.sql
 :r /tmp/test/test_runtime_grants_backend_inventory.sql
 :r /tmp/test/test_usp_consultar_historial_grupos_docente_programa.sql
@@ -110,6 +109,9 @@ PRINT '======================================================================';
 :r /tmp/test/test_usp_rotar_token_matricula_grupo.sql
 :r /tmp/test/test_usp_validar_token_matricula_publico.sql
 :r /tmp/test/test_usp_matricular_estudiante_por_token.sql
+:r /tmp/test/test_culm001_a_retiro_solicitudes.sql
+:r /tmp/test/test_culm001_a_correcciones.sql
+:r /tmp/test/test_culm001_a_fixture_segundo_ambito.sql
 -- CULM-001 B.1 (sesion cancelada, festivos y ventana con tolerancia): registro por nombre exacto (DEC-028)
 :r /tmp/test/test_culm001_b1_ventana_tolerancia.sql
 :r /tmp/test/test_culm001_b1_sesion_cancelada.sql

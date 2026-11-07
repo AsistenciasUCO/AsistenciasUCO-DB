@@ -11,6 +11,8 @@ GO
 -- Las horas y la marca se escriben en el MISMO INSERT. Este SP no es publico: el rol runtime
 -- tiene DENY EXECUTE directo y solo se alcanza por encadenamiento de propiedad desde los wrappers.
 -- UTC_GENERADOR y UTC_OWNER NO se aceptan por esta via (generador y clasificacion propios).
+-- CULM-001 A.2-10 (F-DOC-017): dentro de la transaccion y antes del INSERT, una sesion que se cruce con otra del grupo o
+-- de otro grupo del mismo docente se rechaza con SES_017 (usp_validar_solape_sesion_interno); el rechazo no escribe.
 CREATE OR ALTER PROCEDURE [dbo].[usp_crear_sesion_interno]
 (
     @idGrupo                 UNIQUEIDENTIFIER,
@@ -110,6 +112,20 @@ BEGIN
                 SET @savepointCreado = 1;
             END
 
+            -- PASO 2.8 (CULM-001 A.2-10): solape con sesiones del grupo o del docente, bajo bloqueo
+            EXEC dbo.usp_validar_solape_sesion_interno
+                @idGrupo = @idGrupoDefecto,
+                @idSesionExcluir = NULL,
+                @fechaHoraInicio = @fechaHoraInicio,
+                @fechaHoraFin = @fechaHoraFin,
+                @idCorrelacion = @idCorrelacionDefecto,
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+                @estadoResultado = @estadoResultado OUTPUT;
+        END
+
+        IF @estadoResultado = 1
+        BEGIN
             SELECT @numeroSiguiente = COALESCE(MAX(numero), 0) + 1
             FROM [dbo].[Sesion] WITH (UPDLOCK, HOLDLOCK)
             WHERE grupo = @idGrupoDefecto;
@@ -135,15 +151,19 @@ BEGIN
                 @fechaHoraFin,
                 @procedenciaTemporal
             );
+        END
 
-            IF @transaccionPropia = 1
-            BEGIN
-                IF XACT_STATE() = 1
-                    COMMIT TRANSACTION;
-                ELSE IF XACT_STATE() <> 0
-                    ROLLBACK TRANSACTION;
-            END
+        -- Cierre de la transaccion propia (el rechazo por solape no escribe)
+        IF @transaccionPropia = 1
+        BEGIN
+            IF XACT_STATE() = 1
+                COMMIT TRANSACTION;
+            ELSE IF XACT_STATE() <> 0
+                ROLLBACK TRANSACTION;
+        END
 
+        IF @estadoResultado = 1
+        BEGIN
             EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = 'GEN_004', @p_param1 = 'Sesion', @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT, @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
             SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
         END
