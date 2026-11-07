@@ -51,6 +51,16 @@ JOIN dbo.Estudiante e ON e.id = eg.idEstudiante
 ORDER BY s.id, eg.idEstudiante
 "@).Rows[0]
 $sesion = [guid]$fx.sesion; $estudiante = [guid]$fx.estudiante; $usuario = [guid]$fx.usuario
+# CULM-001 D.1 (HU026B): la radicacion exige estar dentro del plazo de excusas y las sesiones de la semilla ya vencieron. El
+# fixture crea una sesion propia reciente en el grupo de la sesion elegida (nombre LB004D-CONC); `finally` la elimina.
+$sesionFixture = [guid]::NewGuid()
+[void](Invoke-Sql @"
+INSERT dbo.Sesion (id, nombre, numero, codigo, numeroSemana, grupo, fechaHoraInicio, fechaHoraFin)
+SELECT @n, N'LB004D-CONC', 1 + (SELECT ISNULL(MAX(numero), 0) FROM dbo.Sesion WHERE grupo = s.grupo),
+       LEFT(REPLACE(CONVERT(varchar(36), NEWID()), '-', ''), 8), 1, s.grupo, DATEADD(HOUR, -2, SYSUTCDATETIME()), DATEADD(HOUR, -1, SYSUTCDATETIME())
+FROM dbo.Sesion s WHERE s.id = @s
+"@ @{ '@n' = $sesionFixture; '@s' = $sesion })
+$sesion = $sesionFixture
 $asistenciasAntes = @((Invoke-Sql "SELECT id FROM dbo.Asistencia WHERE sesion = @s" @{ '@s' = $sesion }).Rows | ForEach-Object { [string]$_.id })
 
 $callW2 = {
@@ -120,6 +130,7 @@ DELETE a FROM dbo.Asistencia a
 WHERE a.sesion = @s AND NOT EXISTS (SELECT 1 FROM STRING_SPLIT(@antes, ',') x WHERE TRY_CAST(x.value AS UNIQUEIDENTIFIER) = a.id)
   AND NOT EXISTS (SELECT 1 FROM dbo.SolicitudRevisionAsistencia s WHERE s.asistencia = a.id)
   AND NOT EXISTS (SELECT 1 FROM dbo.DetalleAsistencia d WHERE d.asistencia = a.id);
+DELETE FROM dbo.Sesion WHERE id = @s AND nombre = N'LB004D-CONC';
 "@
         [void]$cmd.Parameters.AddWithValue('@a', $fileAttach); [void]$cmd.Parameters.AddWithValue('@r', $fileRegister)
         [void]$cmd.Parameters.AddWithValue('@j', $marker); [void]$cmd.Parameters.AddWithValue('@s', $sesion)

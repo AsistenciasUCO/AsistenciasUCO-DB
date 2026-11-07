@@ -17,7 +17,10 @@ GO
 --   * Soporte inexistente, ajeno, ya vinculado u huerfano => ARC_001 identico, sin escritura.
 --   * Reintento con la misma correlacion tras un exito => exito idempotente (sin segunda solicitud).
 --   * Carrera por el mismo fileId: el UPDLOCK sobre la fila serializa; la segunda ve ATTACHED => ARC_001.
---   * `fecha` conserva la semantica de la v1 (DATE de calendario local), no es un instante UTC.
+--   * CULM-001 D.1 (HU026B): el plazo de excusas se valida DESPUES de la reejecucion idempotente por correlacion y antes de
+--     cualquier escritura (usp_internal_validar_plazo_justificacion: REV_020 vencido, REV_025 sin parametros). Un reintento
+--     legitimo con la misma correlacion tras el vencimiento sigue devolviendo el exito original.
+--   * `fecha` es la fecha LOCAL de radicacion (TIEMPO/ZONA_HORARIA_SQLSERVER), no la fecha UTC del servidor.
 --
 -- Resultset: MUTATION_COMMAND_RESULTSET (4 columnas canonicas).
 -- Ownership transaccional: transaccion propia o SAVE TRANSACTION si el llamador ya tiene una.
@@ -51,6 +54,9 @@ AS
     DECLARE @estadoSoporte        VARCHAR(10);
     DECLARE @correlacionAdjuncion UNIQUEIDENTIFIER;
     DECLARE @esReintento          BIT = 0;
+    DECLARE @fechaLimiteUtc       DATETIME2(7);
+    DECLARE @zonaLocal            NVARCHAR(128);
+    DECLARE @fechaLocalRadicacion DATE;
     DECLARE @filasActualizadas    INT;
     DECLARE @escrituraRealizada   BIT = 0;
 
@@ -194,9 +200,24 @@ BEGIN
             END
         END
 
+        -- PASO 9.5 (D.1): plazo de excusas. Solo cuando NO es la reejecucion idempotente de una radicacion ya exitosa.
+        IF @estadoResultado = 1 AND @esReintento = 0
+        BEGIN
+            EXEC dbo.usp_internal_validar_plazo_justificacion
+                @idSesion = @idSesionDefecto,
+                @idCorrelacion = @idCorrelacionDefecto,
+                @fechaLimiteUtc = @fechaLimiteUtc OUTPUT,
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
+                @estadoResultado = @estadoResultado OUTPUT;
+        END
+
         -- PASO 10: Creacion de la solicitud y vinculo atomico del soporte
         IF @estadoResultado = 1 AND @esReintento = 0
         BEGIN
+            SET @zonaLocal = CAST(dbo.ufn_obtener_parametro_texto(NULL, 'TIEMPO', 'ZONA_HORARIA_SQLSERVER') AS NVARCHAR(128));
+            SET @fechaLocalRadicacion = CAST((SYSUTCDATETIME() AT TIME ZONE 'UTC') AT TIME ZONE @zonaLocal AS DATE);
+
             SELECT TOP 1 @idEstudianteGrupo = eg.id
             FROM dbo.Sesion s
             INNER JOIN dbo.EstudianteGrupo eg ON eg.grupo = s.grupo
@@ -230,7 +251,7 @@ BEGIN
                 @nuevaSolicitudId,
                 @nombreSolicitud,
                 @idAsistencia,
-                CAST(CURRENT_TIMESTAMP AS DATE),
+                @fechaLocalRadicacion,
                 @idEstadoPendiente,
                 CASE WHEN @justificacionDefecto IS NOT NULL AND @justificacionDefecto <> '' THEN @justificacionDefecto ELSE 'Solicitud de revision de asistencia radicada por estudiante.' END,
                 ''
