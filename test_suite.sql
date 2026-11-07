@@ -7,6 +7,9 @@ PRINT '======================================================================';
 PRINT '  DB QUALITY GATE - gestionasistenciadb';
 PRINT '======================================================================';
 
+-- CULM-001 B.2 ([SUPUESTO-B-20]): helper de pruebas (procedimientos temporales de la sesion) para la columna obligatoria
+-- DetalleAsistencia.toma; lo usan las pruebas que insertan detalles o borran sesiones directamente.
+:r /tmp/test/fixtures/culm001_b2_toma_fixture.sql
 :r /tmp/test/test_public_objects.sql
 :r /tmp/test/test_contract_closure.sql
 :r /tmp/test/test_usp_crear_facultad.sql
@@ -111,6 +114,10 @@ PRINT '======================================================================';
 :r /tmp/test/test_culm001_b1_ventana_tolerancia.sql
 :r /tmp/test/test_culm001_b1_sesion_cancelada.sql
 :r /tmp/test/test_culm001_b1_festivos.sql
+-- CULM-001 B.2 (tomas por horas, QR de asistencia, faltantes y cierre): registro por nombre exacto (DEC-028, sin comodin)
+:r /tmp/test/test_culm001_b2_tomas.sql
+:r /tmp/test/test_culm001_b2_horas.sql
+:r /tmp/test/test_culm001_b2_qr.sql
 
 IF @@TRANCOUNT <> 0
 BEGIN
