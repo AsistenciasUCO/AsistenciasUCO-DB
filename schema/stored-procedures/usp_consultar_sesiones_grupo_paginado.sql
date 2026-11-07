@@ -15,6 +15,8 @@ GO
 -- Proposito:
 --   Búsqueda, programación e historial paginado de sesiones de clase para un grupo
 --   académico consumiendo uv_auth_sesion. Aplica preservación estricta de SESSION_CONTEXT.
+--   CULM-001 B.1 (CONTRACT §2.7.7): agrega al final estaCancelada, codigoTipoCancelacion, motivoCancelacion,
+--   nombreDiaFestivo y fechaCancelacionUtc desde uv_sesion_estado (las sesiones canceladas se siguen listando).
 -- ============================================================================
 CREATE OR ALTER PROCEDURE [dbo].[usp_consultar_sesiones_grupo_paginado]
 (
@@ -106,8 +108,15 @@ BEGIN
             s.numeroSemana,
             s.fechaHoraInicio,
             s.fechaHoraFin,
-            COUNT(1) OVER() AS totalRegistros
+            COUNT(1) OVER() AS totalRegistros,
+            -- CULM-001 B.1 (CONTRACT §2.7.7): estado de la sesion desde uv_sesion_estado
+            se.estaCancelada,
+            se.codigoTipoCancelacion,
+            se.motivoCancelacion,
+            se.nombreDiaFestivo,
+            se.fechaCancelacionUtc
         FROM dbo.uv_auth_sesion s
+        INNER JOIN dbo.uv_sesion_estado se ON se.idSesion = s.id
         WHERE s.idGrupo = @idGrupoDefecto
           AND (@filtroFechaDesde IS NULL OR s.fechaHoraInicio >= @filtroFechaDesde)
           AND (@filtroFechaHasta IS NULL OR s.fechaHoraFin <= @filtroFechaHasta)

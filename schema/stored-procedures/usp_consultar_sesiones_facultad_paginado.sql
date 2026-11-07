@@ -102,8 +102,15 @@ BEGIN
             g.nombreAsignatura,
             pr.id                   AS idPrograma,
             pr.nombrePrograma,
-            COUNT(*) OVER()         AS totalRegistros
+            COUNT(*) OVER()         AS totalRegistros,
+            -- CULM-001 B.1 (CONTRACT §2.7.7): estado de la sesion desde uv_sesion_estado
+            se.estaCancelada,
+            se.codigoTipoCancelacion,
+            se.motivoCancelacion,
+            se.nombreDiaFestivo,
+            se.fechaCancelacionUtc
         FROM dbo.uv_auth_sesion s
+        INNER JOIN dbo.uv_sesion_estado se ON se.idSesion = s.id
         INNER JOIN dbo.uv_auth_grupo g ON g.id = s.idGrupo
         INNER JOIN dbo.uv_grupo_programa gp ON gp.idGrupo = s.idGrupo
         INNER JOIN dbo.uv_programa pr ON pr.id = gp.idPrograma

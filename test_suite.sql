@@ -109,6 +109,10 @@ PRINT '======================================================================';
 :r /tmp/test/test_culm001_a_retiro_solicitudes.sql
 :r /tmp/test/test_culm001_a_correcciones.sql
 :r /tmp/test/test_culm001_a_fixture_segundo_ambito.sql
+-- CULM-001 B.1 (sesion cancelada, festivos y ventana con tolerancia): registro por nombre exacto (DEC-028)
+:r /tmp/test/test_culm001_b1_ventana_tolerancia.sql
+:r /tmp/test/test_culm001_b1_sesion_cancelada.sql
+:r /tmp/test/test_culm001_b1_festivos.sql
 
 IF @@TRANCOUNT <> 0
 BEGIN

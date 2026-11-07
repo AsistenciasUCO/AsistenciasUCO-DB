@@ -122,3 +122,38 @@ BEGIN CATCH
 END CATCH;
 PRINT 'TEST_PASS:VIEW_DETALLE_ASISTENCIA_CONTRACT';
 GO
+
+-- CULM-001 B.1 (CONTRACT §2.13, B1-SEG-01): los SP publicos de B.1 tienen EXECUTE para rol_asistencias_runtime;
+-- los nucleos usp_internal_* no; las vistas nuevas de B.1 tienen SELECT.
+DECLARE @b1Faltantes NVARCHAR(MAX) = (
+    SELECT STRING_AGG(o.nombre, N',')
+    FROM (VALUES (N'usp_cancelar_sesion'), (N'usp_consultar_destinatarios_sesion_cancelada'), (N'usp_cargar_dias_festivos'),
+                 (N'usp_cargar_dias_festivos_automatico'), (N'usp_aplicar_festivos_grupo'), (N'usp_aplicar_festivos_periodo'),
+                 (N'usp_aplicar_festivos_automatico'), (N'usp_consultar_sesiones_festivo_con_asistencia_paginado'),
+                 (N'usp_consultar_dias_festivos'), (N'usp_consultar_carga_festivos_anio'), (N'usp_generar_sesiones_grupo_v2')) o(nombre)
+    WHERE NOT EXISTS (
+        SELECT 1 FROM sys.database_permissions dp
+        WHERE dp.major_id = OBJECT_ID(N'dbo.' + o.nombre) AND dp.permission_name = N'EXECUTE' AND dp.state IN ('G', 'W')
+          AND dp.grantee_principal_id = DATABASE_PRINCIPAL_ID(N'rol_asistencias_runtime')));
+IF @b1Faltantes IS NOT NULL
+BEGIN
+    DECLARE @b1Fallo NVARCHAR(2048) = CONCAT('TEST FAILED: CULM001_B1_SEG_01 SP publicos sin EXECUTE: ', @b1Faltantes);
+    THROW 51916, @b1Fallo, 1;
+END
+IF EXISTS (
+    SELECT 1 FROM sys.database_permissions dp
+    WHERE dp.major_id IN (OBJECT_ID(N'dbo.usp_internal_cargar_dias_festivos'), OBJECT_ID(N'dbo.usp_internal_aplicar_festivos_grupo'),
+                          OBJECT_ID(N'dbo.usp_internal_aplicar_festivos_grupos'))
+      AND dp.permission_name = N'EXECUTE' AND dp.state IN ('G', 'W')
+      AND dp.grantee_principal_id = DATABASE_PRINCIPAL_ID(N'rol_asistencias_runtime'))
+   OR OBJECT_ID(N'dbo.usp_internal_cargar_dias_festivos', N'P') IS NULL OR OBJECT_ID(N'dbo.usp_internal_aplicar_festivos_grupo', N'P') IS NULL
+    THROW 51917, 'TEST FAILED: CULM001_B1_SEG_01 un nucleo usp_internal_* de B.1 falta o tiene EXECUTE para el rol runtime.', 1;
+IF EXISTS (
+    SELECT 1 FROM (VALUES (N'uv_sesion_estado'), (N'uv_dia_festivo'), (N'uv_carga_dia_festivo'), (N'uv_tipo_cancelacion_sesion')) v(nombre)
+    WHERE NOT EXISTS (
+        SELECT 1 FROM sys.database_permissions dp
+        WHERE dp.major_id = OBJECT_ID(N'dbo.' + v.nombre) AND dp.permission_name = N'SELECT' AND dp.state IN ('G', 'W')
+          AND dp.grantee_principal_id = DATABASE_PRINCIPAL_ID(N'rol_asistencias_runtime')))
+    THROW 51918, 'TEST FAILED: CULM001_B1_SEG_01 una vista de B.1 no tiene SELECT para el rol runtime.', 1;
+PRINT 'TEST_PASS:CULM001_B1_SEG_01_PERMISOS';
+GO

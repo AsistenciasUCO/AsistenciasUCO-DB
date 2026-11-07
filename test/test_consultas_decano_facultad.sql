@@ -38,7 +38,9 @@ CREATE TABLE #sesiones (
     id UNIQUEIDENTIFIER, nombre NVARCHAR(100), codigo NVARCHAR(50), numeroSemana INT, fechaHoraInicio DATETIME2,
     fechaHoraFin DATETIME2, idGrupo UNIQUEIDENTIFIER, codigoGrupo INT, nombreGrupo NVARCHAR(100),
     idAsignatura UNIQUEIDENTIFIER, nombreAsignatura NVARCHAR(100), idPrograma UNIQUEIDENTIFIER,
-    nombrePrograma NVARCHAR(100), totalRegistros INT);
+    nombrePrograma NVARCHAR(100), totalRegistros INT,
+    -- CULM-001 B.1 (CONTRACT §2.7.7): estado de la sesion desde uv_sesion_estado
+    estaCancelada BIT, codigoTipoCancelacion NVARCHAR(20), motivoCancelacion NVARCHAR(500), nombreDiaFestivo NVARCHAR(120), fechaCancelacionUtc DATETIME2(0));
 
 BEGIN TRANSACTION;
 BEGIN TRY
