@@ -12,7 +12,7 @@ generated-by: scripts/generar-catalogo-mensajes.ps1
 
 Uso en SP: `EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = '<CODIGO>', @p_param1 = ...`. Los marcadores `{}` / `{0}` se reemplazan con los parámetros. El mensaje técnico se entrega como `DBCODE=<CODIGO>|<texto>` (ver `docs/contracts/DB_BASELINE_CONTRACT.md`).
 
-Total de códigos: **163**.
+Total de códigos: **185**.
 
 ## ARC
 
@@ -121,6 +121,21 @@ Total de códigos: **163**.
 | `FAC_001` | BUSINESS_ERROR | MEDIO | La facultad especificada no existe en el sistema. | Error de búsqueda: No se encontró la facultad en uv_facultad: {}. | `04_mensaje.sql` |
 | `FAC_002` | BUSINESS_ERROR | ALTO | El decano seleccionado ya es titular de otra facultad activa. | Regla de unicidad de titularidad: el decano {} ya es titular de otra facultad activa. | `04_mensaje.sql` |
 
+## FES
+
+| Código | Tipo | Severidad | Mensaje usuario | Mensaje técnico | Seed |
+|---|---|---|---|---|---|
+| `FES_001` | VALIDATION_ERROR | BAJO | El año de festivos no es válido. | @anio [{}] fuera de FESTIVOS/ANIO_MINIMO..ANIO_MAXIMO. | `34_mensajes_sesion_cancelada_festivos.sql` |
+| `FES_002` | VALIDATION_ERROR | MEDIO | El listado de festivos recibido no es válido. | @festivosJSON inválido: {}. | `34_mensajes_sesion_cancelada_festivos.sql` |
+| `FES_003` | VALIDATION_ERROR | MEDIO | El listado de festivos no tiene una cantidad válida de días. | Total [{}] fuera de FESTIVOS/MINIMO_POR_ANIO..MAXIMO_POR_ANIO. | `34_mensajes_sesion_cancelada_festivos.sql` |
+| `FES_004` | VALIDATION_ERROR | MEDIO | La fuente de festivos no es válida. | @fuente [{}] no está en FESTIVOS/FUENTES_VALIDAS. | `34_mensajes_sesion_cancelada_festivos.sql` |
+| `FES_005` | SUCCESS | BAJO | Se cargaron {} días festivos de {}. | Carga [{}]: insertados {}, actualizados {}, desactivados {}. | `34_mensajes_sesion_cancelada_festivos.sql` |
+| `FES_006` | VALIDATION_ERROR | BAJO | Indica el periodo académico o el año, no ambos. | @idPeriodoAcademico y @anio: exactamente uno. | `34_mensajes_sesion_cancelada_festivos.sql` |
+| `FES_007` | BUSINESS_ERROR | BAJO | El periodo académico no existe. | Periodo [{}] inexistente. | `34_mensajes_sesion_cancelada_festivos.sql` |
+| `FES_008` | SUCCESS | BAJO | Se cancelaron {} sesiones por festivo; {} sesiones con asistencia quedaron sin cambios. | Aplicación de festivos grupo/periodo [{}]. | `34_mensajes_sesion_cancelada_festivos.sql` |
+| `FES_009` | BUSINESS_ERROR | MEDIO | Algunos grupos no se pudieron actualizar con los festivos. | {} grupos con error; ver log con la correlación. | `34_mensajes_sesion_cancelada_festivos.sql` |
+| `FES_010` | TECHNICAL_ERROR | ALTO | No fue posible obtener los festivos del año; se usó el cálculo local. | Proveedores [{}] fallaron; respaldo CALCULO_LOCAL. | `34_mensajes_sesion_cancelada_festivos.sql` |
+
 ## GEN
 
 | Código | Tipo | Severidad | Mensaje usuario | Mensaje técnico | Seed |
@@ -197,6 +212,12 @@ Total de códigos: **163**.
 | `NTF_001` | BUSINESS_ERROR | MEDIO | Los datos de la notificación no son válidos. | Datos de la notificación o parámetros de invocación no cumplen el contrato. | `04_mensaje.sql` |
 | `NTF_002` | BUSINESS_ERROR | MEDIO | La notificación especificada no existe en el sistema. | Notificación no encontrada por identificador. | `04_mensaje.sql` |
 | `NTF_003` | BUSINESS_ERROR | MEDIO | La notificación ya no está reservada por este proceso. | La notificación no está reservada por la instancia o la reserva ya venció. | `04_mensaje.sql` |
+| `NTF_004` | BUSINESS_ERROR | MEDIO | La plantilla de notificación no contiene todos los marcadores obligatorios o incluye marcadores no permitidos para este tipo. | Validación de plantilla fallida: marcadores obligatorios ausentes o marcadores no permitidos para el tipo. | `04_mensaje.sql` |
+| `NTF_005` | BUSINESS_ERROR | MEDIO | No existe la versión de plantilla solicitada para el tipo e idioma indicados. | No existe la versión de plantilla solicitada para el tipo e idioma indicados. | `04_mensaje.sql` |
+| `NTF_006` | SUCCESS | BAJO | La plantilla de correo se actualizó y activó correctamente en una nueva versión. | La plantilla de correo se actualizó y activó correctamente en una nueva versión. | `04_mensaje.sql` |
+| `NTF_007` | SUCCESS | BAJO | La notificación fallida fue reencolada exitosamente para un nuevo intento de envío. | La notificación fallida fue reencolada exitosamente para un nuevo intento de envío. | `04_mensaje.sql` |
+| `NTF_008` | BUSINESS_ERROR | MEDIO | Solo se pueden reencolar notificaciones en estado fallido definitivo o reintentable. | Solo se pueden reencolar notificaciones en estado fallido definitivo o reintentable. | `04_mensaje.sql` |
+| `NTF_009` | SUCCESS | BAJO | Correo de prueba encolado correctamente. | Correo de prueba encolado correctamente. | `04_mensaje.sql` |
 
 ## PAG
 
@@ -284,6 +305,12 @@ Total de códigos: **163**.
 | `SES_007` | BUSINESS_ERROR | MEDIO | La sesión de clase aún no ha iniciado; la asistencia solo se registra durante la sesión. | SES-01 ventana de registro: la sesión [{}] no ha iniciado (SYSUTCDATETIME() < fechaHoraInicio); lote rechazado sin escrituras. | `04_mensaje.sql` |
 | `SES_008` | BUSINESS_ERROR | MEDIO | La sesión de clase ya finalizó; la asistencia solo puede modificarse mediante un reclamo. | SES-01 ventana de registro: la sesión [{}] está cerrada (SYSUTCDATETIME() >= fechaHoraFin); lote rechazado sin escrituras. | `04_mensaje.sql` |
 | `SES_009` | BUSINESS_ERROR | MEDIO | El horario de la sesión no está confirmado; no es posible registrar asistencia. | SES-01 ventana de registro: la sesión [{}] tiene procedencia temporal INDETERMINADA (procedenciaTemporal NULL); lote rechazado sin escrituras. | `04_mensaje.sql` |
+| `SES_010` | BUSINESS_ERROR | MEDIO | La sesión fue cancelada; no admite registro de asistencia. | Sesión [{}] cancelada (SesionCancelacion existe); operación rechazada sin escrituras. | `34_mensajes_sesion_cancelada_festivos.sql` |
+| `SES_011` | BUSINESS_ERROR | BAJO | La sesión ya estaba cancelada. | Sesión [{}] con SesionCancelacion previa; se conserva el motivo original. | `34_mensajes_sesion_cancelada_festivos.sql` |
+| `SES_012` | BUSINESS_ERROR | MEDIO | No es posible cancelar una sesión que ya tiene asistencia registrada. | Sesión [{}] con Asistencia o TomaAsistencia; cancelación rechazada. | `34_mensajes_sesion_cancelada_festivos.sql` |
+| `SES_013` | VALIDATION_ERROR | BAJO | El motivo de cancelación debe tener entre {} y {} caracteres. | Longitud de @motivo fuera de SESION/MOTIVO_CANCELACION_LONGITUD_*. | `34_mensajes_sesion_cancelada_festivos.sql` |
+| `SES_014` | SUCCESS | BAJO | La sesión fue cancelada y se avisó a los estudiantes. | SesionCancelacion creada para [{}] tipo [{}]. | `34_mensajes_sesion_cancelada_festivos.sql` |
+| `SES_016` | BUSINESS_ERROR | MEDIO | La sesión ya terminó y tiene asistencia registrada; no se puede cancelar. Las correcciones se hacen por reclamo. | Sesión [{}] con Asistencia o TomaAsistencia y SYSUTCDATETIME() >= fin + MARGEN_RETARDO_MINUTOS; cancelación rechazada. | `34_mensajes_sesion_cancelada_festivos.sql` |
 
 ## SIG
 
