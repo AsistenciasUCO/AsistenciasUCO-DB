@@ -98,6 +98,19 @@ DECLARE @idRazonAN UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000001'; --
 DECLARE @idRazonSJC UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000002'; -- Sin justa causa
 DECLARE @idRazonEX UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000003'; -- Excusa / justificada
 
+-- CULM-001 B.2 ([SUPUESTO-B-20]): este script se ejecuta a mano despues del despliegue, cuando DetalleAsistencia.toma ya es
+-- NOT NULL; crea explicitamente la toma 1 (MANUAL, CERRADA, implicita) de cada sesion que siembra.
+INSERT INTO dbo.TomaAsistencia (id, sesion, numero, modo, estado, esImplicita, docenteApertura, fechaAperturaUtc, fechaCierreUtc, idCorrelacionApertura)
+SELECT NEWID(), s.id, 1, (SELECT m.id FROM dbo.ModoTomaAsistencia m WHERE m.usaCodigoQr = 0), (SELECT e.id FROM dbo.EstadoTomaAsistencia e WHERE e.estaAbierta = 0),
+       1, g.docente, CAST(s.fechaHoraInicio AS DATETIME2(0)), CAST(IIF(s.fechaHoraFin > s.fechaHoraInicio, s.fechaHoraFin, s.fechaHoraInicio) AS DATETIME2(0)), NEWID()
+FROM dbo.Sesion s
+INNER JOIN dbo.Grupo g ON g.id = s.grupo
+WHERE s.id IN (@idSesion1, @idSesion2, @idSesion3)
+  AND NOT EXISTS (SELECT 1 FROM dbo.TomaAsistencia t WHERE t.sesion = s.id AND t.numero = 1);
+DECLARE @idToma1 UNIQUEIDENTIFIER = (SELECT id FROM dbo.TomaAsistencia WHERE sesion = @idSesion1 AND numero = 1);
+DECLARE @idToma2 UNIQUEIDENTIFIER = (SELECT id FROM dbo.TomaAsistencia WHERE sesion = @idSesion2 AND numero = 1);
+DECLARE @idToma3 UNIQUEIDENTIFIER = (SELECT id FROM dbo.TomaAsistencia WHERE sesion = @idSesion3 AND numero = 1);
+
 -- Asistencias Sesion 1 (Todos asistieron)
 DECLARE @asistId UNIQUEIDENTIFIER;
 DECLARE cur_est CURSOR FOR SELECT id FROM dbo.EstudianteGrupo WHERE grupo = @idGrupoArq;
@@ -112,8 +125,8 @@ BEGIN
     BEGIN
         SET @asistId = NEWID();
         INSERT INTO dbo.Asistencia (id, estudianteGrupo, sesion) VALUES (@asistId, @egId, @idSesion1);
-        INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin)
-        VALUES (NEWID(), 1, @asistId, 1, @idRazonAN, '2026-08-25 08:00:00', '2026-08-25 10:00:00');
+        INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin, toma)
+        VALUES (NEWID(), 1, @asistId, 1, @idRazonAN, '2026-08-25 08:00:00', '2026-08-25 10:00:00', @idToma1);
     END
 
     -- Sesión 2 (Carlos Zapata faltó)
@@ -124,13 +137,13 @@ BEGIN
 
         IF @egId = 'B1A2C3D4-0000-0000-0000-000000000001' -- Carlos Zapata
         BEGIN
-            INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin)
-            VALUES (NEWID(), 2, @asistId, 0, @idRazonSJC, '2026-08-27 08:00:00', '2026-08-27 10:00:00');
+            INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin, toma)
+            VALUES (NEWID(), 2, @asistId, 0, @idRazonSJC, '2026-08-27 08:00:00', '2026-08-27 10:00:00', @idToma2);
         END
         ELSE
         BEGIN
-            INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin)
-            VALUES (NEWID(), 2, @asistId, 1, @idRazonAN, '2026-08-27 08:00:00', '2026-08-27 10:00:00');
+            INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin, toma)
+            VALUES (NEWID(), 2, @asistId, 1, @idRazonAN, '2026-08-27 08:00:00', '2026-08-27 10:00:00', @idToma2);
         END
     END
 
@@ -142,13 +155,13 @@ BEGIN
 
         IF @egId IN ('B1A2C3D4-0000-0000-0000-000000000001', 'B1A2C3D4-0000-0000-0000-000000000005')
         BEGIN
-            INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin)
-            VALUES (NEWID(), 3, @asistId, 0, @idRazonSJC, '2026-09-01 08:00:00', '2026-09-01 10:00:00');
+            INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin, toma)
+            VALUES (NEWID(), 3, @asistId, 0, @idRazonSJC, '2026-09-01 08:00:00', '2026-09-01 10:00:00', @idToma3);
         END
         ELSE
         BEGIN
-            INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin)
-            VALUES (NEWID(), 3, @asistId, 1, @idRazonAN, '2026-09-01 08:00:00', '2026-09-01 10:00:00');
+            INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin, toma)
+            VALUES (NEWID(), 3, @asistId, 1, @idRazonAN, '2026-09-01 08:00:00', '2026-09-01 10:00:00', @idToma3);
         END
     END
 

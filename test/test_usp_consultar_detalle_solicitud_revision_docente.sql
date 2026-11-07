@@ -85,8 +85,11 @@ BEGIN TRY
     INSERT dbo.Asistencia (id, estudianteGrupo, sesion) VALUES (@asisA, @egA, @session);
     INSERT dbo.Asistencia (id, estudianteGrupo, sesion) VALUES (@asisB, @egB, @session);
     -- Solo el estudiante A tiene DetalleAsistencia (causal SJC, no asistio); B no tiene detalle.
-    INSERT dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin)
-    VALUES (@detalleA, @detalleCode, @asisA, 0, @reasonSjc, @inicioSesion, DATEADD(HOUR, 1, @inicioSesion));
+    -- CULM-001 B.2 ([SUPUESTO-B-20]): la columna obligatoria DetalleAsistencia.toma exige la toma 1 de la sesion (helper culm001_b2_toma_fixture.sql).
+    DECLARE @culmb2Toma UNIQUEIDENTIFIER;
+    EXEC #culm001_b2_crear_toma @idSesion = @session, @idToma = @culmb2Toma OUTPUT;
+    INSERT dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin, toma)
+    VALUES (@detalleA, @detalleCode, @asisA, 0, @reasonSjc, @inicioSesion, DATEADD(HOUR, 1, @inicioSesion), @culmb2Toma);
     INSERT dbo.SolicitudRevisionAsistencia (id, nombre, asistencia, fecha, estado, justificacionSolicitud, justificacionRespuesta)
     VALUES (@reqA, N'QA-HU035-A', @asisA, CAST(SYSUTCDATETIME() AS DATE), @estadoP, 'Cita medica QA', '');
     INSERT dbo.SolicitudRevisionAsistencia (id, nombre, asistencia, fecha, estado, justificacionSolicitud, justificacionRespuesta)

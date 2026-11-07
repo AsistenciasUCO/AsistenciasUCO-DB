@@ -19,6 +19,12 @@ BEGIN TRANSACTION;
 
 DELETE r FROM dbo.SolicitudRevisionAsistencia r JOIN dbo.Asistencia a ON a.id = r.asistencia WHERE LEFT(CONVERT(CHAR(36), a.id), 6) = 'DE0000';
 DELETE FROM dbo.DetalleAsistencia WHERE LEFT(CONVERT(CHAR(36), id), 6) = 'DE0000';
+-- CULM-001 B.2 ([SUPUESTO-B-20]): tokens, tomas y cancelaciones de las sesiones del fixture antes de borrarlas
+IF OBJECT_ID(N'dbo.TomaAsistencia', N'U') IS NOT NULL
+    EXEC sys.sp_executesql N'DELETE tk FROM dbo.TokenAsistenciaToma tk INNER JOIN dbo.TomaAsistencia t ON t.id = tk.toma WHERE LEFT(CONVERT(CHAR(36), t.sesion), 6) = ''DE0000'';
+        DELETE FROM dbo.TomaAsistencia WHERE LEFT(CONVERT(CHAR(36), sesion), 6) = ''DE0000'';';
+IF OBJECT_ID(N'dbo.SesionCancelacion', N'U') IS NOT NULL
+    EXEC sys.sp_executesql N'DELETE FROM dbo.SesionCancelacion WHERE LEFT(CONVERT(CHAR(36), sesion), 6) = ''DE0000'';';
 DELETE FROM dbo.Asistencia WHERE LEFT(CONVERT(CHAR(36), id), 6) = 'DE0000';
 DELETE FROM dbo.SesionProcedenciaClasificacion WHERE LEFT(CONVERT(CHAR(36), sesion), 6) = 'DE0000';
 DELETE FROM dbo.Sesion WHERE LEFT(CONVERT(CHAR(36), id), 6) = 'DE0000';

@@ -169,6 +169,10 @@ finally {
     if ($groupId -and $periodId) {
         $cleanupSql = @"
 SET NOCOUNT ON;
+-- CULM-001 B.2 ([SUPUESTO-B-20]): tokens, tomas y cancelaciones (festivos) de las sesiones del grupo antes de borrarlas
+DELETE tk FROM dbo.TokenAsistenciaToma tk INNER JOIN dbo.TomaAsistencia t ON t.id = tk.toma INNER JOIN dbo.Sesion s ON s.id = t.sesion WHERE s.grupo = '$groupId';
+DELETE t FROM dbo.TomaAsistencia t INNER JOIN dbo.Sesion s ON s.id = t.sesion WHERE s.grupo = '$groupId';
+DELETE sc FROM dbo.SesionCancelacion sc INNER JOIN dbo.Sesion s ON s.id = sc.sesion WHERE s.grupo = '$groupId';
 DELETE FROM dbo.Sesion WHERE grupo = '$groupId';
 DELETE FROM dbo.Horario WHERE grupo = '$groupId';
 DELETE FROM dbo.Grupo WHERE id = '$groupId';

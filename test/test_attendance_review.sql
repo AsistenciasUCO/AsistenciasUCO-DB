@@ -27,8 +27,11 @@ BEGIN TRY
     VALUES (@session, N'QA Revision', @number, @sessionCode, 1, @group,
         DATEADD(HOUR, 1, GETDATE()), DATEADD(HOUR, 2, GETDATE()));
     INSERT dbo.Asistencia (id, estudianteGrupo, sesion) VALUES (@attendance, @enrollment, @session);
-    INSERT dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin)
-    VALUES (@detail, @detailCode, @attendance, 0, @reason, DATEADD(HOUR, 1, GETDATE()), DATEADD(HOUR, 2, GETDATE()));
+    -- CULM-001 B.2 ([SUPUESTO-B-20]): la columna obligatoria DetalleAsistencia.toma exige la toma 1 de la sesion (helper culm001_b2_toma_fixture.sql).
+    DECLARE @culmb2Toma UNIQUEIDENTIFIER;
+    EXEC #culm001_b2_crear_toma @idSesion = @session, @idToma = @culmb2Toma OUTPUT;
+    INSERT dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin, toma)
+    VALUES (@detail, @detailCode, @attendance, 0, @reason, DATEADD(HOUR, 1, GETDATE()), DATEADD(HOUR, 2, GETDATE()), @culmb2Toma);
 
     DECLARE @missingStudent UNIQUEIDENTIFIER = NEWID();
     SET @corr = NEWID();

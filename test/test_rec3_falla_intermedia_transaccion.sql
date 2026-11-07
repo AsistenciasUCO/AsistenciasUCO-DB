@@ -69,6 +69,9 @@ END CATCH;
 IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
 ALTER TABLE dbo.SolicitudRevisionAsistencia DROP CONSTRAINT CK_REC3_TMP_SOLICITUD;
 DELETE FROM dbo.SolicitudRevisionAsistencia WHERE asistencia IN (SELECT id FROM dbo.Asistencia WHERE sesion = @session);
+-- CULM-001 B.2 ([SUPUESTO-B-20]): tomas, tokens y cancelacion de la sesion antes de borrarla
+DECLARE @culmb2Limpieza1 NVARCHAR(MAX) = (SELECT idSesion = @session FOR JSON PATH);
+EXEC #culm001_b2_limpiar_sesiones @sesionesJSON = @culmb2Limpieza1;
 DELETE FROM dbo.Asistencia WHERE sesion = @session;
 DELETE FROM dbo.Sesion WHERE id = @session;
 IF @fallo IS NOT NULL THROW 54301, @fallo, 1;
@@ -99,8 +102,11 @@ INSERT dbo.Sesion (id, nombre, numero, codigo, numeroSemana, grupo, fechaHoraIni
 VALUES (@session, N'QA REC3 TX02', @number, LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8), 1, @group,
         DATEADD(HOUR, -3, SYSUTCDATETIME()), DATEADD(HOUR, -2, SYSUTCDATETIME()));
 INSERT dbo.Asistencia (id, estudianteGrupo, sesion) VALUES (@attendance, @enrollment, @session);
-INSERT dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin)
-VALUES (@detail, @detailCode, @attendance, 0, @reason, DATEADD(HOUR, -3, SYSUTCDATETIME()), DATEADD(HOUR, -2, SYSUTCDATETIME()));
+-- CULM-001 B.2 ([SUPUESTO-B-20]): la columna obligatoria DetalleAsistencia.toma exige la toma 1 de la sesion (helper culm001_b2_toma_fixture.sql).
+DECLARE @culmb2Toma UNIQUEIDENTIFIER;
+EXEC #culm001_b2_crear_toma @idSesion = @session, @idToma = @culmb2Toma OUTPUT;
+INSERT dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin, toma)
+VALUES (@detail, @detailCode, @attendance, 0, @reason, DATEADD(HOUR, -3, SYSUTCDATETIME()), DATEADD(HOUR, -2, SYSUTCDATETIME()), @culmb2Toma);
 INSERT dbo.SolicitudRevisionAsistencia (id, nombre, asistencia, fecha, estado, justificacionSolicitud, justificacionRespuesta)
 VALUES (@request, N'REC-QAREC3', @attendance, CAST(SYSUTCDATETIME() AS DATE), @pending, N'QA REC3 TX02', N'');
 -- Precondicion: sin la restriccion la misma llamada es exitosa (dentro de una transaccion que se revierte), asi la
@@ -133,6 +139,9 @@ IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
 ALTER TABLE dbo.DetalleAsistencia DROP CONSTRAINT CK_REC3_TMP_DETALLE;
 DELETE FROM dbo.SolicitudRevisionAsistencia WHERE id = @request;
 DELETE FROM dbo.DetalleAsistencia WHERE id = @detail;
+-- CULM-001 B.2 ([SUPUESTO-B-20]): tomas, tokens y cancelacion de la sesion antes de borrarla
+DECLARE @culmb2Limpieza2 NVARCHAR(MAX) = (SELECT idSesion = @session FOR JSON PATH);
+EXEC #culm001_b2_limpiar_sesiones @sesionesJSON = @culmb2Limpieza2;
 DELETE FROM dbo.Asistencia WHERE id = @attendance;
 DELETE FROM dbo.Sesion WHERE id = @session;
 IF @fallo IS NOT NULL THROW 54311, @fallo, 1;
@@ -241,6 +250,9 @@ BEGIN CATCH
 END CATCH;
 IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
 ALTER TABLE dbo.Sesion DROP CONSTRAINT CK_REC3_TMP_SESION;
+-- CULM-001 B.2 ([SUPUESTO-B-20]): tomas, tokens y cancelaciones de las sesiones del grupo antes de borrarlas
+DECLARE @culmb2Limpieza4 NVARCHAR(MAX) = (SELECT idSesion = id FROM dbo.Sesion WHERE grupo = @group FOR JSON PATH);
+EXEC #culm001_b2_limpiar_sesiones @sesionesJSON = @culmb2Limpieza4;
 DELETE FROM dbo.Sesion WHERE grupo = @group;
 DELETE FROM dbo.Horario WHERE grupo = @group;
 DELETE FROM dbo.Grupo WHERE id = @group;
