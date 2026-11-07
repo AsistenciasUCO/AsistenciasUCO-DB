@@ -23,7 +23,8 @@ IF dbo.ufn_obtener_parametro_int(NULL, 'ASISTENCIA_QR', 'ROTACION_SEGUNDOS') <> 
    OR dbo.ufn_obtener_parametro_int(NULL, 'ASISTENCIA_QR', 'LOTE_ROTACION') <> 200
    OR dbo.ufn_obtener_parametro_int(NULL, 'ASISTENCIA_QR', 'LIMITE_FALLIDOS_IP_POR_MINUTO') <> 600
    OR dbo.ufn_obtener_parametro_int(NULL, 'ASISTENCIA_QR', 'LIMITE_TOKEN_POR_MINUTO') <> 120
-   OR dbo.ufn_obtener_parametro_int(NULL, 'ASISTENCIA_QR', 'LIMITE_ESTUDIANTE_POR_MINUTO') <> 6
+   -- LIMITE_ESTUDIANTE_POR_MINUTO lo siembra el paquete A (5, A2-T-13); B no lo redefine (conflicto con el 6 de §2.11 escalado)
+   OR dbo.ufn_obtener_parametro_int(NULL, 'ASISTENCIA_QR', 'LIMITE_ESTUDIANTE_POR_MINUTO') IS NULL
    OR CAST(dbo.ufn_obtener_parametro('ASISTENCIA_QR', 'HABILITADA') AS NVARCHAR(10)) <> N'true'
    OR CAST(dbo.ufn_obtener_parametro('ASISTENCIA_QR', 'URL_BASE_FRONTEND') AS NVARCHAR(200)) <> N'http://localhost:4200'
     THROW 57401, 'TEST FAILED CULM001_B2_QR_00: parametros ASISTENCIA_QR/* ausentes o distintos de la semilla 35.', 1;

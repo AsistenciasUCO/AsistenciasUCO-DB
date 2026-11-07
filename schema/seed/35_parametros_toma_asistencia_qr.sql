@@ -25,7 +25,6 @@ USING (VALUES
     ('ASISTENCIA_QR',   'LOTE_ROTACION',                 N'200',   'INT',     N'200'),
     ('ASISTENCIA_QR',   'LIMITE_FALLIDOS_IP_POR_MINUTO', N'600',   'INT',     N'600'),
     ('ASISTENCIA_QR',   'LIMITE_TOKEN_POR_MINUTO',       N'120',   'INT',     N'120'),
-    ('ASISTENCIA_QR',   'LIMITE_ESTUDIANTE_POR_MINUTO',  N'6',     'INT',     N'6'),
     ('ASISTENCIA_QR',   'URL_BASE_FRONTEND',             N'http://localhost:4200', 'STRING', N'http://localhost:4200')
 ) AS Source (grupo, clave, valor, tipoDato, valorDefecto)
 ON (Target.grupo = Source.grupo AND Target.clave = Source.clave)
@@ -36,9 +35,5 @@ WHEN NOT MATCHED THEN
     VALUES (Source.grupo, Source.clave, Source.valor, Source.tipoDato, Source.valorDefecto, 1, SYSUTCDATETIME(), SYSUTCDATETIME());
 GO
 
--- ASISTENCIA_QR/LIMITE_ESTUDIANTE_POR_MINUTO ya existia con 5 (semilla 29_parametros_matricula_qr.sql, A.2-4); el contrato B.2
--- (§2.11) lo fija en 6. Solo se ajusta el valor si nunca fue administrado (valor igual al defecto anterior 5).
-UPDATE dbo.CatalogoParametro
-SET valor = N'6', valorDefecto = N'6', fechaModificacion = SYSUTCDATETIME()
-WHERE grupo = 'ASISTENCIA_QR' AND clave = 'LIMITE_ESTUDIANTE_POR_MINUTO' AND valor = N'5';
-GO
+-- ASISTENCIA_QR/LIMITE_ESTUDIANTE_POR_MINUTO no se siembra aqui: pertenece al paquete A (semillas 29 y 33, A.2-4, valor 5, verificado
+-- por A2-T-13). El 6 del contrato B (§2.11) queda como decision pendiente del orquestador; B no pisa el parametro de A.
