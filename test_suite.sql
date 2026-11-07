@@ -120,6 +120,9 @@ PRINT '======================================================================';
 :r /tmp/test/test_culm001_b2_tomas.sql
 :r /tmp/test/test_culm001_b2_horas.sql
 :r /tmp/test/test_culm001_b2_qr.sql
+-- CULM-001 D.3 y D.6 (parametros editables y auditoria de /admin/**): registro por nombre exacto (DEC-028, sin comodin)
+:r /tmp/test/test_culm001_d3_parametros.sql
+:r /tmp/test/test_culm001_d6_auditoria.sql
 
 IF @@TRANCOUNT <> 0
 BEGIN
