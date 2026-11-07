@@ -146,11 +146,18 @@ BEGIN
         -- PASO 4.5 (CULM-001 B.2): toma explicita o toma vigente de la sesion
         IF @estadoResultado = 1
         BEGIN
-            IF @idToma IS NOT NULL
-            BEGIN
+            -- Registro del estudiante (QR): bloqueo compartido de la toma (NB-4); el cierre (U/X) sigue serializado
+            IF @idToma IS NOT NULL AND @registradoPorEstudianteDefecto = 1 AND @soloSiNoExisteDefecto = 1
+                SELECT @idTomaResuelta = t.id
+                FROM dbo.TomaAsistencia t WITH (HOLDLOCK)
+                WHERE t.id = @idToma AND t.sesion = @idSesionDefecto;
+            ELSE IF @idToma IS NOT NULL
                 SELECT @idTomaResuelta = t.id
                 FROM dbo.TomaAsistencia t WITH (UPDLOCK, HOLDLOCK)
                 WHERE t.id = @idToma AND t.sesion = @idSesionDefecto;
+
+            IF @idToma IS NOT NULL
+            BEGIN
 
                 IF @idTomaResuelta IS NULL
                 BEGIN

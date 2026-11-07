@@ -113,12 +113,13 @@ BEGIN
                 SET @savepointCreado = 1;
             END
 
-            -- Ventana con tolerancia y margen (bloquea Sesion; sesion cancelada SES_010)
+            -- Ventana con tolerancia y margen (bloqueo COMPARTIDO de Sesion, alternativa NB-4: los 40 registros de un grupo no se
+            -- serializan; la cancelacion sigue serializada contra ellos; sesion cancelada SES_010)
             EXEC dbo.usp_validar_sesion_ventana_registro_interno
                 @idSesion = @idSesion, @idCorrelacion = @idCorrelacionDefecto,
                 @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT, @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT,
                 @estadoResultado = @estadoResultado OUTPUT,
-                @toleranciaMinutos = @toleranciaMinutos, @margenMinutos = @margenMinutos;
+                @toleranciaMinutos = @toleranciaMinutos, @margenMinutos = @margenMinutos, @bloqueoCompartido = 1;
 
             IF @estadoResultado = 1
             BEGIN
