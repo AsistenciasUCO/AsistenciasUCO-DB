@@ -401,7 +401,7 @@ Contiene la documentación oficial de:
   1. Validar datos de entrada.
   2. Insertar en `dbo.EstudianteGrupo` con estado de matrícula pendiente.
 - **Reglas de Negocio y Validaciones Específicas:**
-  * La resolución vigente es por solicitudes de ingreso (HU053-HU055, `usp_resolver_solicitud_ingreso_grupo`); `usp_resolver_solicitud_matricula` se eliminó el 2026-10-29.
+  * Las solicitudes de ingreso (HU053-HU055) se retiraron en CULM-001 A.1; la matrícula es manual del docente titular (HU050) o por QR/PIN (HU176B), y la reactivación de una matrícula retirada la hace `usp_internal_reactivar_matricula_retirada` desde `usp_registrar_estudiante_en_grupo_interno`, que participa en la transacción de su llamador (no la abre ni la confirma). `usp_resolver_solicitud_matricula` se eliminó el 2026-10-29.
 - **Estado Resultante en la BD:** Fila en `EstudianteGrupo` en estado pendiente.
 
 ---

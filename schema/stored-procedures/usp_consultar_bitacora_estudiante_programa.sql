@@ -68,12 +68,13 @@ BEGIN
     INNER JOIN dbo.uv_cumplimiento_sesion_grupo c ON c.idGrupo = eg.idGrupo AND c.estaVencida = 1
     INNER JOIN dbo.uv_sesion_v2 s ON s.id = c.idSesion
     INNER JOIN dbo.uv_grupo g ON g.id = eg.idGrupo
+    -- CULM-001 B.2 (CONTRACT §2.9): estado consolidado de la sesion (uv_asistencia_sesion_horas): una fila aunque haya varias tomas
     OUTER APPLY (
-        SELECT TOP 1 da.asistio, da.codigoRazonCausa, da.nombreRazonCausa
-        FROM dbo.uv_asistencia a
-        INNER JOIN dbo.uv_detalle_asistencia da ON da.idAsistencia = a.id
-        WHERE a.idEstudianteGrupo = eg.id AND a.idSesion = s.id
-        ORDER BY da.fechaHoraInicio DESC, da.id ASC
+        SELECT TOP 1 asistio = CAST(IIF(h.codigoRazonCausaConsolidado = N'AN', 1, 0) AS BIT),
+               codigoRazonCausa = rc.codigo, nombreRazonCausa = rc.nombre, h.horasFalta
+        FROM dbo.uv_asistencia_sesion_horas h
+        LEFT JOIN dbo.uv_razon_causa rc ON rc.codigo = h.codigoRazonCausaConsolidado
+        WHERE h.idEstudianteGrupo = eg.id AND h.idSesion = s.id AND h.codigoRazonCausaConsolidado IS NOT NULL
     ) d
     WHERE eg.idEstudiante = @idEstudiante
       AND c.idPrograma = @idPrograma

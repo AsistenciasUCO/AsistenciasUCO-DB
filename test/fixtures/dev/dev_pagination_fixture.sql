@@ -162,14 +162,27 @@ CROSS APPLY GENERATE_SERIES(1, c.size) s
 CROSS APPLY GENERATE_SERIES(1, CASE WHEN c.size = 300 THEN 3 ELSE 1 END) n
 WHERE s.value % 50 NOT IN (0, 1, 2, 3);
 
+-- CULM-001 B.2 ([SUPUESTO-B-20]): toma 1 (MANUAL, CERRADA, implicita) de cada sesion del fixture con asistencia, antes del
+-- detalle (columna obligatoria DetalleAsistencia.toma). Ids con prefijo DE00000A para la limpieza.
+INSERT INTO dbo.TomaAsistencia (id, sesion, numero, modo, estado, esImplicita, docenteApertura, fechaAperturaUtc, fechaCierreUtc, idCorrelacionApertura)
+SELECT CONVERT(UNIQUEIDENTIFIER, CONCAT('DE00000A', SUBSTRING(CONVERT(CHAR(36), s.id), 9, 28))), s.id, 1,
+       (SELECT m.id FROM dbo.ModoTomaAsistencia m WHERE m.usaCodigoQr = 0), (SELECT e.id FROM dbo.EstadoTomaAsistencia e WHERE e.estaAbierta = 0), 1, g.docente,
+       CAST(s.fechaHoraInicio AS DATETIME2(0)), CAST(IIF(s.fechaHoraFin > s.fechaHoraInicio, s.fechaHoraFin, s.fechaHoraInicio) AS DATETIME2(0)), NEWID()
+FROM dbo.Sesion s
+JOIN dbo.Grupo g ON g.id = s.grupo
+WHERE LEFT(CONVERT(CHAR(36), s.id), 6) = 'DE0000'
+  AND EXISTS (SELECT 1 FROM dbo.Asistencia a WHERE a.sesion = s.id AND LEFT(CONVERT(CHAR(36), a.id), 6) = 'DE0000')
+  AND NOT EXISTS (SELECT 1 FROM dbo.TomaAsistencia t WHERE t.sesion = s.id AND t.numero = 1);
+
 DECLARE @codigoBase INT = ISNULL((SELECT MAX(codigo) FROM dbo.DetalleAsistencia), 0);
-INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin)
+INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin, toma)
 SELECT CONVERT(UNIQUEIDENTIFIER, CONCAT('DE000009', SUBSTRING(CONVERT(CHAR(36), a.id), 9, 28))),
        @codigoBase + ROW_NUMBER() OVER (ORDER BY a.id),
        a.id,
        CASE WHEN x.estado = 'AN' THEN 1 ELSE 0 END,
        CASE x.estado WHEN 'AN' THEN @rAN WHEN 'SJC' THEN @rSJC ELSE @rEX END,
-       ses.fechaHoraInicio, ses.fechaHoraFin
+       ses.fechaHoraInicio, ses.fechaHoraFin,
+       (SELECT t.id FROM dbo.TomaAsistencia t WHERE t.sesion = a.sesion AND t.numero = 1)
 FROM dbo.Asistencia a
 JOIN dbo.Sesion ses ON ses.id = a.sesion
 JOIN dbo.EstudianteGrupo eg ON eg.id = a.estudianteGrupo

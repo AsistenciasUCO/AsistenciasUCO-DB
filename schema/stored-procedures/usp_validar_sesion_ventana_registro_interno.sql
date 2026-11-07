@@ -16,13 +16,27 @@ GO
 --     obtener el bloqueo (una solicitud iniciada antes del cierre que llega despues del cierre se rechaza).
 --   * Codigos: SES_007 (sesion no iniciada), SES_008 (sesion cerrada), SES_009 (horario indeterminado).
 --   * No escribe. El llamador decide la reversion y el resultset canonico.
+-- CULM-001 B.1 (CONTRACT §2.7.1):
+--   * @toleranciaMinutos / @margenMinutos (opcionales): ventana [inicio - tolerancia, fin + margen). NULL o negativos = 0,
+--     es decir, la regla estricta de SES-01; los llamadores de 5 parametros (lote congelado, autonomo) no cambian.
+--     Los valores los lee el LLAMADOR (ASISTENCIA/TOLERANCIA_MINUTOS y ASISTENCIA/MARGEN_RETARDO_MINUTOS).
+--   * PASO 2.5 (todos los llamadores): una sesion con dbo.SesionCancelacion se rechaza con SES_010. Se lee despues del
+--     UPDLOCK + HOLDLOCK sobre dbo.Sesion, el mismo bloqueo que toma usp_cancelar_sesion: registro y cancelacion se
+--     serializan.
+-- CULM-001 B.2 (CONTRACT §2.8.3, NB-4, alternativa aprobada de antemano): @bloqueoCompartido = 1 lee la sesion con HOLDLOCK
+--   (bloqueo compartido) en lugar de UPDLOCK, HOLDLOCK. Solo lo usa usp_registrar_asistencia_por_token: los registros QR de un
+--   grupo no se serializan entre si y la cancelacion (U/X) sigue serializada contra ellos; el registro no actualiza Sesion,
+--   asi que no hay conversion de bloqueo. Por defecto 0: todos los demas llamadores conservan el bloqueo exclusivo.
 CREATE OR ALTER PROCEDURE [dbo].[usp_validar_sesion_ventana_registro_interno]
 (
     @idSesion                UNIQUEIDENTIFIER,
     @idCorrelacion           UNIQUEIDENTIFIER,
     @mensajeUsuarioResultado NVARCHAR(4000) OUTPUT,
     @mensajeTecnicoResultado NVARCHAR(4000) OUTPUT,
-    @estadoResultado         BIT OUTPUT
+    @estadoResultado         BIT OUTPUT,
+    @toleranciaMinutos       INT = NULL,
+    @margenMinutos           INT = NULL,
+    @bloqueoCompartido       BIT = 0
 )
 AS
     -- 1. Estandarización e inicialización de variables utilizando funciones de catálogo (Sin ISNULL)
@@ -34,6 +48,13 @@ AS
     DECLARE @fechaHoraFin        DATETIME2;
     DECLARE @procedenciaTemporal NVARCHAR(24);
     DECLARE @instanteActualUtc   DATETIME2;
+    DECLARE @toleranciaAplicada  INT = IIF(@toleranciaMinutos IS NULL OR @toleranciaMinutos < 0, 0, @toleranciaMinutos);
+    DECLARE @margenAplicado      INT = IIF(@margenMinutos IS NULL OR @margenMinutos < 0, 0, @margenMinutos);
+    DECLARE @aperturaUtc         DATETIME2;
+    DECLARE @cierreUtc           DATETIME2;
+    DECLARE @detalleVentana      NVARCHAR(200) = IIF(@toleranciaMinutos IS NULL AND @margenMinutos IS NULL,
+                                                     dbo.ufn_obtener_parametro('GENERAL', 'CADENA_VACIA'),
+                                                     CONCAT(' Tolerancia: ', @toleranciaAplicada, ' min; margen: ', @margenAplicado, ' min.'));
 
     -- Inicialización de respuesta desde parámetros del catálogo
     SELECT
@@ -55,13 +76,22 @@ BEGIN
         -- PASO 2: Lectura bloqueada del horario y su procedencia (misma fila, una sola sentencia)
         IF @estadoResultado = 1
         BEGIN
-            SELECT TOP 1
-                @existe = 1,
-                @fechaHoraInicio = s.fechaHoraInicio,
-                @fechaHoraFin = s.fechaHoraFin,
-                @procedenciaTemporal = s.procedenciaTemporal
-            FROM dbo.Sesion s WITH (UPDLOCK, HOLDLOCK)
-            WHERE s.id = @idSesionDefecto;
+            IF @bloqueoCompartido = 1
+                SELECT TOP 1
+                    @existe = 1,
+                    @fechaHoraInicio = s.fechaHoraInicio,
+                    @fechaHoraFin = s.fechaHoraFin,
+                    @procedenciaTemporal = s.procedenciaTemporal
+                FROM dbo.Sesion s WITH (HOLDLOCK)
+                WHERE s.id = @idSesionDefecto;
+            ELSE
+                SELECT TOP 1
+                    @existe = 1,
+                    @fechaHoraInicio = s.fechaHoraInicio,
+                    @fechaHoraFin = s.fechaHoraFin,
+                    @procedenciaTemporal = s.procedenciaTemporal
+                FROM dbo.Sesion s WITH (UPDLOCK, HOLDLOCK)
+                WHERE s.id = @idSesionDefecto;
 
             IF @existe = 0
             BEGIN
@@ -74,6 +104,20 @@ BEGIN
                 SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
                 SET @estadoResultado = 0;
             END
+        END
+
+        -- PASO 2.5 (CULM-001 B.1): sesion cancelada => SES_010 (lectura despues del bloqueo de la fila de dbo.Sesion)
+        IF @estadoResultado = 1
+           AND EXISTS (SELECT 1 FROM dbo.SesionCancelacion sc WHERE sc.sesion = @idSesionDefecto)
+        BEGIN
+            EXEC dbo.usp_obtener_mensaje_catalogo
+                @p_codigo = 'SES_010',
+                @p_param1 = @idSesionDefecto,
+                @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
+                @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
+
+            SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+            SET @estadoResultado = 0;
         END
 
         -- PASO 3: Procedencia temporal confirmada (NULL o desconocida = INDETERMINADA)
@@ -90,12 +134,15 @@ BEGIN
             SET @estadoResultado = 0;
         END
 
-        -- PASO 4: Ventana [inicio, fin) contra el reloj UTC del motor, leído después de obtener el bloqueo
+        -- PASO 4: Ventana [inicio - tolerancia, fin + margen) contra el reloj UTC del motor, leído después de obtener
+        --         el bloqueo. Sin tolerancia ni margen es la ventana estricta [inicio, fin) de SES-01.
         IF @estadoResultado = 1
         BEGIN
             SET @instanteActualUtc = SYSUTCDATETIME();
+            SET @aperturaUtc = DATEADD(MINUTE, -@toleranciaAplicada, @fechaHoraInicio);
+            SET @cierreUtc = DATEADD(MINUTE, @margenAplicado, @fechaHoraFin);
 
-            IF @instanteActualUtc < @fechaHoraInicio
+            IF @instanteActualUtc < @aperturaUtc
             BEGIN
                 EXEC dbo.usp_obtener_mensaje_catalogo
                     @p_codigo = 'SES_007',
@@ -103,10 +150,10 @@ BEGIN
                     @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                     @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
 
-                SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+                SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, @detalleVentana, ' Correlacion: ', @idCorrelacionDefecto);
                 SET @estadoResultado = 0;
             END
-            ELSE IF @instanteActualUtc >= @fechaHoraFin
+            ELSE IF @instanteActualUtc >= @cierreUtc
             BEGIN
                 EXEC dbo.usp_obtener_mensaje_catalogo
                     @p_codigo = 'SES_008',
@@ -114,7 +161,7 @@ BEGIN
                     @mensajeUsuarioResultado = @mensajeUsuarioResultado OUTPUT,
                     @mensajeTecnicoResultado = @mensajeTecnicoResultado OUTPUT;
 
-                SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, ' Correlacion: ', @idCorrelacionDefecto);
+                SET @mensajeTecnicoResultado = CONCAT(@mensajeTecnicoResultado, @detalleVentana, ' Correlacion: ', @idCorrelacionDefecto);
                 SET @estadoResultado = 0;
             END
         END

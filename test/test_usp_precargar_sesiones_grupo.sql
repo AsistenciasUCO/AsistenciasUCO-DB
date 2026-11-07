@@ -170,8 +170,11 @@ BEGIN TRY
     IF @idSesionConAsistencia IS NULL THROW 53421, 'TEST FAILED: no se encontro la sesion futura para adjuntar asistencia.', 1;
     DECLARE @idAsistencia UNIQUEIDENTIFIER = NEWID();
     INSERT INTO dbo.Asistencia (id, estudianteGrupo, sesion) VALUES (@idAsistencia, @idEstudianteGrupo, @idSesionConAsistencia);
-    INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin)
-    SELECT NEWID(), 680000 + ABS(CHECKSUM(NEWID()) % 9999), @idAsistencia, 1, @idRazonAN, s.fechaHoraInicio, s.fechaHoraFin
+    -- CULM-001 B.2 ([SUPUESTO-B-20]): la columna obligatoria DetalleAsistencia.toma exige la toma 1 de la sesion (helper culm001_b2_toma_fixture.sql).
+    DECLARE @culmb2Toma UNIQUEIDENTIFIER;
+    EXEC #culm001_b2_crear_toma @idSesion = @idSesionConAsistencia, @idToma = @culmb2Toma OUTPUT;
+    INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin, toma)
+    SELECT NEWID(), 680000 + ABS(CHECKSUM(NEWID()) % 9999), @idAsistencia, 1, @idRazonAN, s.fechaHoraInicio, s.fechaHoraFin, @culmb2Toma
     FROM dbo.uv_sesion_v2 s WHERE s.id = @idSesionConAsistencia;
 
     DECLARE @idSesionClasificada UNIQUEIDENTIFIER = NEWID();

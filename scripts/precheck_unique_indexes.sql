@@ -11,6 +11,12 @@
 -- ============================================================================
 SET NOCOUNT ON;
 
+DECLARE @duplicadosDetalle INT;
+DECLARE @sqlDetalle NVARCHAR(400) = IIF(COL_LENGTH('dbo.DetalleAsistencia', 'toma') IS NULL,
+    N'SELECT @n = COUNT(*) FROM (SELECT asistencia FROM dbo.DetalleAsistencia GROUP BY asistencia HAVING COUNT(*) > 1) d;',
+    N'SELECT @n = COUNT(*) FROM (SELECT asistencia, toma FROM dbo.DetalleAsistencia GROUP BY asistencia, toma HAVING COUNT(*) > 1) d;');
+EXEC sys.sp_executesql @sqlDetalle, N'@n INT OUTPUT', @n = @duplicadosDetalle OUTPUT;
+
 SELECT check_name, unique_index, duplicate_groups
 FROM (
     SELECT 'Asistencia(estudianteGrupo, sesion)' AS check_name,
@@ -19,11 +25,11 @@ FROM (
                 SELECT estudianteGrupo, sesion FROM dbo.Asistencia
                 GROUP BY estudianteGrupo, sesion HAVING COUNT(*) > 1) d) AS duplicate_groups
     UNION ALL
-    SELECT 'DetalleAsistencia(asistencia)',
-           'UX_DetalleAsistencia_Asistencia',
-           (SELECT COUNT(*) FROM (
-                SELECT asistencia FROM dbo.DetalleAsistencia
-                GROUP BY asistencia HAVING COUNT(*) > 1) d)
+    -- CULM-001 B.2 (CONTRACT §2.3, DEC-011): con DetalleAsistencia.toma el indice unico es (asistencia, toma); se evalua por
+    -- SQL dinamico para que el precheck siga funcionando sobre una BD anterior a B.2 (sin la columna).
+    SELECT IIF(COL_LENGTH('dbo.DetalleAsistencia', 'toma') IS NULL, 'DetalleAsistencia(asistencia)', 'DetalleAsistencia(asistencia, toma)'),
+           IIF(COL_LENGTH('dbo.DetalleAsistencia', 'toma') IS NULL, 'UX_DetalleAsistencia_Asistencia', 'UX_DetalleAsistencia_Asistencia_Toma'),
+           @duplicadosDetalle
     UNION ALL
     SELECT 'RazonCausa(codigo)',
            'UX_RazonCausa_Codigo',
@@ -36,7 +42,7 @@ ORDER BY check_name;
 -- Codigo de salida legible: THROW si hay duplicados (con -b, sqlcmd retorna exit code != 0).
 IF EXISTS (
     SELECT 1 FROM dbo.Asistencia GROUP BY estudianteGrupo, sesion HAVING COUNT(*) > 1
-    UNION ALL SELECT 1 FROM dbo.DetalleAsistencia GROUP BY asistencia HAVING COUNT(*) > 1
+    UNION ALL SELECT 1 WHERE @duplicadosDetalle > 0
     UNION ALL SELECT 1 FROM dbo.RazonCausa GROUP BY codigo HAVING COUNT(*) > 1
 )
     THROW 52200, 'PRECHECK FAILED: existen duplicados que rechazarian los indices unicos. Detener el despliegue.', 1;

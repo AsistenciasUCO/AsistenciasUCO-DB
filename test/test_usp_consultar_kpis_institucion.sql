@@ -153,8 +153,12 @@ BEGIN TRY
     INSERT INTO #asi (id, egId, sesId, codigo)
     SELECT NEWID(), x.id, s.id, r.codigo FROM #reg r INNER JOIN #eg x ON x.k = r.k AND x.g = r.g INNER JOIN #s s ON s.k = r.g AND s.n = r.n;
     INSERT INTO dbo.Asistencia (id, estudianteGrupo, sesion) SELECT id, egId, sesId FROM #asi;
-    INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin)
-    SELECT NEWID(), 1, a.id, IIF(a.codigo = N'SJC', 0, 1), rc.id, @ahora, @ahora FROM #asi a INNER JOIN dbo.RazonCausa rc ON rc.codigo = a.codigo;
+    -- CULM-001 B.2 ([SUPUESTO-B-20]): la columna obligatoria DetalleAsistencia.toma exige la toma 1 de la sesion (helper culm001_b2_toma_fixture.sql).
+    DECLARE @culmb2Sesiones NVARCHAR(MAX) = (SELECT DISTINCT idSesion = sesId FROM #asi FOR JSON PATH);
+    EXEC #culm001_b2_crear_tomas @sesionesJSON = @culmb2Sesiones;
+    INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin, toma)
+    SELECT NEWID(), 1, a.id, IIF(a.codigo = N'SJC', 0, 1), rc.id, @ahora, @ahora, t.id FROM #asi a INNER JOIN dbo.RazonCausa rc ON rc.codigo = a.codigo
+    INNER JOIN dbo.TomaAsistencia t ON t.sesion = a.sesId AND t.numero = 1;
 
 
     -- Fixture de administrador: F2 y F3 (inactiva) en I1, F4 en I2, programas PX/P4/P5, periodo pasado, grupo G4 de un 2do docente
@@ -187,7 +191,9 @@ BEGIN TRY
         sesionesEjecutadas INT, faltasSinJustaCausa INT, porcentajeAusentismo DECIMAL(5,2), porcentajeAsistencia DECIMAL(5,2),
         sesionesVencidas INT, sesionesConRegistro INT, porcentajeCumplimiento DECIMAL(5,2),
         estudiantesConMatriculaActiva INT, estudiantesRegistrados INT, docentesConGrupoActivo INT, docentesRegistrados INT,
-        umbralAdvertencia DECIMAL(5,2), umbralPerdida DECIMAL(5,2));
+        umbralAdvertencia DECIMAL(5,2), umbralPerdida DECIMAL(5,2),
+        -- CULM-001 B.2 (CONTRACT §2.9, NB-2): columnas nuevas al final del resultset (forma del contrato, sin cambio de asercion).
+        tomasDictadas INT, horasDictadas DECIMAL(12,6), horasFalta DECIMAL(12,6));
     -- T-DB-05: cifras exactas de I1 (periodo por defecto)
     INSERT INTO #k EXEC dbo.usp_consultar_kpis_institucion @idUsuarioEjecutor = @uA1, @idCorrelacion = @c, @idPeriodoAcademico = NULL;
     IF NOT ((SELECT COUNT(*) FROM #k) = 1) THROW 54301, 'TEST FAILED: se esperaba exactamente 1 fila', 1;
@@ -236,7 +242,7 @@ BEGIN TRY
     -- Errores
     SET @err = NULL;
     BEGIN TRY
-        INSERT INTO #k (idInstitucion, nombreInstitucion, idPeriodoAcademico, nombrePeriodoAcademico, totalFacultades, totalProgramas, totalEstudiantes, estudiantesRegulares, estudiantesRiesgo, estudiantesPerdida, tasaRetencion, sesionesEjecutadas, faltasSinJustaCausa, porcentajeAusentismo, porcentajeAsistencia, sesionesVencidas, sesionesConRegistro, porcentajeCumplimiento, estudiantesConMatriculaActiva, estudiantesRegistrados, docentesConGrupoActivo, docentesRegistrados, umbralAdvertencia, umbralPerdida) EXEC dbo.usp_consultar_kpis_institucion @idUsuarioEjecutor = @uDec, @idCorrelacion = @c;
+        INSERT INTO #k (idInstitucion, nombreInstitucion, idPeriodoAcademico, nombrePeriodoAcademico, totalFacultades, totalProgramas, totalEstudiantes, estudiantesRegulares, estudiantesRiesgo, estudiantesPerdida, tasaRetencion, sesionesEjecutadas, faltasSinJustaCausa, porcentajeAusentismo, porcentajeAsistencia, sesionesVencidas, sesionesConRegistro, porcentajeCumplimiento, estudiantesConMatriculaActiva, estudiantesRegistrados, docentesConGrupoActivo, docentesRegistrados, umbralAdvertencia, umbralPerdida, tomasDictadas, horasDictadas, horasFalta) EXEC dbo.usp_consultar_kpis_institucion @idUsuarioEjecutor = @uDec, @idCorrelacion = @c;
     END TRY
     BEGIN CATCH
         SET @err = ERROR_MESSAGE();
@@ -245,7 +251,7 @@ BEGIN TRY
         THROW 54321, 'TEST FAILED: T-DB-02 decano (esperaba KPI_004).', 1;
     SET @err = NULL;
     BEGIN TRY
-        INSERT INTO #k (idInstitucion, nombreInstitucion, idPeriodoAcademico, nombrePeriodoAcademico, totalFacultades, totalProgramas, totalEstudiantes, estudiantesRegulares, estudiantesRiesgo, estudiantesPerdida, tasaRetencion, sesionesEjecutadas, faltasSinJustaCausa, porcentajeAusentismo, porcentajeAsistencia, sesionesVencidas, sesionesConRegistro, porcentajeCumplimiento, estudiantesConMatriculaActiva, estudiantesRegistrados, docentesConGrupoActivo, docentesRegistrados, umbralAdvertencia, umbralPerdida) EXEC dbo.usp_consultar_kpis_institucion @idUsuarioEjecutor = @uC1, @idCorrelacion = @c;
+        INSERT INTO #k (idInstitucion, nombreInstitucion, idPeriodoAcademico, nombrePeriodoAcademico, totalFacultades, totalProgramas, totalEstudiantes, estudiantesRegulares, estudiantesRiesgo, estudiantesPerdida, tasaRetencion, sesionesEjecutadas, faltasSinJustaCausa, porcentajeAusentismo, porcentajeAsistencia, sesionesVencidas, sesionesConRegistro, porcentajeCumplimiento, estudiantesConMatriculaActiva, estudiantesRegistrados, docentesConGrupoActivo, docentesRegistrados, umbralAdvertencia, umbralPerdida, tomasDictadas, horasDictadas, horasFalta) EXEC dbo.usp_consultar_kpis_institucion @idUsuarioEjecutor = @uC1, @idCorrelacion = @c;
     END TRY
     BEGIN CATCH
         SET @err = ERROR_MESSAGE();
@@ -254,7 +260,7 @@ BEGIN TRY
         THROW 54322, 'TEST FAILED: T-DB-02 coordinador (esperaba KPI_004).', 1;
     SET @err = NULL;
     BEGIN TRY
-        INSERT INTO #k (idInstitucion, nombreInstitucion, idPeriodoAcademico, nombrePeriodoAcademico, totalFacultades, totalProgramas, totalEstudiantes, estudiantesRegulares, estudiantesRiesgo, estudiantesPerdida, tasaRetencion, sesionesEjecutadas, faltasSinJustaCausa, porcentajeAusentismo, porcentajeAsistencia, sesionesVencidas, sesionesConRegistro, porcentajeCumplimiento, estudiantesConMatriculaActiva, estudiantesRegistrados, docentesConGrupoActivo, docentesRegistrados, umbralAdvertencia, umbralPerdida) EXEC dbo.usp_consultar_kpis_institucion @idUsuarioEjecutor = @uPlano, @idCorrelacion = @c;
+        INSERT INTO #k (idInstitucion, nombreInstitucion, idPeriodoAcademico, nombrePeriodoAcademico, totalFacultades, totalProgramas, totalEstudiantes, estudiantesRegulares, estudiantesRiesgo, estudiantesPerdida, tasaRetencion, sesionesEjecutadas, faltasSinJustaCausa, porcentajeAusentismo, porcentajeAsistencia, sesionesVencidas, sesionesConRegistro, porcentajeCumplimiento, estudiantesConMatriculaActiva, estudiantesRegistrados, docentesConGrupoActivo, docentesRegistrados, umbralAdvertencia, umbralPerdida, tomasDictadas, horasDictadas, horasFalta) EXEC dbo.usp_consultar_kpis_institucion @idUsuarioEjecutor = @uPlano, @idCorrelacion = @c;
     END TRY
     BEGIN CATCH
         SET @err = ERROR_MESSAGE();
@@ -263,7 +269,7 @@ BEGIN TRY
         THROW 54323, 'TEST FAILED: T-DB-02 usuario sin perfil (esperaba KPI_004).', 1;
     SET @err = NULL;
     BEGIN TRY
-        INSERT INTO #k (idInstitucion, nombreInstitucion, idPeriodoAcademico, nombrePeriodoAcademico, totalFacultades, totalProgramas, totalEstudiantes, estudiantesRegulares, estudiantesRiesgo, estudiantesPerdida, tasaRetencion, sesionesEjecutadas, faltasSinJustaCausa, porcentajeAusentismo, porcentajeAsistencia, sesionesVencidas, sesionesConRegistro, porcentajeCumplimiento, estudiantesConMatriculaActiva, estudiantesRegistrados, docentesConGrupoActivo, docentesRegistrados, umbralAdvertencia, umbralPerdida) EXEC dbo.usp_consultar_kpis_institucion @idUsuarioEjecutor = @uE1, @idCorrelacion = @c;
+        INSERT INTO #k (idInstitucion, nombreInstitucion, idPeriodoAcademico, nombrePeriodoAcademico, totalFacultades, totalProgramas, totalEstudiantes, estudiantesRegulares, estudiantesRiesgo, estudiantesPerdida, tasaRetencion, sesionesEjecutadas, faltasSinJustaCausa, porcentajeAusentismo, porcentajeAsistencia, sesionesVencidas, sesionesConRegistro, porcentajeCumplimiento, estudiantesConMatriculaActiva, estudiantesRegistrados, docentesConGrupoActivo, docentesRegistrados, umbralAdvertencia, umbralPerdida, tomasDictadas, horasDictadas, horasFalta) EXEC dbo.usp_consultar_kpis_institucion @idUsuarioEjecutor = @uE1, @idCorrelacion = @c;
     END TRY
     BEGIN CATCH
         SET @err = ERROR_MESSAGE();
@@ -272,7 +278,7 @@ BEGIN TRY
         THROW 54324, 'TEST FAILED: T-DB-02 estudiante (esperaba KPI_004).', 1;
     SET @err = NULL;
     BEGIN TRY
-        INSERT INTO #k (idInstitucion, nombreInstitucion, idPeriodoAcademico, nombrePeriodoAcademico, totalFacultades, totalProgramas, totalEstudiantes, estudiantesRegulares, estudiantesRiesgo, estudiantesPerdida, tasaRetencion, sesionesEjecutadas, faltasSinJustaCausa, porcentajeAusentismo, porcentajeAsistencia, sesionesVencidas, sesionesConRegistro, porcentajeCumplimiento, estudiantesConMatriculaActiva, estudiantesRegistrados, docentesConGrupoActivo, docentesRegistrados, umbralAdvertencia, umbralPerdida) EXEC dbo.usp_consultar_kpis_institucion @idUsuarioEjecutor = @uA1, @idCorrelacion = @c, @idPeriodoAcademico = @inexistente;
+        INSERT INTO #k (idInstitucion, nombreInstitucion, idPeriodoAcademico, nombrePeriodoAcademico, totalFacultades, totalProgramas, totalEstudiantes, estudiantesRegulares, estudiantesRiesgo, estudiantesPerdida, tasaRetencion, sesionesEjecutadas, faltasSinJustaCausa, porcentajeAusentismo, porcentajeAsistencia, sesionesVencidas, sesionesConRegistro, porcentajeCumplimiento, estudiantesConMatriculaActiva, estudiantesRegistrados, docentesConGrupoActivo, docentesRegistrados, umbralAdvertencia, umbralPerdida, tomasDictadas, horasDictadas, horasFalta) EXEC dbo.usp_consultar_kpis_institucion @idUsuarioEjecutor = @uA1, @idCorrelacion = @c, @idPeriodoAcademico = @inexistente;
     END TRY
     BEGIN CATCH
         SET @err = ERROR_MESSAGE();
@@ -281,7 +287,7 @@ BEGIN TRY
         THROW 54325, 'TEST FAILED: periodo inexistente (esperaba PER_001).', 1;
     SET @err = NULL;
     BEGIN TRY
-        INSERT INTO #k (idInstitucion, nombreInstitucion, idPeriodoAcademico, nombrePeriodoAcademico, totalFacultades, totalProgramas, totalEstudiantes, estudiantesRegulares, estudiantesRiesgo, estudiantesPerdida, tasaRetencion, sesionesEjecutadas, faltasSinJustaCausa, porcentajeAusentismo, porcentajeAsistencia, sesionesVencidas, sesionesConRegistro, porcentajeCumplimiento, estudiantesConMatriculaActiva, estudiantesRegistrados, docentesConGrupoActivo, docentesRegistrados, umbralAdvertencia, umbralPerdida) EXEC dbo.usp_consultar_kpis_institucion @idUsuarioEjecutor = @uA1, @idCorrelacion = NULL;
+        INSERT INTO #k (idInstitucion, nombreInstitucion, idPeriodoAcademico, nombrePeriodoAcademico, totalFacultades, totalProgramas, totalEstudiantes, estudiantesRegulares, estudiantesRiesgo, estudiantesPerdida, tasaRetencion, sesionesEjecutadas, faltasSinJustaCausa, porcentajeAusentismo, porcentajeAsistencia, sesionesVencidas, sesionesConRegistro, porcentajeCumplimiento, estudiantesConMatriculaActiva, estudiantesRegistrados, docentesConGrupoActivo, docentesRegistrados, umbralAdvertencia, umbralPerdida, tomasDictadas, horasDictadas, horasFalta) EXEC dbo.usp_consultar_kpis_institucion @idUsuarioEjecutor = @uA1, @idCorrelacion = NULL;
     END TRY
     BEGIN CATCH
         SET @err = ERROR_MESSAGE();
@@ -290,7 +296,7 @@ BEGIN TRY
         THROW 54326, 'TEST FAILED: correlacion nula (esperaba CORR_001).', 1;
     SET @err = NULL;
     BEGIN TRY
-        INSERT INTO #k (idInstitucion, nombreInstitucion, idPeriodoAcademico, nombrePeriodoAcademico, totalFacultades, totalProgramas, totalEstudiantes, estudiantesRegulares, estudiantesRiesgo, estudiantesPerdida, tasaRetencion, sesionesEjecutadas, faltasSinJustaCausa, porcentajeAusentismo, porcentajeAsistencia, sesionesVencidas, sesionesConRegistro, porcentajeCumplimiento, estudiantesConMatriculaActiva, estudiantesRegistrados, docentesConGrupoActivo, docentesRegistrados, umbralAdvertencia, umbralPerdida) EXEC dbo.usp_consultar_kpis_institucion @idUsuarioEjecutor = NULL, @idCorrelacion = @c;
+        INSERT INTO #k (idInstitucion, nombreInstitucion, idPeriodoAcademico, nombrePeriodoAcademico, totalFacultades, totalProgramas, totalEstudiantes, estudiantesRegulares, estudiantesRiesgo, estudiantesPerdida, tasaRetencion, sesionesEjecutadas, faltasSinJustaCausa, porcentajeAusentismo, porcentajeAsistencia, sesionesVencidas, sesionesConRegistro, porcentajeCumplimiento, estudiantesConMatriculaActiva, estudiantesRegistrados, docentesConGrupoActivo, docentesRegistrados, umbralAdvertencia, umbralPerdida, tomasDictadas, horasDictadas, horasFalta) EXEC dbo.usp_consultar_kpis_institucion @idUsuarioEjecutor = NULL, @idCorrelacion = @c;
     END TRY
     BEGIN CATCH
         SET @err = ERROR_MESSAGE();
@@ -300,7 +306,7 @@ BEGIN TRY
     UPDATE dbo.CatalogoParametro SET estaActivo = 0 WHERE grupo = N'ASISTENCIA' AND clave = N'UMBRAL_ALERTA_PERDIDA';
     SET @err = NULL;
     BEGIN TRY
-        INSERT INTO #k (idInstitucion, nombreInstitucion, idPeriodoAcademico, nombrePeriodoAcademico, totalFacultades, totalProgramas, totalEstudiantes, estudiantesRegulares, estudiantesRiesgo, estudiantesPerdida, tasaRetencion, sesionesEjecutadas, faltasSinJustaCausa, porcentajeAusentismo, porcentajeAsistencia, sesionesVencidas, sesionesConRegistro, porcentajeCumplimiento, estudiantesConMatriculaActiva, estudiantesRegistrados, docentesConGrupoActivo, docentesRegistrados, umbralAdvertencia, umbralPerdida) EXEC dbo.usp_consultar_kpis_institucion @idUsuarioEjecutor = @uA1, @idCorrelacion = @c;
+        INSERT INTO #k (idInstitucion, nombreInstitucion, idPeriodoAcademico, nombrePeriodoAcademico, totalFacultades, totalProgramas, totalEstudiantes, estudiantesRegulares, estudiantesRiesgo, estudiantesPerdida, tasaRetencion, sesionesEjecutadas, faltasSinJustaCausa, porcentajeAusentismo, porcentajeAsistencia, sesionesVencidas, sesionesConRegistro, porcentajeCumplimiento, estudiantesConMatriculaActiva, estudiantesRegistrados, docentesConGrupoActivo, docentesRegistrados, umbralAdvertencia, umbralPerdida, tomasDictadas, horasDictadas, horasFalta) EXEC dbo.usp_consultar_kpis_institucion @idUsuarioEjecutor = @uA1, @idCorrelacion = @c;
     END TRY
     BEGIN CATCH
         SET @err = ERROR_MESSAGE();

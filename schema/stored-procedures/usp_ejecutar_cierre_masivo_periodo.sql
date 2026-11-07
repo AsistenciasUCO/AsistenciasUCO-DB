@@ -116,7 +116,8 @@ BEGIN
                 SELECT 
                     eg.estudiante,
                     eg.grupo,
-                    COUNT(da.id) AS totalFallas
+                    -- CULM-001 B.2 (B-7): varias tomas ausentes de una misma sesion cuentan como una sesion (C lo reescribe por horas)
+                    COUNT(DISTINCT a.sesion) AS totalFallas
                 FROM dbo.DetalleAsistencia da
                 INNER JOIN dbo.Asistencia a ON da.asistencia = a.id
                 INNER JOIN dbo.EstudianteGrupo eg ON a.estudianteGrupo = eg.id
@@ -125,7 +126,7 @@ BEGIN
                 WHERE g.periodoAcademico = @idPeriodoTarget
                   AND da.asistio = 0
                 GROUP BY eg.estudiante, eg.grupo
-                HAVING COUNT(da.id) >= 3
+                HAVING COUNT(DISTINCT a.sesion) >= 3
             )
             UPDATE eg
             SET eg.estado = @idEstadoCanceladoInasistencia

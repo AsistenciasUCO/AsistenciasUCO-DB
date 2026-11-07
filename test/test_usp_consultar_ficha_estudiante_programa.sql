@@ -149,8 +149,12 @@ BEGIN TRY
     INSERT INTO #asi (id, egId, sesId, codigo)
     SELECT NEWID(), x.id, s.id, r.codigo FROM #reg r INNER JOIN #eg x ON x.k = r.k AND x.g = r.g INNER JOIN #s s ON s.k = r.g AND s.n = r.n;
     INSERT INTO dbo.Asistencia (id, estudianteGrupo, sesion) SELECT id, egId, sesId FROM #asi;
-    INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin)
-    SELECT NEWID(), 1, a.id, IIF(a.codigo = N'SJC', 0, 1), rc.id, @ahora, @ahora FROM #asi a INNER JOIN dbo.RazonCausa rc ON rc.codigo = a.codigo;
+    -- CULM-001 B.2 ([SUPUESTO-B-20]): la columna obligatoria DetalleAsistencia.toma exige la toma 1 de la sesion (helper culm001_b2_toma_fixture.sql).
+    DECLARE @culmb2Sesiones NVARCHAR(MAX) = (SELECT DISTINCT idSesion = sesId FROM #asi FOR JSON PATH);
+    EXEC #culm001_b2_crear_tomas @sesionesJSON = @culmb2Sesiones;
+    INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin, toma)
+    SELECT NEWID(), 1, a.id, IIF(a.codigo = N'SJC', 0, 1), rc.id, @ahora, @ahora, t.id FROM #asi a INNER JOIN dbo.RazonCausa rc ON rc.codigo = a.codigo
+    INNER JOIN dbo.TomaAsistencia t ON t.sesion = a.sesId AND t.numero = 1;
 
     -- Usuarios ejecutores y de estudiantes por clave
     DECLARE @uE1 UNIQUEIDENTIFIER = (SELECT id FROM #u WHERE n = 5), @uE5 UNIQUEIDENTIFIER = (SELECT id FROM #u WHERE n = 9);
@@ -164,7 +168,9 @@ BEGIN TRY
         primerApellido NVARCHAR(50), segundoApellido NVARCHAR(50), nombreCompleto NVARCHAR(300), correo NVARCHAR(100), estaActivoUsuario BIT,
         idPrograma UNIQUEIDENTIFIER, nombrePrograma NVARCHAR(50));
     CREATE TABLE #rs (idGrupo UNIQUEIDENTIFIER, codigoGrupo INT, idAsignatura UNIQUEIDENTIFIER, nombreAsignatura NVARCHAR(50), codigoEstadoEstudiante NVARCHAR(10),
-        nombreEstadoEstudiante NVARCHAR(100), sesionesEjecutadas INT, asistencias INT, faltasSinJustaCausa INT, excusas INT, porcentajeInasistencia DECIMAL(5,2), codigoPermanencia NVARCHAR(10));
+        nombreEstadoEstudiante NVARCHAR(100), sesionesEjecutadas INT, asistencias INT, faltasSinJustaCausa INT, excusas INT, porcentajeInasistencia DECIMAL(5,2), codigoPermanencia NVARCHAR(10),
+        -- CULM-001 B.2 (CONTRACT §2.9, NB-2): columnas nuevas al final del resultset (forma del contrato, sin cambio de asercion).
+        tomasDictadas INT, horasDictadas DECIMAL(12,6), horasFalta DECIMAL(12,6));
     DECLARE @err NVARCHAR(4000);
     SET @c = NEWID();
 

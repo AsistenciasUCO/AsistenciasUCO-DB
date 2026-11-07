@@ -65,3 +65,5 @@ El despliegue no cambia datos. La depuración de las filas `EstudiantePrograma` 
   3. `@soloConteo = 0` y `@filasEsperadas = <total>`: borra dentro de una transacción y hace ROLLBACK si el número no coincide. Es idempotente.
 - Resultado en la BD local de John (`sql_server_asistencias`, 2026-10-27): dry run `HU008_DEPURACION_CANDIDATAS=0`. La base local tiene 0 filas en `EstudiantePrograma`, así que **no hubo nada que borrar** y no se ejecutó el modo de borrado. No se tocó ninguna otra base.
 - Para otros ambientes (develop, staging), primero el dry run, luego respaldo y luego el borrado con el total confirmado, a cargo de quien administre ese ambiente.
+
+> **Retirado en CULM-001 A (2026-11-07):** las solicitudes de ingreso (HU053-HU055) se descartaron; la reactivacion de la matricula retirada vive en `usp_internal_reactivar_matricula_retirada` (DEC-009). Ver `docs/arquitectura/DOCUMENTACION_PROCEDIMIENTOS_PUBLICOS.md`, addendum CULM-001 A.

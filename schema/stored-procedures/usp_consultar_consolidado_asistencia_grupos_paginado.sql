@@ -83,9 +83,10 @@ BEGIN
             SELECT  r.idGrupo,
                     activos = SUM(IIF(r.codigoEstadoEstudiante = N'A', 1, 0)),
                     sesionesEjecutadas = MAX(r.sesionesEjecutadas),
-                    asistencias = SUM(IIF(r.codigoEstadoEstudiante = N'A', r.asistencias, 0)),
-                    faltas = SUM(IIF(r.codigoEstadoEstudiante = N'A', r.faltasSinJustaCausa, 0)),
-                    excusas = SUM(IIF(r.codigoEstadoEstudiante = N'A', r.excusas, 0)),
+                    -- CULM-001 B.2 (diferido a D: debe pasar a horas): conteos en unidades de sesion (estado consolidado)
+                    asistencias = SUM(IIF(r.codigoEstadoEstudiante = N'A', r.sesionesAsistidas, 0)),
+                    faltas = SUM(IIF(r.codigoEstadoEstudiante = N'A', r.sesionesConFaltaSinJustaCausa, 0)),
+                    excusas = SUM(IIF(r.codigoEstadoEstudiante = N'A', r.sesionesConExcusa, 0)),
                     riesgo = SUM(IIF(r.codigoEstadoEstudiante = N'A' AND r.codigoPermanencia = N'RIESGO', 1, 0)),
                     perdida = SUM(IIF(r.codigoPermanencia = N'PERDIDA', 1, 0))
             FROM    dbo.uv_resumen_asistencia_estudiante_grupo r

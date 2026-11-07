@@ -35,7 +35,13 @@ CREATE TABLE #resultadoSesiones (
     numeroSemana INT,
     fechaHoraInicio DATETIME2,
     fechaHoraFin DATETIME2,
-    totalRegistros INT
+    totalRegistros INT,
+    -- CULM-001 B.1 (CONTRACT §2.7.7): estado de la sesion desde uv_sesion_estado
+    estaCancelada BIT,
+    codigoTipoCancelacion NVARCHAR(20),
+    motivoCancelacion NVARCHAR(500),
+    nombreDiaFestivo NVARCHAR(120),
+    fechaCancelacionUtc DATETIME2(0)
 );
 
 BEGIN TRANSACTION;
@@ -85,7 +91,9 @@ BEGIN TRY
             nombreRazonCausa NVARCHAR(100),
             fechaHoraInicio DATETIME2,
             fechaHoraFin DATETIME2,
-            totalRegistros INT
+            totalRegistros INT,
+            -- CULM-001 B.2 (CONTRACT §2.9, NB-2): columnas nuevas al final del resultset (forma del contrato, sin cambio de asercion).
+            totalTomas INT, horasAsistidas DECIMAL(12,6), horasFalta DECIMAL(12,6), horasExcusa DECIMAL(12,6)
         );
 
         INSERT INTO #resultadoAsistencias

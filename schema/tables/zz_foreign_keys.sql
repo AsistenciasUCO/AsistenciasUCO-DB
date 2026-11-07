@@ -349,32 +349,6 @@ BEGIN
 END
 GO
 
--- 42-46. SolicitudIngresoGrupo (HU053/HU054/HU055): solo FKs DESDE la tabla nueva; ninguna tabla existente cambia.
-IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_SolicitudIngresoGrupo_Estudiante')
-BEGIN
-    ALTER TABLE [dbo].[SolicitudIngresoGrupo] ADD CONSTRAINT [FK_SolicitudIngresoGrupo_Estudiante] FOREIGN KEY ([estudiante]) REFERENCES [dbo].[Estudiante] ([id]);
-END
-GO
-IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_SolicitudIngresoGrupo_Grupo')
-BEGIN
-    ALTER TABLE [dbo].[SolicitudIngresoGrupo] ADD CONSTRAINT [FK_SolicitudIngresoGrupo_Grupo] FOREIGN KEY ([grupo]) REFERENCES [dbo].[Grupo] ([id]);
-END
-GO
-IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_SolicitudIngresoGrupo_Estado')
-BEGIN
-    ALTER TABLE [dbo].[SolicitudIngresoGrupo] ADD CONSTRAINT [FK_SolicitudIngresoGrupo_Estado] FOREIGN KEY ([estado]) REFERENCES [dbo].[Estado] ([id]);
-END
-GO
-IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_SolicitudIngresoGrupo_Docente')
-BEGIN
-    ALTER TABLE [dbo].[SolicitudIngresoGrupo] ADD CONSTRAINT [FK_SolicitudIngresoGrupo_Docente] FOREIGN KEY ([docenteResolutor]) REFERENCES [dbo].[Docente] ([id]);
-END
-GO
-IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_SolicitudIngresoGrupo_EstudianteGrupo')
-BEGIN
-    ALTER TABLE [dbo].[SolicitudIngresoGrupo] ADD CONSTRAINT [FK_SolicitudIngresoGrupo_EstudianteGrupo] FOREIGN KEY ([estudianteGrupo]) REFERENCES [dbo].[EstudianteGrupo] ([id]);
-END
-GO
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_TokenVerificacionCorreo_Usuario')
 BEGIN
     ALTER TABLE [dbo].[TokenVerificacionCorreo] ADD CONSTRAINT [FK_TokenVerificacionCorreo_Usuario] FOREIGN KEY ([usuario]) REFERENCES [dbo].[Usuario] ([id]);
@@ -388,5 +362,69 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_TokenMatriculaGrupo_Docente')
 BEGIN
     ALTER TABLE [dbo].[TokenMatriculaGrupo] ADD CONSTRAINT [FK_TokenMatriculaGrupo_Docente] FOREIGN KEY ([docenteEmisor]) REFERENCES [dbo].[Docente] ([id]);
+END
+GO
+-- CULM-001 B.1 (CONTRACT §2.2): sesion cancelada y dias festivos
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_SesionCancelacion_Sesion')
+BEGIN
+    ALTER TABLE [dbo].[SesionCancelacion] ADD CONSTRAINT [FK_SesionCancelacion_Sesion] FOREIGN KEY ([sesion]) REFERENCES [dbo].[Sesion] ([id]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_SesionCancelacion_TipoCancelacionSesion')
+BEGIN
+    ALTER TABLE [dbo].[SesionCancelacion] ADD CONSTRAINT [FK_SesionCancelacion_TipoCancelacionSesion] FOREIGN KEY ([tipoCancelacion]) REFERENCES [dbo].[TipoCancelacionSesion] ([id]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_SesionCancelacion_DiaFestivo')
+BEGIN
+    ALTER TABLE [dbo].[SesionCancelacion] ADD CONSTRAINT [FK_SesionCancelacion_DiaFestivo] FOREIGN KEY ([diaFestivo]) REFERENCES [dbo].[DiaFestivo] ([id]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_SesionCancelacion_Usuario')
+BEGIN
+    ALTER TABLE [dbo].[SesionCancelacion] ADD CONSTRAINT [FK_SesionCancelacion_Usuario] FOREIGN KEY ([usuarioEjecutor]) REFERENCES [dbo].[Usuario] ([id]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_CargaDiaFestivo_Usuario')
+BEGIN
+    ALTER TABLE [dbo].[CargaDiaFestivo] ADD CONSTRAINT [FK_CargaDiaFestivo_Usuario] FOREIGN KEY ([usuarioEjecutor]) REFERENCES [dbo].[Usuario] ([id]);
+END
+GO
+-- CULM-001 B.2 (CONTRACT §2.2, §2.3): tomas de asistencia y tokens QR por toma
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_TomaAsistencia_Sesion')
+BEGIN
+    ALTER TABLE [dbo].[TomaAsistencia] ADD CONSTRAINT [FK_TomaAsistencia_Sesion] FOREIGN KEY ([sesion]) REFERENCES [dbo].[Sesion] ([id]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_TomaAsistencia_ModoTomaAsistencia')
+BEGIN
+    ALTER TABLE [dbo].[TomaAsistencia] ADD CONSTRAINT [FK_TomaAsistencia_ModoTomaAsistencia] FOREIGN KEY ([modo]) REFERENCES [dbo].[ModoTomaAsistencia] ([id]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_TomaAsistencia_EstadoTomaAsistencia')
+BEGIN
+    ALTER TABLE [dbo].[TomaAsistencia] ADD CONSTRAINT [FK_TomaAsistencia_EstadoTomaAsistencia] FOREIGN KEY ([estado]) REFERENCES [dbo].[EstadoTomaAsistencia] ([id]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_TomaAsistencia_Docente')
+BEGIN
+    ALTER TABLE [dbo].[TomaAsistencia] ADD CONSTRAINT [FK_TomaAsistencia_Docente] FOREIGN KEY ([docenteApertura]) REFERENCES [dbo].[Docente] ([id]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_TokenAsistenciaToma_TomaAsistencia')
+BEGIN
+    ALTER TABLE [dbo].[TokenAsistenciaToma] ADD CONSTRAINT [FK_TokenAsistenciaToma_TomaAsistencia] FOREIGN KEY ([toma]) REFERENCES [dbo].[TomaAsistencia] ([id]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_TokenAsistenciaToma_Docente')
+BEGIN
+    ALTER TABLE [dbo].[TokenAsistenciaToma] ADD CONSTRAINT [FK_TokenAsistenciaToma_Docente] FOREIGN KEY ([docenteEmisor]) REFERENCES [dbo].[Docente] ([id]);
+END
+GO
+-- Dependiente de DetalleAsistencia.toma: solo cuando la columna ya es NOT NULL (B-1: evita el error 4922 en el ALTER COLUMN)
+IF COLUMNPROPERTY(OBJECT_ID('dbo.DetalleAsistencia'), 'toma', 'AllowsNull') = 0
+   AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_DetalleAsistencia_TomaAsistencia')
+BEGIN
+    ALTER TABLE [dbo].[DetalleAsistencia] ADD CONSTRAINT [FK_DetalleAsistencia_TomaAsistencia] FOREIGN KEY ([toma]) REFERENCES [dbo].[TomaAsistencia] ([id]);
 END
 GO

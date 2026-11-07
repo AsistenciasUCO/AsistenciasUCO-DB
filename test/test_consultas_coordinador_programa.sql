@@ -32,14 +32,18 @@ CREATE TABLE #grupos (
     grupoEstaHablitado BIT, fechaInicioPeriodoAcademico DATETIME2, fechaFinPeriodoAcademico DATETIME2, totalRegistros INT);
 CREATE TABLE #sesiones (
     id UNIQUEIDENTIFIER, idGrupo UNIQUEIDENTIFIER, codigoGrupo INT, nombreGrupo NVARCHAR(100), nombre NVARCHAR(100),
-    numero INT, codigo NVARCHAR(50), numeroSemana INT, fechaHoraInicio DATETIME2, fechaHoraFin DATETIME2, totalRegistros INT);
+    numero INT, codigo NVARCHAR(50), numeroSemana INT, fechaHoraInicio DATETIME2, fechaHoraFin DATETIME2, totalRegistros INT,
+    -- CULM-001 B.1 (CONTRACT §2.7.7): estado de la sesion desde uv_sesion_estado
+    estaCancelada BIT, codigoTipoCancelacion NVARCHAR(20), motivoCancelacion NVARCHAR(500), nombreDiaFestivo NVARCHAR(120), fechaCancelacionUtc DATETIME2(0));
 CREATE TABLE #asistencias (
     idDetalleAsistencia UNIQUEIDENTIFIER, codigoDetalleAsistencia INT, idAsistencia UNIQUEIDENTIFIER, idSesion UNIQUEIDENTIFIER,
     nombreSesion NVARCHAR(100), codigoSesion NVARCHAR(50), numeroSemana INT, idEstudianteGrupo UNIQUEIDENTIFIER,
     idEstudiante UNIQUEIDENTIFIER, idUsuario UNIQUEIDENTIFIER, numeroIdentificacion NVARCHAR(50), primerApellido NVARCHAR(50),
     segundoApellido NVARCHAR(50), primerNombre NVARCHAR(50), segundoNombre NVARCHAR(50), nombreCompleto NVARCHAR(250),
     asistio BIT, idRazonCausa UNIQUEIDENTIFIER, codigoRazonCausa VARCHAR(10), nombreRazonCausa NVARCHAR(100),
-    fechaHoraInicio DATETIME2, fechaHoraFin DATETIME2, totalRegistros INT);
+    fechaHoraInicio DATETIME2, fechaHoraFin DATETIME2, totalRegistros INT,
+    -- CULM-001 B.2 (CONTRACT §2.9, NB-2): columnas nuevas al final del resultset (forma del contrato, sin cambio de asercion).
+    totalTomas INT, horasAsistidas DECIMAL(12,6), horasFalta DECIMAL(12,6), horasExcusa DECIMAL(12,6));
 
 BEGIN TRANSACTION;
 BEGIN TRY

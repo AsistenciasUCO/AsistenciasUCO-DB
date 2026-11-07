@@ -30,3 +30,5 @@ Ninguno está en un manifiesto congelado. Pruebas: `test_consultas_decano_facult
 ## Rollback
 
 Revertir el commit; las filas ya sembradas no afectan otros datos.
+
+> **Retirado en CULM-001 A (2026-11-07):** las solicitudes de ingreso (HU053-HU055) se descartaron; la reactivacion de la matricula retirada vive en `usp_internal_reactivar_matricula_retirada` (DEC-009). Ver `docs/arquitectura/DOCUMENTACION_PROCEDIMIENTOS_PUBLICOS.md`, addendum CULM-001 A.

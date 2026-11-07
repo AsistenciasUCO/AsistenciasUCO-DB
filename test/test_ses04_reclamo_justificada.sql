@@ -45,9 +45,14 @@ BEGIN TRY
     INSERT dbo.Asistencia (id, estudianteGrupo, sesion)
     VALUES (@aApprove, @enrollment, @sApprove), (@aReject, @enrollment, @sReject), (@aNoDetail, @enrollment, @sNoDetail),
            (@aPresent, @enrollment, @sPresent), (@aInvalid, @enrollment, @sInvalid);
-    INSERT dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin)
-    VALUES (@dApprove, @dc, @aApprove, 0, @sjc, @inicio, @fin), (@dReject, @dc + 1, @aReject, 0, @sjc, @inicio, @fin),
-           (@dPresent, @dc + 2, @aPresent, 1, @an, @inicio, @fin), (@dInvalid, @dc + 3, @aInvalid, 0, @sjc, @inicio, @fin);
+    -- CULM-001 B.2 ([SUPUESTO-B-20]): la columna obligatoria DetalleAsistencia.toma exige la toma 1 de la sesion (helper culm001_b2_toma_fixture.sql).
+    DECLARE @culmb2Sesiones NVARCHAR(MAX) = (SELECT idSesion = v.id FROM (VALUES (@sApprove), (@sReject), (@sPresent), (@sInvalid)) v(id) FOR JSON PATH);
+    EXEC #culm001_b2_crear_tomas @sesionesJSON = @culmb2Sesiones;
+    INSERT dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin, toma)
+    SELECT v.d, v.c, v.a, v.asistio, v.r, @inicio, @fin, t.id
+    FROM (VALUES (@dApprove, @dc, @aApprove, CAST(0 AS BIT), @sjc, @sApprove), (@dReject, @dc + 1, @aReject, CAST(0 AS BIT), @sjc, @sReject),
+                 (@dPresent, @dc + 2, @aPresent, CAST(1 AS BIT), @an, @sPresent), (@dInvalid, @dc + 3, @aInvalid, CAST(0 AS BIT), @sjc, @sInvalid)) v(d, c, a, asistio, r, s)
+    INNER JOIN dbo.TomaAsistencia t ON t.sesion = v.s AND t.numero = 1;
     INSERT dbo.SolicitudRevisionAsistencia (id, nombre, asistencia, fecha, estado, justificacionSolicitud, justificacionRespuesta)
     VALUES (@rApprove, N'REC-SES04-A', @aApprove, CAST(SYSUTCDATETIME() AS DATE), @pending, N'Cita medica', N''),
            (@rReject, N'REC-SES04-R', @aReject, CAST(SYSUTCDATETIME() AS DATE), @pending, N'Sin soporte', N''),
