@@ -9,10 +9,19 @@ GO
 -- A.1 (A-C4, N10): codigos de uv_estado_estudiante_grupo que leen los SP de matricula sin literales quemados:
 --   MATRICULA/ESTADO_RETIRADA = I (matricula retirada por el docente, HU051; la reactivan la matricula manual y el QR).
 --   MATRICULA/ESTADO_INSCRITA = A (unica matricula que cuenta como inscrita: oferta, materias, horario).
+-- A.2 (A2-DB-5; valor = valor por defecto en codigo del backend, DEC-018; se administran en GET /admin/parametros):
+--   ARCHIVOS/LIMITE_SUBIDAS_POR_MINUTO = 10, ASISTENCIA_QR/LIMITE_IP_POR_MINUTO = 20 y
+--   ASISTENCIA_QR/LIMITE_ESTUDIANTE_POR_MINUTO = 5 (A.2-4, limites de intentos); RECLAMO/ESTADO_PENDIENTE = P y
+--   RECLAMO/ESTADO_RETIRADO = X (A.2-7, retiro del reclamo propio; codigos de dbo.Estado).
 MERGE INTO [dbo].[CatalogoParametro] AS Target
 USING (VALUES
-    ('MATRICULA', 'ESTADO_RETIRADA', N'I', 'STRING', N'I'),
-    ('MATRICULA', 'ESTADO_INSCRITA', N'A', 'STRING', N'A')
+    ('MATRICULA',     'ESTADO_RETIRADA',              N'I',  'STRING', N'I'),
+    ('MATRICULA',     'ESTADO_INSCRITA',              N'A',  'STRING', N'A'),
+    ('ARCHIVOS',      'LIMITE_SUBIDAS_POR_MINUTO',    N'10', 'INT',    N'10'),
+    ('ASISTENCIA_QR', 'LIMITE_IP_POR_MINUTO',         N'20', 'INT',    N'20'),
+    ('ASISTENCIA_QR', 'LIMITE_ESTUDIANTE_POR_MINUTO', N'5',  'INT',    N'5'),
+    ('RECLAMO',       'ESTADO_PENDIENTE',             N'P',  'STRING', N'P'),
+    ('RECLAMO',       'ESTADO_RETIRADO',              N'X',  'STRING', N'X')
 ) AS Source (grupo, clave, valor, tipoDato, valorDefecto)
 ON (Target.grupo = Source.grupo AND Target.clave = Source.clave)
 WHEN MATCHED THEN

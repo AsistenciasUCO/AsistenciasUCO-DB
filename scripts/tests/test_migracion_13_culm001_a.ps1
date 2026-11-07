@@ -81,10 +81,12 @@ function Get-SchemaBatchHash {
     param([string]$RelativePath)
     $text = (Get-Content -Raw -Encoding UTF8 -Path (Join-Path $Root $RelativePath)).Replace("`r", '')
     $batches = [regex]::Split($text, '(?m)^GO[ \t]*$')
-    $batch = @($batches | Where-Object { $_ -match 'CREATE OR ALTER (PROCEDURE|VIEW|FUNCTION)' })
+    $batch = @($batches | Where-Object { $_ -match 'CREATE\s+OR\s+ALTER\s+(PROCEDURE|VIEW|FUNCTION)' })
     if ($batch.Count -ne 1) { throw "Lote CREATE no unico en $RelativePath" }
-    # SQL Server guarda CREATE OR ALTER como 'CREATE   ' (OR ALTER sustituido por espacios) en sys.sql_modules.
-    $norm = ([regex]'CREATE OR ALTER (PROCEDURE|VIEW|FUNCTION)').Replace($batch[0], 'CREATE   $1', 1).Trim()
+    # sys.sql_modules guarda CREATE OR ALTER como CREATE (con otros espacios): se compara sin espacios en blanco y sin el
+    # primer OR ALTER; cualquier otro cambio de texto se detecta.
+    $sinBlancos = $batch[0] -replace '[ \t\r\n]', ''
+    $norm = ([regex]'CREATEORALTER').Replace($sinBlancos, 'CREATE', 1)
     $sha = [System.Security.Cryptography.SHA256]::Create()
     return ([BitConverter]::ToString($sha.ComputeHash([System.Text.Encoding]::Unicode.GetBytes($norm)))).Replace('-', '')
 }
@@ -94,8 +96,7 @@ function Test-SchemaParity {
     foreach ($name in $Objects.Keys) {
         $expected = Get-SchemaBatchHash -RelativePath $Objects[$name]
         $actual = Get-Value -Key 'HASH' -Sql @"
-DECLARE @d NVARCHAR(MAX) = REPLACE(OBJECT_DEFINITION(OBJECT_ID(N'dbo.$name')), CHAR(13), N'');
-SET @d = TRIM(CHAR(10) + CHAR(9) + CHAR(32) FROM @d);
+DECLARE @d NVARCHAR(MAX) = REPLACE(REPLACE(REPLACE(REPLACE(OBJECT_DEFINITION(OBJECT_ID(N'dbo.$name')), CHAR(13), N''), CHAR(10), N''), CHAR(9), N''), N' ', N'');
 SELECT CONCAT('HASH=', CONVERT(VARCHAR(64), HASHBYTES('SHA2_256', @d), 2));
 "@
         Assert-True ($actual -eq $expected) "$Label $name difiere de su archivo de schema/ (T-13)."
