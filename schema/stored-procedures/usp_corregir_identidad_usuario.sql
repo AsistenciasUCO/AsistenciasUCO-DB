@@ -10,10 +10,12 @@ GO
 --
 -- Correccion de los datos de identidad (tipo y numero de documento, nombres y apellidos) por jerarquia. No toca el
 -- correo, la contrasena ni el estado. @tipoUsuario elige el registro y quien puede corregirlo:
---   * ESTUDIANTE (@idRegistro = Estudiante.id): solo el COORDINADOR de un programa al que pertenece el estudiante
---     (EstudiantePrograma -> Programa.coordinador). Uno de otro programa (aunque este en un grupo del coordinador)
---     es indistinguible de uno inexistente: GEN_001.
---   * DECANO (@idRegistro = Decano.id): solo el ADMINISTRADOR de la institucion de sus facultades.
+--   * ESTUDIANTE (@idRegistro = Estudiante.id): los perfiles de IDENTIDAD/PERFILES_CORRECCION_ESTUDIANTE (CULM-001 D.4). El
+--     coordinador de un programa al que pertenece el estudiante (EstudiantePrograma -> Programa.coordinador) o el administrador de
+--     la institucion de uno de sus programas. Uno fuera de ese ambito (aunque este en un grupo del coordinador) es
+--     indistinguible de uno inexistente: GEN_001.
+--   * DECANO (@idRegistro = Decano.id): los perfiles de IDENTIDAD/PERFILES_CORRECCION_DECANO; el administrador de la institucion
+--     de sus facultades.
 --   (Coordinador y docente se corrigen en sus SP de edicion: usp_actualizar_coordinador y
 --   usp_actualizar_docente_programa. El administrador no se corrige por la app.)
 --   * El motivo es obligatorio (1..500 caracteres, sin espacios extremos): IDE_001.
@@ -43,8 +45,11 @@ AS
     DECLARE @idCorrelacionDefecto     UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idCorrelacion, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
     DECLARE @idRegistroDefecto        UNIQUEIDENTIFIER = dbo.ufn_obtener_parametro_guid(@idRegistro, 'GENERAL', 'GUID_DEFECTO_CORRELACION');
     DECLARE @esDecano                 BIT = IIF(@tipoUsuario = 'DECANO', 1, 0);
-    -- Perfil que puede corregir cada tipo de registro (NULL => tipo no soportado, lo rechaza el RBAC).
-    DECLARE @perfilRequerido          VARCHAR(50) = CASE @tipoUsuario WHEN 'ESTUDIANTE' THEN 'COORDINADOR' WHEN 'DECANO' THEN 'ADMINISTRADOR' END;
+    -- Perfiles que pueden corregir cada tipo de registro, desde parametros (CULM-001 D.4, OBS-6): lista separada por comas;
+    -- NULL => tipo no soportado, lo rechaza el paso 3. El ambito de cada perfil se evalua por datos, sin nombrar perfiles.
+    DECLARE @perfilRequerido          VARCHAR(200) = NULLIF(TRIM(CASE @tipoUsuario
+                                          WHEN 'ESTUDIANTE' THEN dbo.ufn_obtener_parametro('IDENTIDAD', 'PERFILES_CORRECCION_ESTUDIANTE')
+                                          WHEN 'DECANO' THEN dbo.ufn_obtener_parametro('IDENTIDAD', 'PERFILES_CORRECCION_DECANO') END), '');
     DECLARE @tipoRecurso              VARCHAR(120) = IIF(@esDecano = 1, 'Decano', 'Estudiante');
     DECLARE @accionAuditoria          VARCHAR(120) = IIF(@esDecano = 1, 'CORREGIR_IDENTIDAD_DECANO', 'CORREGIR_IDENTIDAD_ESTUDIANTE');
     DECLARE @rutaAuditoria            NVARCHAR(240) = IIF(@esDecano = 1, N'/api/v1/admin/decanos/{id}/identidad',
@@ -136,13 +141,23 @@ BEGIN
             -- Ambito por jerarquia, en tablas base.
             SELECT @idUsuarioRegistro = u.id
             FROM dbo.Usuario u WITH (UPDLOCK, HOLDLOCK)
-            WHERE (@esDecano = 0 AND EXISTS (
+            WHERE (@esDecano = 0 AND (EXISTS (
+                      -- Ambito del coordinador: estudiante de un programa que el ejecutor coordina
                       SELECT 1
                       FROM dbo.Estudiante e
                       INNER JOIN dbo.EstudiantePrograma ep ON ep.estudiante = e.id
                       INNER JOIN dbo.Programa p ON p.id = ep.programa
                       INNER JOIN dbo.Coordinador c ON c.id = p.coordinador
-                      WHERE e.id = @idRegistroDefecto AND e.usuario = u.id AND c.usuario = @idUsuarioEjecutorDefecto))
+                      WHERE e.id = @idRegistroDefecto AND e.usuario = u.id AND c.usuario = @idUsuarioEjecutorDefecto)
+                  OR EXISTS (
+                      -- Ambito del administrador: estudiante de un programa de la institucion del ejecutor
+                      SELECT 1
+                      FROM dbo.Estudiante e
+                      INNER JOIN dbo.EstudiantePrograma ep ON ep.estudiante = e.id
+                      INNER JOIN dbo.Programa p ON p.id = ep.programa
+                      INNER JOIN dbo.Facultad f ON f.id = p.facultad
+                      INNER JOIN dbo.Administrador a ON a.institucion = f.institucion
+                      WHERE e.id = @idRegistroDefecto AND e.usuario = u.id AND a.usuario = @idUsuarioEjecutorDefecto)))
                OR (@esDecano = 1 AND EXISTS (
                       SELECT 1
                       FROM dbo.Decano d
