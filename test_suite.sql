@@ -108,6 +108,7 @@ PRINT '======================================================================';
 :r /tmp/test/test_usp_matricular_estudiante_por_token.sql
 :r /tmp/test/test_culm001_a_retiro_solicitudes.sql
 :r /tmp/test/test_culm001_a_correcciones.sql
+:r /tmp/test/test_culm001_a_fixture_segundo_ambito.sql
 
 IF @@TRANCOUNT <> 0
 BEGIN
