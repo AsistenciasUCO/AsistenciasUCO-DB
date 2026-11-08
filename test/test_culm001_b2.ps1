@@ -91,6 +91,35 @@ SELECT TOP 1 @a = da.asistencia, @s = t.sesion, @t1 = t.id, @d = da.id
 FROM dbo.DetalleAsistencia da INNER JOIN dbo.TomaAsistencia t ON t.id = da.toma
 WHERE t.numero = 1 AND NOT EXISTS (SELECT 1 FROM dbo.TomaAsistencia t2 WHERE t2.sesion = t.sesion AND t2.numero > 1)
 ORDER BY da.id;
+IF @a IS NULL
+BEGIN
+    DECLARE @eg UNIQUEIDENTIFIER;
+    SELECT TOP 1 @s = s.id, @eg = eg.id
+    FROM dbo.Sesion s
+    INNER JOIN dbo.EstudianteGrupo eg ON eg.grupo = s.grupo
+    WHERE NOT EXISTS (SELECT 1 FROM dbo.TomaAsistencia t WHERE t.sesion = s.id AND t.numero > 1)
+    ORDER BY s.id;
+
+    IF @s IS NOT NULL AND @eg IS NOT NULL
+    BEGIN
+        SELECT TOP 1 @t1 = t.id FROM dbo.TomaAsistencia t WHERE t.sesion = @s AND t.numero = 1;
+        IF @t1 IS NULL
+        BEGIN
+            SET @t1 = NEWID();
+            INSERT INTO dbo.TomaAsistencia (id, sesion, numero, modo, estado, esImplicita, docenteApertura, fechaAperturaUtc, fechaCierreUtc, idCorrelacionApertura)
+            VALUES (@t1, @s, 1, (SELECT TOP 1 id FROM dbo.ModoTomaAsistencia WHERE usaCodigoQr = 0), (SELECT TOP 1 id FROM dbo.EstadoTomaAsistencia WHERE estaAbierta = 0), 1, NULL, SYSUTCDATETIME(), SYSUTCDATETIME(), NEWID());
+        END
+        SELECT TOP 1 @a = a.id FROM dbo.Asistencia a WHERE a.sesion = @s AND a.estudianteGrupo = @eg;
+        IF @a IS NULL
+        BEGIN
+            SET @a = NEWID();
+            INSERT INTO dbo.Asistencia (id, sesion, estudianteGrupo) VALUES (@a, @s, @eg);
+        END
+        SET @d = NEWID();
+        INSERT INTO dbo.DetalleAsistencia (id, codigo, asistencia, asistio, razonCausa, fechaHoraInicio, fechaHoraFin, toma, registradoPorEstudiante, fechaRegistroUtc)
+        VALUES (@d, NEXT VALUE FOR dbo.seq_detalle_asistencia_codigo, @a, 1, (SELECT TOP 1 id FROM dbo.RazonCausa WHERE codigo = N'AN'), SYSUTCDATETIME(), DATEADD(HOUR, 1, SYSUTCDATETIME()), @t1, 0, SYSUTCDATETIME());
+    END
+END
 IF @a IS NULL THROW 57760, 'MIG_COLAPSO_SIN_DATOS', 1;
 UPDATE dbo.DetalleAsistencia SET razonCausa = (SELECT id FROM dbo.RazonCausa WHERE codigo = N'AN'), asistio = 1 WHERE id = @d;
 INSERT INTO dbo.TomaAsistencia (id, sesion, numero, modo, estado, esImplicita, docenteApertura, fechaAperturaUtc, fechaCierreUtc, idCorrelacionApertura)
