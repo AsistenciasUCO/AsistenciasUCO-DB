@@ -196,7 +196,7 @@ SELECT CONCAT('CHECK|',
     if ($errs.Count -gt 0) { throw "errors: $(($errs | Select-Object -First 5) -join ' / ')" }
     if ($ok1 -ne $expected -or $ok2 -ne $expected -or $times.Count -ne $expected) { throw "round1 AQR_009=$ok1 round2 AQR_008=$ok2 timings=$($times.Count) (expected $expected)" }
     if ($state.Count -ne 1 -or $state[0] -ne "CHECK|$expected|0|0|$expected") { throw "unexpected final state $($state -join ';')" }
-    Write-Host 'TEST_PASS:CULM001_B2_CON_01_5X40'
+    Write-Output 'TEST_PASS:CULM001_B2_CON_01_5X40'
 }
 catch { $failures += "CULM001_B2_CON_01_5X40 $($_.Exception.Message)" }
 finally {
@@ -208,6 +208,6 @@ finally {
     $null = & docker exec -u 0 $ContainerName rm -rf $remoteDir 2>&1
     Remove-Item -Recurse -Force -Path $localDir -ErrorAction SilentlyContinue
 }
-foreach ($f in $failures) { Write-Host "TEST FAILED: $f" }
+foreach ($f in $failures) { Write-Output "TEST FAILED: $f" }
 if ($failures.Count -gt 0) { exit 1 }
 exit 0

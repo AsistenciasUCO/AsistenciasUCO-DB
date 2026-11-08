@@ -322,9 +322,9 @@ finally {
         $cleanupErrors += 'attendance worker file cleanup raised an exception'
     }
     if ($concurrencySession) {
-        $cleanupSql = "SET NOCOUNT ON; DELETE d FROM dbo.DetalleAsistencia d JOIN dbo.Asistencia a ON a.id = d.asistencia WHERE a.sesion = '$concurrencySession'; DELETE FROM dbo.Asistencia WHERE sesion = '$concurrencySession'; DELETE FROM dbo.Sesion WHERE id = '$concurrencySession';"
+        $cleanupSql = "SET NOCOUNT ON; SET QUOTED_IDENTIFIER ON; DELETE tk FROM dbo.TokenAsistenciaToma tk INNER JOIN dbo.TomaAsistencia t ON t.id = tk.toma WHERE t.sesion = '$concurrencySession'; DELETE FROM dbo.DetalleAsistencia WHERE toma IN (SELECT id FROM dbo.TomaAsistencia WHERE sesion = '$concurrencySession'); DELETE FROM dbo.TomaAsistencia WHERE sesion = '$concurrencySession'; DELETE d FROM dbo.DetalleAsistencia d JOIN dbo.Asistencia a ON a.id = d.asistencia WHERE a.sesion = '$concurrencySession'; DELETE FROM dbo.Asistencia WHERE sesion = '$concurrencySession'; DELETE FROM dbo.Sesion WHERE id = '$concurrencySession';"
         try {
-            docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $Password -C -Q $cleanupSql | Out-Null
+            docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $Password -C -I -b -Q $cleanupSql | Out-Null
             if ($LASTEXITCODE -ne 0) { $cleanupErrors += 'attendance SQL cleanup returned a non-zero exit code' }
         }
         catch {
@@ -355,21 +355,25 @@ ORDER BY g.cuposDisponibles DESC;
     if ($LASTEXITCODE -ne 0 -or $d06Setup.Count -ne 1) { throw "setup failed: $($d06Setup -join '; ')" }
     $d06Group = $d06Setup[0].Split('|')[0]
     $d06Owner = $d06Setup[0].Split('|')[1]
-    $d06WorkerSql = "SET NOCOUNT ON; DECLARE @i INT = 0; WHILE @i < 5 BEGIN DECLARE @corr UNIQUEIDENTIFIER = NEWID(); EXEC dbo.usp_crear_sesion_v2 @idGrupo = '$d06Group', @nombre = N'$d06Tag', @fechaHoraInicio = '2027-01-10T13:00:00', @fechaHoraFin = '2027-01-10T14:00:00', @idCorrelacion = @corr, @idUsuarioEjecutor = '$d06Owner'; SET @i += 1; END"
-    $d06Local = Join-Path ([System.IO.Path]::GetTempPath()) "utc_d06_concurrent_worker_$([guid]::NewGuid().ToString('N')).sql"
-    Set-Content -Path $d06Local -Value $d06WorkerSql -Encoding utf8 -NoNewline
-    docker cp $d06Local "${ContainerName}:/tmp/utc_d06_concurrent_worker.sql" | Out-Null
+    $d06WorkerSqlA = "SET NOCOUNT ON; DECLARE @i INT = 0; WHILE @i < 5 BEGIN DECLARE @corr UNIQUEIDENTIFIER = NEWID(); DECLARE @inicio DATETIME2 = DATEADD(HOUR, @i * 2, CAST('2027-01-10T08:00:00' AS DATETIME2)); DECLARE @fin DATETIME2 = DATEADD(HOUR, 1, @inicio); EXEC dbo.usp_crear_sesion_v2 @idGrupo = '$d06Group', @nombre = N'$d06Tag', @fechaHoraInicio = @inicio, @fechaHoraFin = @fin, @idCorrelacion = @corr, @idUsuarioEjecutor = '$d06Owner'; SET @i += 1; END"
+    $d06WorkerSqlB = "SET NOCOUNT ON; DECLARE @i INT = 0; WHILE @i < 5 BEGIN DECLARE @corr UNIQUEIDENTIFIER = NEWID(); DECLARE @inicio DATETIME2 = DATEADD(HOUR, (@i + 5) * 2, CAST('2027-01-10T08:00:00' AS DATETIME2)); DECLARE @fin DATETIME2 = DATEADD(HOUR, 1, @inicio); EXEC dbo.usp_crear_sesion_v2 @idGrupo = '$d06Group', @nombre = N'$d06Tag', @fechaHoraInicio = @inicio, @fechaHoraFin = @fin, @idCorrelacion = @corr, @idUsuarioEjecutor = '$d06Owner'; SET @i += 1; END"
+    $d06LocalA = Join-Path ([System.IO.Path]::GetTempPath()) "utc_d06_concurrent_worker_a_$([guid]::NewGuid().ToString('N')).sql"
+    $d06LocalB = Join-Path ([System.IO.Path]::GetTempPath()) "utc_d06_concurrent_worker_b_$([guid]::NewGuid().ToString('N')).sql"
+    Set-Content -Path $d06LocalA -Value $d06WorkerSqlA -Encoding utf8 -NoNewline
+    Set-Content -Path $d06LocalB -Value $d06WorkerSqlB -Encoding utf8 -NoNewline
+    docker cp $d06LocalA "${ContainerName}:/tmp/utc_d06_concurrent_worker_a.sql" | Out-Null
+    docker cp $d06LocalB "${ContainerName}:/tmp/utc_d06_concurrent_worker_b.sql" | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'could not copy D06 worker sql into container.' }
-    docker exec -u 0 $ContainerName chmod a+r /tmp/utc_d06_concurrent_worker.sql | Out-Null
-    Remove-Item -Path $d06Local -Force -ErrorAction SilentlyContinue
+    docker exec -u 0 $ContainerName chmod a+r /tmp/utc_d06_concurrent_worker_a.sql /tmp/utc_d06_concurrent_worker_b.sql | Out-Null
+    Remove-Item -Path $d06LocalA, $d06LocalB -Force -ErrorAction SilentlyContinue
     $d06Job = {
-        param($cn, $pw)
-        $output = @(& docker exec $cn /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $pw -C -b -h -1 -W -i /tmp/utc_d06_concurrent_worker.sql 2>&1)
+        param($cn, $pw, $file)
+        $output = @(& docker exec $cn /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $pw -C -b -h -1 -W -i $file 2>&1)
         if ($LASTEXITCODE -ne 0) { throw "sqlcmd failed: $($output -join '; ')" }
     }
     $d06Jobs = @(
-        (Start-Job -ScriptBlock $d06Job -ArgumentList $ContainerName, $Password),
-        (Start-Job -ScriptBlock $d06Job -ArgumentList $ContainerName, $Password)
+        (Start-Job -ScriptBlock $d06Job -ArgumentList $ContainerName, $Password, '/tmp/utc_d06_concurrent_worker_a.sql'),
+        (Start-Job -ScriptBlock $d06Job -ArgumentList $ContainerName, $Password, '/tmp/utc_d06_concurrent_worker_b.sql')
     )
     $d06Out = @(Receive-Job -Job $d06Jobs -Wait -AutoRemoveJob 2>&1)
     if ($d06Out | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] }) { throw "worker failed: $($d06Out -join '; ')" }
@@ -386,7 +390,7 @@ catch {
 finally {
     $cleanupErrors = @()
     try {
-        docker exec -u 0 $ContainerName rm -f /tmp/utc_d06_concurrent_worker.sql 2>$null | Out-Null
+        docker exec -u 0 $ContainerName rm -f /tmp/utc_d06_concurrent_worker_a.sql /tmp/utc_d06_concurrent_worker_b.sql 2>$null | Out-Null
         if ($LASTEXITCODE -ne 0) { $cleanupErrors += 'D06 worker file cleanup returned a non-zero exit code' }
     }
     catch {
@@ -394,7 +398,7 @@ finally {
     }
     if ($d06Group) {
         try {
-            docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $Password -C -Q "SET NOCOUNT ON; DELETE FROM dbo.Sesion WHERE grupo = '$d06Group' AND nombre = N'$d06Tag';" | Out-Null
+            docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $Password -C -I -b -Q "SET NOCOUNT ON; SET QUOTED_IDENTIFIER ON; DELETE tk FROM dbo.TokenAsistenciaToma tk INNER JOIN dbo.TomaAsistencia t ON t.id = tk.toma INNER JOIN dbo.Sesion s ON s.id = t.sesion WHERE s.grupo = '$d06Group' AND s.nombre = N'$d06Tag'; DELETE t FROM dbo.TomaAsistencia t INNER JOIN dbo.Sesion s ON s.id = t.sesion WHERE s.grupo = '$d06Group' AND s.nombre = N'$d06Tag'; DELETE sc FROM dbo.SesionCancelacion sc INNER JOIN dbo.Sesion s ON s.id = sc.sesion WHERE s.grupo = '$d06Group' AND s.nombre = N'$d06Tag'; DELETE FROM dbo.Sesion WHERE grupo = '$d06Group' AND nombre = N'$d06Tag';" | Out-Null
             if ($LASTEXITCODE -ne 0) { $cleanupErrors += 'D06 SQL cleanup returned a non-zero exit code' }
         }
         catch {
