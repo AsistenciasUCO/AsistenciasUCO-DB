@@ -65,6 +65,14 @@ $postFreezeNew = @( # added or extended (Sesion.sql gains the provenance column 
 )
 $culm001DManifestRel = 'docs/contracts/DB_CULM001_D_POST_FREEZE_MANIFEST.sha256'
 $culm001DNew = @( # CULM-001 D: fuentes nuevas por subpaquete (D.x agrega las suyas)
+    # D.4 admision de estudiantes (HU156)
+    'schema/stored-procedures/usp_admitir_estudiante.sql',
+    'schema/stored-procedures/usp_consultar_programas_institucion_paginado.sql',
+    'schema/security/rol_asistencias_runtime_culm001_d4.sql',
+    'schema/seed/54_culm001_d4_mensajes.sql',
+    'schema/seed/54_culm001_d4_parametros.sql',
+    'migrations/23_culm001_d4_admision_estudiantes_up.sql',
+    'migrations/23_culm001_d4_admision_estudiantes_down.sql',
     # D.1 plazo de excusas (HU026B)
     'schema/functions/ufn_calcular_fecha_limite_justificacion.sql',
     'schema/stored-procedures/usp_internal_validar_plazo_justificacion.sql',

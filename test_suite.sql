@@ -120,6 +120,8 @@ PRINT '======================================================================';
 :r /tmp/test/test_culm001_b2_tomas.sql
 :r /tmp/test/test_culm001_b2_horas.sql
 :r /tmp/test/test_culm001_b2_qr.sql
+-- CULM-001 D.4 (admision de estudiantes HU156): registro por nombre exacto (DEC-028, sin comodin)
+:r /tmp/test/test_culm001_d4_admision.sql
 -- CULM-001 D.1 (plazo de excusas HU026B): registro por nombre exacto (DEC-028, sin comodin)
 :r /tmp/test/test_culm001_d1_plazo_justificacion.sql
 

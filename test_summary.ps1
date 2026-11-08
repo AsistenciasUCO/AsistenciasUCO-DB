@@ -574,6 +574,18 @@ try {
 catch {
     $resultFailures += "CULM001_B2_RUNNER $($_.Exception.Message)"
 }
+# CULM-001 D.4: migracion 23 (up/down/up) en test/test_culm001_d4.ps1.
+$culm001D4Ids = @('CULM001_D4_12_UP_DOWN_UP')
+try {
+    $culm001D4Output = @(& (Join-Path $PSScriptRoot 'test/test_culm001_d4.ps1') -ContainerName $ContainerName -Password $Password 2>&1 | ForEach-Object { "$_" })
+    foreach ($line in $culm001D4Output) { Write-Host $line }
+    foreach ($id in $culm001D4Ids) {
+        if ($culm001D4Output -contains "TEST_PASS:$id") { $clientPassed += $id }
+        else { $resultFailures += "$id not reported by test_culm001_d4.ps1" }
+    }
+}
+catch {
+    $resultFailures += "CULM001_D4_RUNNER $($_.Exception.Message)"
 # CULM-001 D.1: migracion 20 (up/down/up) y proteccion del down (D-RB-01) en test/test_culm001_d1.ps1.
 $culm001D1Ids = @('CULM001_D1_11_UP_DOWN_UP', 'CULM001_D1_RB_01_DOWN_GUARD')
 try {
@@ -807,6 +819,11 @@ $criticalIds = @(
     'CULM001_B2_MIG_05_DOBLE_DESPLIEGUE', 'CULM001_B2_MIG_04_UP_DOWN_UP_15_16', 'CULM001_B2_MIG_03_COLAPSO_SIN_CONFIRMACION',
     'CULM001_B2_MIG_03_COLAPSO_CONFIRMADO', 'CULM001_B2_SEG_02_FIXTURES_REPETIBLES', 'CULM001_B2_TOM_10_CIERRE_AUTOMATICO_CONCURRENTE',
     'CULM001_B2_TOM_08_CIERRE_CONCURRENTE',
+    # CULM-001 D.4 (test/test_culm001_d4_admision.sql, test/test_culm001_d4.ps1)
+    'CULM001_D4_01_ALTA_NUEVA', 'CULM001_D4_02_PERSONA_EXISTENTE', 'CULM001_D4_03_YA_ADMITIDO', 'CULM001_D4_04_PERSONAS_DISTINTAS',
+    'CULM001_D4_05_PROGRAMA_FUERA_DE_AMBITO', 'CULM001_D4_06_CORREO_INSTITUCIONAL', 'CULM001_D4_07_CONTRASENA_INICIAL', 'CULM001_D4_08_RBAC',
+    'CULM001_D4_09_SIN_FILAS_PARCIALES', 'CULM001_D4_10_CORRECCION_POR_JERARQUIA', 'CULM001_D4_11_PROGRAMAS_PAGINADOS',
+    'CULM001_D4_11_ERRORES_DE_VALIDACION', 'CULM001_D4_12_UP_DOWN_UP',
     # CULM-001 D.1 (test/test_culm001_d1_plazo_justificacion.sql, test/test_culm001_d1.ps1)
     'CULM001_D1_07_FUNCION', 'CULM001_D1_01_RECIENTE', 'CULM001_D1_02_ULTIMO_DIA', 'CULM001_D1_03_VENCIDA', 'CULM001_D1_04_PARAMETRO',
     'CULM001_D1_05_V1', 'CULM001_D1_06_PROPIEDAD_ANTES_QUE_PLAZO', 'CULM001_D1_08_PARAMETRO_AUSENTE', 'CULM001_D1_09_FECHA_LOCAL',
