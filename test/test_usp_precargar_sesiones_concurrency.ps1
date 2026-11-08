@@ -28,7 +28,7 @@ function Invoke-ContainerSqlFile {
     if ($LASTEXITCODE -ne 0) { throw "could not copy SQL fixture: $($copyOutput -join '; ')" }
     $null = & docker exec -u 0 $ContainerName chmod a+r $RemotePath 2>&1
     if ($LASTEXITCODE -ne 0) { throw 'could not set SQL fixture read permissions.' }
-    $output = @(& docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $Password -C -b -h -1 -W -s '|' -t 60 -i $RemotePath 2>&1)
+    $output = @(& docker exec $ContainerName /opt/mssql-tools18/bin/sqlcmd -S localhost -d gestionasistenciadb -U sa -P $Password -C -I -b -h -1 -W -s '|' -t 60 -i $RemotePath 2>&1)
     $exitCode = $LASTEXITCODE
     if ($exitCode -ne 0) { throw "sqlcmd failed with exit code ${exitCode}: $($output -join '; ')" }
     return $output
@@ -169,6 +169,7 @@ finally {
     if ($groupId -and $periodId) {
         $cleanupSql = @"
 SET NOCOUNT ON;
+SET QUOTED_IDENTIFIER ON;
 -- CULM-001 B.2 ([SUPUESTO-B-20]): tokens, tomas y cancelaciones (festivos) de las sesiones del grupo antes de borrarlas
 DELETE tk FROM dbo.TokenAsistenciaToma tk INNER JOIN dbo.TomaAsistencia t ON t.id = tk.toma INNER JOIN dbo.Sesion s ON s.id = t.sesion WHERE s.grupo = '$groupId';
 DELETE t FROM dbo.TomaAsistencia t INNER JOIN dbo.Sesion s ON s.id = t.sesion WHERE s.grupo = '$groupId';

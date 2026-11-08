@@ -113,7 +113,7 @@ COMMIT TRANSACTION;
     $check = Invoke-ContainerSql -Name 'fes05_check' -Sql "SET NOCOUNT ON; SELECT CONCAT('FES05|', (SELECT COUNT(*) FROM dbo.DiaFestivo WHERE anio = 2099), '|', (SELECT COUNT(DISTINCT fecha) FROM dbo.DiaFestivo WHERE anio = 2099 AND estaActivo = 1), '|', (SELECT COUNT(*) FROM dbo.CargaDiaFestivo WHERE anio = 2099));" -AbortOnError
     $line = @($check.Lines | Where-Object { $_ -like 'FES05|*' })
     if ($line.Count -ne 1 -or $line[0] -ne 'FES05|19|19|2') { throw "unexpected final state: $($line -join ';')" }
-    Write-Host 'TEST_PASS:CULM001_B1_FES_05_CARGA_CONCURRENTE'
+    Write-Output 'TEST_PASS:CULM001_B1_FES_05_CARGA_CONCURRENTE'
 }
 catch { $failures += "CULM001_B1_FES_05_CARGA_CONCURRENTE $($_.Exception.Message)" }
 finally { try { $cr = Invoke-ContainerSql -Name 'fes05_cleanup' -Sql $cleanup2099 -AbortOnError; if ($cr.ExitCode -ne 0) { throw "cleanup exit $($cr.ExitCode): $($cr.Lines -join '; ')" } } catch { $failures += 'CULM001_B1_FES_05 cleanup failed' } }
@@ -156,7 +156,7 @@ SELECT CONCAT('FES07_AFTER|', @@TRANCOUNT, '|', (SELECT COUNT(*) FROM dbo.Grupo 
     if ($run2.Count -ne 1 -or $run2[0] -notmatch '\|DBCODE=GEN_004\|.*\|1\|0\|0$') { throw "second run tuple: $($run2 -join ';')" }
     if (@($res.Lines | Where-Object { $_ -eq 'FES07|20|2' }).Count -ne 1) { throw "expected 20 sessions and 2 cancelled: $text" }
     if (@($res.Lines | Where-Object { $_ -eq 'FES07_AFTER|0|0' }).Count -ne 1) { throw "rollback did not restore state: $text" }
-    Write-Host 'TEST_PASS:CULM001_B1_FES_07_TUPLA_CONTEOS'
+    Write-Output 'TEST_PASS:CULM001_B1_FES_07_TUPLA_CONTEOS'
 }
 catch { $failures += "CULM001_B1_FES_07_TUPLA_CONTEOS $($_.Exception.Message)" }
 
@@ -203,7 +203,7 @@ SELECT CONCAT('FES08A_STATE|', @@TRANCOUNT, '|', (SELECT COUNT(*) FROM dbo.Sesio
     if ($t.User -cne $expectedUser -or $t.Rest -notmatch '\|0\|NULL\|NULL$') { throw "expected SYS_001 tuple with estadoResultado = 0: $($rows[0])" }
     if (@($res.Lines | Where-Object { $_ -eq 'FES08A_STATE|0|0' }).Count -ne 1) { throw "expected @@TRANCOUNT = 0 and 0 sessions: $text" }
     if ($text -match 'Msg \d+, Level') { throw "the v2 raised an error to the caller without an external transaction: $text" }
-    Write-Host 'TEST_PASS:CULM001_B1_FES_08A_SIN_TRANSACCION_SYS001'
+    Write-Output 'TEST_PASS:CULM001_B1_FES_08A_SIN_TRANSACCION_SYS001'
 }
 catch { $failures += "CULM001_B1_FES_08A_SIN_TRANSACCION_SYS001 $($_.Exception.Message)" }
 finally {
@@ -253,7 +253,7 @@ SELECT CONCAT('FES08B2_STATE|', @@TRANCOUNT, '|', (SELECT COUNT(*) FROM dbo.Sesi
     if ($rows.Count -ne 0) { throw "the v2 returned a tuple with an external transaction: $($rows -join ';')" }
     if (@($res.Lines | Where-Object { $_ -eq 'FES08B2_XACT|-1' }).Count -ne 1) { throw "caller must see XACT_STATE() = -1: $text" }
     if (@($res.Lines | Where-Object { $_ -eq 'FES08B2_STATE|0|0|0' }).Count -ne 1) { throw "state after caller rollback: $text" }
-    Write-Host 'TEST_PASS:CULM001_B1_FES_08B2_SIN_TUPLA'
+    Write-Output 'TEST_PASS:CULM001_B1_FES_08B2_SIN_TUPLA'
 }
 catch { $failures += "CULM001_B1_FES_08B2_SIN_TUPLA $($_.Exception.Message)" }
 finally {
@@ -303,7 +303,7 @@ PRINT 'P_END';
         if ("$($caso.V1[0])|NULL|NULL" -cne $caso.V2[0]) { throw "tuple parity ($($caso.Nombre)): v1=[$($caso.V1[0])] v2=[$($caso.V2[0])]" }
     }
     if ($casos[1].V1[0] -notmatch '\|DBCODE=SEC_002\|') { throw "non-owner should be SEC_002: $($casos[1].V1[0])" }
-    Write-Host 'TEST_PASS:CULM001_B1_FES_08B_PARIDAD_TUPLA'
+    Write-Output 'TEST_PASS:CULM001_B1_FES_08B_PARIDAD_TUPLA'
 }
 catch { $failures += "CULM001_B1_FES_08B_PARIDAD_TUPLA $($_.Exception.Message)" }
 finally {
@@ -407,7 +407,7 @@ GO
         if ($text -notmatch $marker) { throw "missing $marker (exit $($res.ExitCode)): $text" }
     }
     if ($res.ExitCode -ne 0) { throw "sqlcmd exit $($res.ExitCode): $text" }
-    Write-Host 'TEST_PASS:CULM001_B1_MIG_01_UP_DOWN_UP'
+    Write-Output 'TEST_PASS:CULM001_B1_MIG_01_UP_DOWN_UP'
 }
 catch { $failures += "CULM001_B1_MIG_01_UP_DOWN_UP $($_.Exception.Message)" }
 finally {
@@ -421,6 +421,6 @@ finally {
 
 $null = & docker exec -u 0 $ContainerName rm -rf $remoteDir 2>&1
 Remove-Item -Recurse -Force -Path $localDir -ErrorAction SilentlyContinue
-foreach ($f in $failures) { Write-Host "TEST FAILED: $f" }
+foreach ($f in $failures) { Write-Output "TEST FAILED: $f" }
 if ($failures.Count -gt 0) { exit 1 }
 exit 0

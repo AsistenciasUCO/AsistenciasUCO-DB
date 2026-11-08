@@ -34,18 +34,18 @@ function Invoke-Sqlcmd-File([string]$file) {
 try {
     $r = Invoke-Sqlcmd-File 'test_culm001_d1_migraciones.sql'
     $missing = @(@('MIG_D1_DOWN_OK', 'MIG_D1_UP1_OK', 'MIG_D1_UP2_OK', 'MIG_D1_DOWN_UP_OK', 'MIG_D1_ROLLBACK_OK') | Where-Object { $r.Text -notmatch "(?m)^$_$" })
-    if ($missing.Count -eq 0 -and $r.ExitCode -eq 0) { Write-Host 'TEST_PASS:CULM001_D1_11_UP_DOWN_UP' }
+    if ($missing.Count -eq 0 -and $r.ExitCode -eq 0) { Write-Output 'TEST_PASS:CULM001_D1_11_UP_DOWN_UP' }
     else { $failures += "CULM001_D1_11_UP_DOWN_UP missing $($missing -join ',') (exit $($r.ExitCode)): $(($r.Lines | Where-Object { $_ -match 'Msg |MIG_|TEST' }) -join ' / ')" }
 
     $g = Invoke-Sqlcmd-File 'test_culm001_d1_down_guard.sql'
-    if ($g.Text -match '(?m)^DOWN_GUARD_STUB_OK$' -and $g.Text -notmatch 'DOWN_GUARD_NOT_ENFORCED' -and $g.Text -match '50020') { Write-Host 'TEST_PASS:CULM001_D1_RB_01_DOWN_GUARD' }
+    if ($g.Text -match '(?m)^DOWN_GUARD_STUB_OK$' -and $g.Text -notmatch 'DOWN_GUARD_NOT_ENFORCED' -and $g.Text -match '50020') { Write-Output 'TEST_PASS:CULM001_D1_RB_01_DOWN_GUARD' }
     else { $failures += "CULM001_D1_RB_01_DOWN_GUARD (exit $($g.ExitCode)): $(($g.Lines | Where-Object { $_ -match 'Msg |DOWN_GUARD|CULM001|50020' }) -join ' / ')" }
 }
 catch { $failures += "CULM001_D1_RUNNER $($_.Exception.Message)" }
 finally { $null = & docker exec -u 0 $ContainerName rm -rf $remoteDir 2>&1 }
 
 if ($failures.Count -gt 0) {
-    $failures | ForEach-Object { Write-Host "TEST FAILED: $_" }
+    $failures | ForEach-Object { Write-Output "TEST FAILED: $_" }
     exit 1
 }
 exit 0

@@ -66,7 +66,7 @@ try {
     foreach ($id in @('CULM001_B2_MIG_03_DOWN_RESTAURA', 'CULM001_B2_MIG_01_UP_CON_DATOS', 'CULM001_B2_MIG_02_UP_IDEMPOTENTE',
                       'CULM001_B2_MIG_05_DOBLE_DESPLIEGUE', 'CULM001_B2_MIG_04_UP_DOWN_UP_15_16')) {
         $missing = @($marks[$id] | Where-Object { $text -notmatch "(?m)^$_$" })
-        if ($missing.Count -eq 0 -and ($exit -eq 0 -or $id -ne 'CULM001_B2_MIG_04_UP_DOWN_UP_15_16')) { Write-Host "TEST_PASS:$id" }
+        if ($missing.Count -eq 0 -and ($exit -eq 0 -or $id -ne 'CULM001_B2_MIG_04_UP_DOWN_UP_15_16')) { Write-Output "TEST_PASS:$id" }
         else { $failures += "$id missing $($missing -join ',') (exit $exit): $(($lines | Where-Object { $_ -match 'Msg |MIG_|TEST' }) -join ' / ')" }
     }
 }
@@ -123,7 +123,7 @@ GO
     }
     $check = Invoke-ContainerSql -Name 'mig16_colapso_sin_check' -Sql "SET NOCOUNT ON; SELECT CONCAT('COLSIN|', IIF(OBJECT_ID(N'dbo.TomaAsistencia', N'U') IS NULL, 0, 1), '|', (SELECT COUNT(*) FROM dbo.TomaAsistencia WHERE numero > 1 AND idCorrelacionCierre IS NULL AND docenteApertura IS NULL AND esImplicita = 0), '|', IIF(OBJECT_ID(N'dbo.zz_archivo_DetalleAsistencia_culm001_b2', N'U') IS NULL, 0, 1));" -AbortOnError
     if (@($check.Lines | Where-Object { $_ -eq 'COLSIN|1|0|0' }).Count -ne 1) { throw "state after aborted down: $($check.Lines -join ';')" }
-    Write-Host 'TEST_PASS:CULM001_B2_MIG_03_COLAPSO_SIN_CONFIRMACION'
+    Write-Output 'TEST_PASS:CULM001_B2_MIG_03_COLAPSO_SIN_CONFIRMACION'
 }
 catch { $failures += "CULM001_B2_MIG_03_COLAPSO_SIN_CONFIRMACION $($_.Exception.Message)" }
 
@@ -158,7 +158,7 @@ GO
     $res = Invoke-ContainerSql -Name 'mig16_colapso_con' -Sql $sql
     $text = $res.Lines -join "`n"
     if ($text -notmatch 'COLAPSO_CONFIRMADO_OK' -or $text -notmatch 'COLAPSO_RESTAURADO_OK' -or $res.ExitCode -ne 0) { throw "exit $($res.ExitCode): $text" }
-    Write-Host 'TEST_PASS:CULM001_B2_MIG_03_COLAPSO_CONFIRMADO'
+    Write-Output 'TEST_PASS:CULM001_B2_MIG_03_COLAPSO_CONFIRMADO'
 }
 catch { $failures += "CULM001_B2_MIG_03_COLAPSO_CONFIRMADO $($_.Exception.Message)" }
 
@@ -220,7 +220,7 @@ GO
     $text = $res.Lines -join "`n"
     foreach ($m in @('SEG02_MAINT_OK', 'SEG02_DEV_OK', 'SEG02_RESTORED_OK')) { if ($text -notmatch $m) { throw "missing $m (exit $($res.ExitCode)): $(($res.Lines | Where-Object { $_ -match 'Msg |SEG02|Level' }) -join ' / ')" } }
     if ($res.ExitCode -ne 0) { throw "exit $($res.ExitCode)" }
-    Write-Host 'TEST_PASS:CULM001_B2_SEG_02_FIXTURES_REPETIBLES'
+    Write-Output 'TEST_PASS:CULM001_B2_SEG_02_FIXTURES_REPETIBLES'
 }
 catch { $failures += "CULM001_B2_SEG_02_FIXTURES_REPETIBLES $($_.Exception.Message)" }
 
@@ -324,7 +324,7 @@ SELECT CONCAT('TOM10|', (SELECT COUNT(*) FROM dbo.TomaAsistencia t INNER JOIN db
     '|', (SELECT COUNT(*) FROM (SELECT da.asistencia, da.toma FROM dbo.DetalleAsistencia da GROUP BY da.asistencia, da.toma HAVING COUNT(*) > 1) x));
 "@ -AbortOnError
     if (@($check.Lines | Where-Object { $_ -eq 'TOM10|0|12|0' }).Count -ne 1) { throw "unexpected final state: $($check.Lines -join ';')" }
-    Write-Host 'TEST_PASS:CULM001_B2_TOM_10_CIERRE_AUTOMATICO_CONCURRENTE'
+    Write-Output 'TEST_PASS:CULM001_B2_TOM_10_CIERRE_AUTOMATICO_CONCURRENTE'
 }
 catch { $failures += "CULM001_B2_TOM_10_CIERRE_AUTOMATICO_CONCURRENTE $($_.Exception.Message)" }
 
@@ -368,7 +368,7 @@ SELECT CONCAT('TOM08|', (SELECT COUNT(*) FROM dbo.TomaAsistencia t INNER JOIN db
     if ($p[1] -ne '1' -or $p[2] -ne '0' -or $p[3] -ne $p[4] -or ($p[3] -ne '0' -and $p[3] -ne '3')) { throw "unexpected final state $($line[0])" }
     $docTuple = @($results | ForEach-Object { $_.Lines } | Where-Object { $_ -match '\|DBCODE=TOM_0(09|11)\|' })
     if ($docTuple.Count -ne 1) { throw "docente tuple not found: $($results | ForEach-Object { $_.Lines })" }
-    Write-Host 'TEST_PASS:CULM001_B2_TOM_08_CIERRE_CONCURRENTE'
+    Write-Output 'TEST_PASS:CULM001_B2_TOM_08_CIERRE_CONCURRENTE'
 }
 catch { $failures += "CULM001_B2_TOM_08_CIERRE_CONCURRENTE $($_.Exception.Message)" }
 finally {
@@ -381,6 +381,6 @@ finally {
 
 $null = & docker exec -u 0 $ContainerName rm -rf $remoteDir 2>&1
 Remove-Item -Recurse -Force -Path $localDir -ErrorAction SilentlyContinue
-foreach ($f in $failures) { Write-Host "TEST FAILED: $f" }
+foreach ($f in $failures) { Write-Output "TEST FAILED: $f" }
 if ($failures.Count -gt 0) { exit 1 }
 exit 0
