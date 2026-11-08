@@ -586,6 +586,18 @@ try {
 }
 catch {
     $resultFailures += "CULM001_D3_RUNNER $($_.Exception.Message)"
+# CULM-001 D.1: migracion 20 (up/down/up) y proteccion del down (D-RB-01) en test/test_culm001_d1.ps1.
+$culm001D1Ids = @('CULM001_D1_11_UP_DOWN_UP', 'CULM001_D1_RB_01_DOWN_GUARD')
+try {
+    $culm001D1Output = @(& (Join-Path $PSScriptRoot 'test/test_culm001_d1.ps1') -ContainerName $ContainerName -Password $Password 2>&1 | ForEach-Object { "$_" })
+    foreach ($line in $culm001D1Output) { Write-Host $line }
+    foreach ($id in $culm001D1Ids) {
+        if ($culm001D1Output -contains "TEST_PASS:$id") { $clientPassed += $id }
+        else { $resultFailures += "$id not reported by test_culm001_d1.ps1" }
+    }
+}
+catch {
+    $resultFailures += "CULM001_D1_RUNNER $($_.Exception.Message)"
 }
 # CULM-001 B.2 (B2-CON-01, NB-4): 5 grupos x 40 estudiantes por token a la vez; solo bajo demanda (-Concurrencia).
 if ($Concurrencia) {
@@ -817,6 +829,11 @@ $criticalIds = @(
     'CULM001_D6_00_OBJETOS_Y_SEMILLAS', 'CULM001_D6_04_SIN_FILTROS_NUEVOS', 'CULM001_D6_01_FILTRO_CORRELACION', 'CULM001_D6_02_SOLO_ADMINISTRACION',
     'CULM001_D6_03_FILTROS_EXCLUYENTES', 'CULM001_D6_05_PARAMETROS_EXPLICITOS', 'CULM001_D6_RBAC', 'CULM001_D6_06_DOS_INSTITUCIONES',
     'CULM001_D6_TRANCOUNT_ZERO', 'CULM001_D6_MIG_01_UP_DOWN_UP'
+    # CULM-001 D.1 (test/test_culm001_d1_plazo_justificacion.sql, test/test_culm001_d1.ps1)
+    'CULM001_D1_07_FUNCION', 'CULM001_D1_01_RECIENTE', 'CULM001_D1_02_ULTIMO_DIA', 'CULM001_D1_03_VENCIDA', 'CULM001_D1_04_PARAMETRO',
+    'CULM001_D1_05_V1', 'CULM001_D1_06_PROPIEDAD_ANTES_QUE_PLAZO', 'CULM001_D1_08_PARAMETRO_AUSENTE', 'CULM001_D1_09_FECHA_LOCAL',
+    'CULM001_D1_12_REINTENTO_IDEMPOTENTE', 'CULM001_D1_10_SESIONES_MATERIA_ESTUDIANTE', 'CULM001_D1_10_ERRORES_DE_VALIDACION', 'CULM001_D1_SEG_PERMISOS',
+    'CULM001_D1_03_AUTOCOMMIT', 'CULM001_D1_11_UP_DOWN_UP', 'CULM001_D1_RB_01_DOWN_GUARD'
 )
 if ($Concurrencia) { $criticalIds += 'CULM001_B2_CON_01_5X40' }
 $sqlPasses = @([regex]::Matches($outputStr, '(?m)^TEST_PASS:([A-Z0-9_]+)\s*$') | ForEach-Object { $_.Groups[1].Value })

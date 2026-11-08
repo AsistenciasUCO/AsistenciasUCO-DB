@@ -12,7 +12,7 @@ generated-by: scripts/generar-catalogo-mensajes.ps1
 
 Uso en SP: `EXEC dbo.usp_obtener_mensaje_catalogo @p_codigo = '<CODIGO>', @p_param1 = ...`. Los marcadores `{}` / `{0}` se reemplazan con los parámetros. El mensaje técnico se entrega como `DBCODE=<CODIGO>|<texto>` (ver `docs/contracts/DB_BASELINE_CONTRACT.md`).
 
-Total de códigos: **210**.
+Total de códigos: **212**.
 
 ## AQR
 
@@ -330,6 +330,8 @@ Total de códigos: **210**.
 | `REV_006` | BUSINESS_ERROR | MEDIO | La solicitud de revisión no existe. | Ambito: la solicitud de revision [{}] no existe o no es del estudiante ejecutor; sin escrituras. | `33_culm001_a_mensajes.sql` |
 | `REV_007` | BUSINESS_ERROR | MEDIO | Solo se puede retirar una solicitud de revisión pendiente. | Regla: la solicitud de revision [{}] no esta en el estado de RECLAMO/ESTADO_PENDIENTE; sin escrituras. | `33_culm001_a_mensajes.sql` |
 | `REV_008` | SUCCESS | BAJO | La solicitud de revisión fue retirada. | Actualizacion: la solicitud de revision [{}] paso al estado de RECLAMO/ESTADO_RETIRADO. | `33_culm001_a_mensajes.sql` |
+| `REV_020` | BUSINESS_ERROR | MEDIO | El plazo para justificar esta inasistencia venció el {}. | HU026B: instante {} >= límite {} (ASISTENCIA/DIAS_LIMITE_JUSTIFICACION={}). | `51_culm001_d1_mensajes.sql` |
+| `REV_025` | TECHNICAL_ERROR | ALTO | No es posible validar el plazo de justificación en este momento. | HU026B: falta ASISTENCIA/DIAS_LIMITE_JUSTIFICACION o TIEMPO/ZONA_HORARIA_SQLSERVER. | `51_culm001_d1_mensajes.sql` |
 
 ## SEC
 
