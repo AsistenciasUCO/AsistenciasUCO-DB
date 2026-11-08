@@ -71,7 +71,9 @@ DECLARE @number INT = 1 + (SELECT ISNULL(MAX(numero), 0) FROM dbo.Sesion WHERE g
 DECLARE @number2 INT = 1 + (SELECT ISNULL(MAX(numero), 0) FROM dbo.Sesion WHERE grupo = @group2);
 DECLARE @sessionCode NVARCHAR(50) = LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8);
 DECLARE @sessionCode2 NVARCHAR(50) = LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8);
-DECLARE @inicioSesion DATETIME2(7) = '2026-10-19T15:30:45.1234567';
+-- CULM-001 D.1 (HU026B): la radicacion exige estar dentro del plazo de excusas; la sesion se ubica ayer (UTC) con la misma
+-- hora y fraccion de 7 digitos que antes (la prueba UTC_V2_DATETIME2_7 conserva la precision). Contrato D §2.2, DEC-044 (11).
+DECLARE @inicioSesion DATETIME2(7) = CAST(CONCAT(CONVERT(CHAR(10), DATEADD(DAY, -1, SYSUTCDATETIME()), 23), 'T15:30:45.1234567') AS DATETIME2(7));
 
 DECLARE @corr UNIQUEIDENTIFIER, @userMsg NVARCHAR(4000), @techMsg NVARCHAR(4000);
 DECLARE @file1 UNIQUEIDENTIFIER = NEWID(), @file2 UNIQUEIDENTIFIER = NEWID(), @fileB UNIQUEIDENTIFIER = NEWID();
